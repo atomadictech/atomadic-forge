@@ -28,7 +28,12 @@ from ..a1_at_functions.forge_feedback import (
     system_prompt,
 )
 from ..a1_at_functions.llm_client import LLMClient, resolve_default_client
+from ..a1_at_functions.scaffold_pyproject import render_pyproject
+from ..a1_at_functions.scaffold_starter import (
+    render_gitignore, render_readme, render_tests_conftest, render_tests_init,
+)
 from ..a1_at_functions.scout_walk import harvest_repo
+from ..a1_at_functions.tier_init_rebuild import rebuild_tier_inits
 from ..a1_at_functions.wire_check import scan_violations
 from ..a2_mo_composites.manifest_store import ManifestStore
 
@@ -39,7 +44,16 @@ except Exception:  # noqa: BLE001
     _HAS_EMERGENT = False
 
 
-def _scaffold_package(output: Path, package: str) -> Path:
+def _scaffold_package(output: Path, package: str, *,
+                      intent: str = "") -> Path:
+    """Scaffold a complete, pip-installable Python package skeleton.
+
+    Creates: 5 tier directories with ``__init__.py``s, a real
+    ``pyproject.toml`` rooted at ``output/``, ``README.md`` summarising
+    the intent, ``.gitignore``, and ``tests/`` with a conftest that adds
+    ``src/`` to ``sys.path``.  After this runs, ``pip install -e <output>``
+    works and the LLM only has to emit the actual code.
+    """
     pkg_root = output / "src" / package
     for tier in TIER_NAMES:
         d = pkg_root / tier
@@ -50,6 +64,38 @@ def _scaffold_package(output: Path, package: str) -> Path:
         f'__version__ = "0.0.1"\n',
         encoding="utf-8",
     )
+
+    # Top-level scaffolds — only write if absent so re-runs don't clobber
+    # an LLM-improved README.
+    pyproject = output / "pyproject.toml"
+    if not pyproject.exists():
+        pyproject.write_text(
+            render_pyproject(
+                package=package,
+                description=(intent or "")[:120].strip() or f"{package} package",
+                console_script_target="a4_sy_orchestration.cli:main",
+            ),
+            encoding="utf-8",
+        )
+    readme = output / "README.md"
+    if not readme.exists():
+        readme.write_text(
+            render_readme(package=package, intent=intent or "(unspecified)"),
+            encoding="utf-8",
+        )
+    gi = output / ".gitignore"
+    if not gi.exists():
+        gi.write_text(render_gitignore(), encoding="utf-8")
+
+    tests_dir = output / "tests"
+    tests_dir.mkdir(exist_ok=True)
+    init = tests_dir / "__init__.py"
+    if not init.exists():
+        init.write_text(render_tests_init(), encoding="utf-8")
+    cf = tests_dir / "conftest.py"
+    if not cf.exists():
+        cf.write_text(render_tests_conftest(package=package), encoding="utf-8")
+
     return pkg_root
 
 
@@ -118,7 +164,8 @@ def run_iterate(
     output = Path(output).resolve()
     output.mkdir(parents=True, exist_ok=True)
     llm = llm or resolve_default_client()
-    pkg_root = _scaffold_package(output, package) if apply else output / "src" / package
+    pkg_root = (_scaffold_package(output, package, intent=intent)
+                if apply else output / "src" / package)
 
     # Optional seed catalog from a sibling repo.
     seed_catalog: list[dict] = []
@@ -161,6 +208,8 @@ def run_iterate(
         files = parse_files_from_response(response)
         parse_retried = True
     written = _write_files(output, files)
+    if pkg_root.exists():
+        rebuild_tier_inits(pkg_root)
     history_files.extend(written)
     transcript.append({"turn": 0, "prompt": prompt, "files_written": written,
                         "raw_response_chars": len(response),
