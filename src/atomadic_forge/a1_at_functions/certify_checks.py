@@ -6,6 +6,7 @@ import time
 from pathlib import Path
 
 from ..a0_qk_constants.tier_names import TIER_NAMES
+from .stub_detector import detect_stubs, stub_penalty
 from .wire_check import scan_violations
 
 
@@ -55,6 +56,16 @@ def certify(root: Path, *, project: str = "Atomadic project",
     layout_ok, layout_d = check_tier_layout(root, package)
     wire_ok, wire_d = check_no_upward_imports(root, package)
 
+    # Stub-body detection: scan the package itself (where generated code lives)
+    src_for_stubs = root / "src"
+    if package and (src_for_stubs / package).exists():
+        src_for_stubs = src_for_stubs / package
+    elif not src_for_stubs.exists():
+        src_for_stubs = root
+    stub_findings = detect_stubs(package_root=src_for_stubs)
+    stub_pen = stub_penalty(stub_findings)
+    no_stubs = stub_pen == 0
+
     issues: list[str] = []
     recs: list[str] = []
     if not docs_ok:
@@ -69,8 +80,17 @@ def certify(root: Path, *, project: str = "Atomadic project",
     if not wire_ok:
         issues.append(f"Upward-import violations: {wire_d['violation_count']}")
         recs.append("Run `forge wire --apply` to auto-fix where unambiguous.")
+    if not no_stubs:
+        issues.append(f"Stub bodies detected: {len(stub_findings)} "
+                       "function(s) with `pass`/NotImplementedError/TODO")
+        for f in stub_findings[:5]:
+            issues.append(f"  · {f['file']}:{f['lineno']} {f['qualname']} ({f['kind']})")
+        recs.append("Replace stub bodies with real implementations before shipping.")
 
-    score = max(0.0, 100.0 - 25.0 * len(issues))
+    base_score = max(0.0, 100.0 - 25.0 * len(
+        [x for x in (not docs_ok, not tests_ok, not layout_ok, not wire_ok) if x]
+    ))
+    score = max(0.0, base_score - stub_pen)
     return {
         "schema_version": "atomadic-forge.certify/v1",
         "project": project,
@@ -79,9 +99,12 @@ def certify(root: Path, *, project: str = "Atomadic project",
         "tests_present": tests_ok,
         "tier_layout_present": layout_ok,
         "no_upward_imports": wire_ok,
+        "no_stub_bodies": no_stubs,
         "score": score,
         "issues": issues,
         "recommendations": recs,
-        "detail": {"docs": docs_d, "tests": tests_d,
-                   "layout": layout_d, "wire": wire_d},
+        "detail": {"docs": docs_d, "tests": tests_d, "layout": layout_d,
+                   "wire": wire_d,
+                   "stubs": {"count": len(stub_findings),
+                             "findings": stub_findings[:20]}},
     }

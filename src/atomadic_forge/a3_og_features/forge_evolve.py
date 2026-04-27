@@ -41,11 +41,16 @@ def run_evolve(
     iterations_per_round: int = 4,
     target_score: float = 75.0,
     stop_on_regression: bool = False,
+    stagnation_threshold: int = 3,
 ) -> dict[str, Any]:
     """Recursive iterate.
 
     The growing package itself becomes the seed for the next round, so the
     LLM sees its own prior output as building blocks the next time around.
+
+    ``stagnation_threshold`` halts evolve when the score AND symbol count
+    are unchanged for that many consecutive rounds — saves tokens when the
+    LLM is stuck re-emitting the same files.  Set to 0 to disable.
     """
     output = Path(output).resolve()
     output.mkdir(parents=True, exist_ok=True)
@@ -56,6 +61,8 @@ def run_evolve(
     last_symbol_count = 0
     last_score = 0.0
     current_seed = Path(seed_repo) if seed_repo else None
+    stagnant_streak = 0
+    halt_reason: str | None = None
 
     for round_idx in range(rounds):
         report = run_iterate(
@@ -87,11 +94,24 @@ def run_evolve(
         }
         rounds_log.append(round_record)
 
-        # Convergence checks
+        # Stagnation tracking — flat score AND flat catalog vs. previous round.
+        if round_idx > 0 and delta == 0 and abs(round_record["delta_score"]) < 0.5:
+            stagnant_streak += 1
+        else:
+            stagnant_streak = 0
+        round_record["stagnant_streak"] = stagnant_streak
+
+        # Convergence checks (in priority order)
         if report.get("converged") and delta == 0:
+            halt_reason = "converged"
             break
         if stop_on_regression and round_idx > 0 and round_record["delta_score"] < 0:
-            round_record["halt_reason"] = "score regression"
+            halt_reason = "score regression"
+            round_record["halt_reason"] = halt_reason
+            break
+        if stagnation_threshold and stagnant_streak >= stagnation_threshold:
+            halt_reason = "stagnation"
+            round_record["halt_reason"] = halt_reason
             break
 
         # The growing package becomes the seed for the next round.
@@ -115,6 +135,7 @@ def run_evolve(
         "final_symbol_count": final_symbols,
         "score_trajectory": [r["score"] for r in rounds_log],
         "symbol_trajectory": [r["symbol_count"] for r in rounds_log],
+        "halt_reason": halt_reason or "rounds_exhausted",
         "converged": rounds_log[-1].get("converged", False) if rounds_log else False,
         "generated_at_utc": _dt.datetime.utcnow().isoformat(timespec="seconds") + "Z",
     }

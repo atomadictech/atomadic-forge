@@ -143,6 +143,17 @@ def pack_feedback(*, wire_report: dict[str, Any] | None = None,
             parts.append(f"- {issue}")
         for rec in certify_report.get("recommendations", []):
             parts.append(f"  → {rec}")
+        # Per-file stub callouts — actionable feedback the LLM can target.
+        stubs = (certify_report.get("detail") or {}).get("stubs") or {}
+        findings = stubs.get("findings") or []
+        if findings:
+            parts.append("")
+            parts.append("**Stub bodies — replace with real implementations:**")
+            for f in findings[:10]:
+                parts.append(
+                    f"  · `{f['file']}` line {f['lineno']} → "
+                    f"`{f['qualname']}` ({f['kind']}): `{f['excerpt']}`"
+                )
         parts.append("")
 
     if reuse_stats:
