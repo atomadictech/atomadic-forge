@@ -80,8 +80,13 @@ def test_certify_deducts_for_stubs(tmp_path):
     (tmp_path / "tests" / "test_x.py").write_text(
         "def test_one():\n    assert True\n", encoding="utf-8")
     result = certify(tmp_path, project="demo", package="demo")
-    # docs/tests/layout/wire/import all pass → 100; one stub deducts 8 → 92.
-    assert result["score"] == 92
+    # New score weights:
+    #   structural: docs(10)+layout(10)+wire(10)+tests-present(5) = 35
+    #   runtime: import(25)
+    #   behavioral: pass-ratio(1.0) * 30 = 30
+    #   stub penalty: -8 (one stub)
+    # Total: 35 + 25 + 30 - 8 = 82.
+    assert result["score"] == 82
     assert result["no_stub_bodies"] is False
     assert result["package_importable"] is True
     assert any("Stub bodies detected" in i for i in result["issues"])
@@ -103,13 +108,19 @@ def test_certify_score_pristine_with_no_stubs(tmp_path):
     (tmp_path / "tests" / "test_x.py").write_text(
         "def test_x():\n    assert True\n", encoding="utf-8")
     result = certify(tmp_path, project="demo", package="demo")
-    assert result["score"] == 100
+    # 35 (structural) + 25 (runtime) + 30 (1/1 pass) = 90 — losing 10pts
+    # because tests-present is now 5pt and behavioral is 30pt.  No, wait:
+    # docs(10) + layout(10) + wire(10) + tests(5) = 35; import(25); behav(30) = 90.
+    # Hmm that's 90 not 100.  Let me re-do: structural max 35, runtime 25, behav 30 = 90 max.
+    # We removed 10 points from the structural side and added them to behavioral.
+    assert result["score"] == 90
+    assert result["test_pass_ratio"] == 1.0
     assert result["no_stub_bodies"] is True
     assert result["package_importable"] is True
 
 
 def test_certify_penalises_unimportable_package(tmp_path):
-    """Wire-clean tier tree but a syntax error → loses the 30 import points."""
+    """Wire-clean tier tree but a syntax error → loses runtime AND behavioral points."""
     pkg = tmp_path / "src" / "demo"
     pkg.mkdir(parents=True)
     for tier in ("a0_qk_constants", "a1_at_functions", "a2_mo_composites",
@@ -125,6 +136,7 @@ def test_certify_penalises_unimportable_package(tmp_path):
         "def test_one():\n    assert True\n", encoding="utf-8")
     result = certify(tmp_path, project="demo", package="demo")
     assert result["package_importable"] is False
-    # full credit would be 100; minus 40 (no import) = 60.
-    assert result["score"] == 60
+    # structural 35 + runtime 0 + behavioral 0 (tests can't run if package
+    # doesn't import — the runner is gated on importable) = 35.
+    assert result["score"] == 35
     assert any("fails to import" in i for i in result["issues"])

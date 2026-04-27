@@ -204,6 +204,32 @@ def pack_feedback(*, wire_report: dict[str, Any] | None = None,
             parts.append("  - missing module file or wrong tier directory")
             parts.append("  - relative import path uses old/wrong package name")
             parts.append("  - syntax error in an emitted file")
+
+        # Behavioral test failures — the breakthrough signal.  Identity-
+        # function stubs pass wire+import but fail tests.  Pasting the
+        # pytest output lets the LLM see exactly which assertion broke.
+        test_run = (certify_report.get("detail") or {}).get("test_run")
+        if test_run and test_run.get("ran") and test_run.get("failed"):
+            parts.append("")
+            parts.append(
+                f"**Tests FAILED: {test_run['failed']} of "
+                f"{test_run['total']} "
+                f"({test_run.get('pass_ratio', 0):.0%} pass-ratio)**"
+            )
+            for fid in (test_run.get("failure_excerpts") or [])[:5]:
+                parts.append(f"  · `{fid}`")
+            summary = (test_run.get("pytest_summary") or "").strip()
+            if summary:
+                parts.append("")
+                parts.append("```text")
+                parts.append(summary[:1500])
+                parts.append("```")
+            parts.append("")
+            parts.append("Tests are the behavior gate.  An identity-function "
+                          "implementation (e.g. `def f(x): return x`) passes "
+                          "wire and import but fails its own tests.  Replace "
+                          "stubs with implementations that satisfy the "
+                          "assertions.")
         parts.append("")
 
     if reuse_stats:

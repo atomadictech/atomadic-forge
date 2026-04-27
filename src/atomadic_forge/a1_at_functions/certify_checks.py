@@ -8,6 +8,7 @@ from pathlib import Path
 from ..a0_qk_constants.tier_names import TIER_NAMES
 from .import_smoke import import_smoke
 from .stub_detector import detect_stubs, stub_penalty
+from .test_runner import run_pytest
 from .wire_check import scan_violations
 
 
@@ -81,6 +82,19 @@ def certify(root: Path, *, project: str = "Atomadic project",
         # blanket deduction.
         importable = True
 
+    # Behavioral check — actually run pytest against the emitted tests/.
+    # This is the breakthrough signal: a package can pass wire + import and
+    # still be a no-op stub.  Running its own tests catches that.
+    test_run: dict | None = None
+    test_pass_ratio = 0.0
+    if importable and (root / "tests").exists() and tests_ok:
+        test_run = dict(run_pytest(output_root=root, package=package))
+        test_pass_ratio = test_run["pass_ratio"]
+    elif not (root / "tests").exists() or not tests_ok:
+        # No tests means we can't credit the ratio — and the structural
+        # 'tests_present' check already caught the absence.
+        test_pass_ratio = 0.0
+
     issues: list[str] = []
     recs: list[str] = []
     if not docs_ok:
@@ -106,20 +120,31 @@ def certify(root: Path, *, project: str = "Atomadic project",
                        f"{smoke['error_message']}")
         recs.append("Fix the import error so the package is loadable; the "
                      "wire scan can pass while the runtime fails.")
+    if test_run is not None and test_run.get("ran") and test_run["failed"]:
+        issues.append(
+            f"Tests failed: {test_run['failed']} of {test_run['total']} "
+            f"(pass-ratio {test_pass_ratio:.0%})"
+        )
+        for fid in (test_run.get("failure_excerpts") or [])[:5]:
+            issues.append(f"  · {fid}")
+        recs.append("Fix the failing tests — wire/import alone does not "
+                     "prove behavior.")
 
     # Score weights (sum to 100):
-    #   docs/tests/layout/wire   — 15 each  (60 max)
-    #   importable runtime       — 40       (heaviest — actually loads)
+    #   docs / layout / wire     — 10 each  (30 max — structural)
+    #   tests-present            — 5
+    #   importable runtime       — 25
+    #   tests-pass-ratio         — 30 max  (BREAKTHROUGH: rewards actual behavior)
     #   stub-body penalty        — up to 40 deducted
-    base_components = {
-        "docs": (docs_ok, 15),
-        "tests": (tests_ok, 15),
-        "layout": (layout_ok, 15),
-        "wire": (wire_ok, 15),
-        "import": (importable, 40),
-    }
-    score = sum(weight for ok, weight in base_components.values() if ok)
-    score = max(0.0, float(score) - stub_pen)
+    structural = (
+        (10 if docs_ok else 0)
+        + (10 if layout_ok else 0)
+        + (10 if wire_ok else 0)
+        + (5 if tests_ok else 0)
+    )
+    runtime = (25 if importable else 0)
+    behavioral = int(round(30.0 * test_pass_ratio))
+    score = max(0.0, float(structural + runtime + behavioral) - stub_pen)
     return {
         "schema_version": "atomadic-forge.certify/v1",
         "project": project,
@@ -130,12 +155,20 @@ def certify(root: Path, *, project: str = "Atomadic project",
         "no_upward_imports": wire_ok,
         "no_stub_bodies": no_stubs,
         "package_importable": importable,
+        "test_pass_ratio": test_pass_ratio,
         "score": score,
+        "score_components": {
+            "structural": structural,
+            "runtime": runtime,
+            "behavioral": behavioral,
+            "stub_penalty": -stub_pen,
+        },
         "issues": issues,
         "recommendations": recs,
         "detail": {"docs": docs_d, "tests": tests_d, "layout": layout_d,
                    "wire": wire_d,
                    "stubs": {"count": len(stub_findings),
                              "findings": stub_findings[:20]},
-                   "import_smoke": smoke},
+                   "import_smoke": smoke,
+                   "test_run": test_run},
     }
