@@ -1,0 +1,68 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "atomadic-forge"
+version = "0.1.0"
+description = "Atomadic Forge — absorb, enforce, emerge. Architecture guardian for AI-generated code."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "BSL-1.1" }
+authors = [{ name = "Atomadic" }]
+keywords = ["atomadic", "ass-ade", "monadic", "architecture", "forge",
+            "code-quality", "ai", "agents"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent",
+    "Topic :: Software Development :: Quality Assurance",
+]
+dependencies = [
+    "typer>=0.15,<1",
+    "rich>=14,<15",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7",
+    "import-linter>=2.0,<3",
+    "ruff>=0.4",
+]
+
+[project.scripts]
+forge = "atomadic_forge.a4_sy_orchestration.cli:main"
+atomadic-forge = "atomadic_forge.a4_sy_orchestration.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["atomadic_forge*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.importlinter]
+root_package = "atomadic_forge"
+
+[[tool.importlinter.contracts]]
+name = "Atomadic Forge — Monadic tiers"
+type = "layers"
+layers = [
+    "atomadic_forge.a4_sy_orchestration",
+    "atomadic_forge.commands",
+    "atomadic_forge.a3_og_features",
+    "atomadic_forge.a2_mo_composites",
+    "atomadic_forge.a1_at_functions",
+    "atomadic_forge.a0_qk_constants",
+]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["E501"]
