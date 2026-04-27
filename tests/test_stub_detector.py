@@ -80,9 +80,10 @@ def test_certify_deducts_for_stubs(tmp_path):
     (tmp_path / "tests" / "test_x.py").write_text(
         "def test_one():\n    assert True\n", encoding="utf-8")
     result = certify(tmp_path, project="demo", package="demo")
-    # docs/tests/layout/wire all pass → would be 100; one stub deducts 8.
+    # docs/tests/layout/wire/import all pass → 100; one stub deducts 8 → 92.
     assert result["score"] == 92
     assert result["no_stub_bodies"] is False
+    assert result["package_importable"] is True
     assert any("Stub bodies detected" in i for i in result["issues"])
 
 
@@ -104,3 +105,26 @@ def test_certify_score_pristine_with_no_stubs(tmp_path):
     result = certify(tmp_path, project="demo", package="demo")
     assert result["score"] == 100
     assert result["no_stub_bodies"] is True
+    assert result["package_importable"] is True
+
+
+def test_certify_penalises_unimportable_package(tmp_path):
+    """Wire-clean tier tree but a syntax error → loses the 30 import points."""
+    pkg = tmp_path / "src" / "demo"
+    pkg.mkdir(parents=True)
+    for tier in ("a0_qk_constants", "a1_at_functions", "a2_mo_composites",
+                 "a3_og_features", "a4_sy_orchestration"):
+        d = pkg / tier
+        d.mkdir()
+        (d / "__init__.py").write_text("", encoding="utf-8")
+    # __init__.py triggers a syntax error during `python -c "import demo"`.
+    (pkg / "__init__.py").write_text("def broken(\n    return\n", encoding="utf-8")
+    (tmp_path / "README.md").write_text("# demo\n", encoding="utf-8")
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests" / "test_x.py").write_text(
+        "def test_one():\n    assert True\n", encoding="utf-8")
+    result = certify(tmp_path, project="demo", package="demo")
+    assert result["package_importable"] is False
+    # full credit would be 100; minus 40 (no import) = 60.
+    assert result["score"] == 60
+    assert any("fails to import" in i for i in result["issues"])

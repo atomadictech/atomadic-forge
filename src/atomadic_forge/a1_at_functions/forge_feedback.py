@@ -32,11 +32,27 @@ When you emit code, you MUST:
   2. Never import upward (lower tier importing from higher tier).
   3. One responsibility per file.
   4. Module docstrings of the form: \"\"\"Tier aN — <one-line>.\"\"\"
-  5. Output as a JSON array of file objects:
-       [{"path": "src/<pkg>/aN_…/foo.py", "content": "…"}, …]
+  5. Write COMPLETE function bodies — no `pass`, no `NotImplementedError`,
+     no `# TODO`, no `# Implement me!`.  If you don't know how to implement
+     something, choose a simpler design rather than emit a stub.
+  6. Use ABSOLUTE imports rooted at the package: `from <pkg>.a1_at_functions.foo
+     import foo` — not relative imports, not bare names.
+  7. Output as a JSON array of file objects ONLY — no prose, no fences:
+       [{"path": "src/<pkg>/aN_…/foo.py", "content": "…"}, ...]
+  8. SUBSTITUTE the actual package name into every `<pkg>` placeholder.
 
-Forge will then materialise your output, run wire + certify, and feed any
-violations back to you on the next turn.
+Example (intent: "calc with add() at a1, CLI at a4", package: "calc"):
+
+[
+  {"path": "src/calc/a1_at_functions/add.py",
+   "content": "\\"\\"\\"Tier a1 — pure addition.\\"\\"\\"\\n\\ndef add(a: int, b: int) -> int:\\n    return a + b\\n"},
+  {"path": "src/calc/a4_sy_orchestration/cli.py",
+   "content": "\\"\\"\\"Tier a4 — CLI entry.\\"\\"\\"\\nimport argparse\\nfrom calc.a1_at_functions.add import add\\n\\ndef main():\\n    p = argparse.ArgumentParser()\\n    p.add_argument('a', type=int); p.add_argument('b', type=int)\\n    args = p.parse_args()\\n    print(add(args.a, args.b))\\n"}
+]
+
+Forge then materialises your output, runs wire + certify + import-smoke,
+and feeds any violations back to you on the next turn.  An importable
+package with real bodies scores high; stubs and broken imports lose points.
 """
 
 
@@ -154,6 +170,25 @@ def pack_feedback(*, wire_report: dict[str, Any] | None = None,
                     f"  · `{f['file']}` line {f['lineno']} → "
                     f"`{f['qualname']}` ({f['kind']}): `{f['excerpt']}`"
                 )
+        # Runtime import error — paste the actual traceback so the LLM
+        # can fix the exact failing import / syntax / path issue.
+        smoke = (certify_report.get("detail") or {}).get("import_smoke")
+        if smoke and not smoke.get("importable", True):
+            parts.append("")
+            parts.append("**Runtime import FAILED — package does not load:**")
+            parts.append(f"  · error: `{smoke.get('error_kind')}` — "
+                          f"{smoke.get('error_message')}")
+            tb = smoke.get("traceback_excerpt") or ""
+            if tb:
+                parts.append("")
+                parts.append("```text")
+                parts.append(tb.strip())
+                parts.append("```")
+            parts.append("")
+            parts.append("Fix the import error.  Common causes:")
+            parts.append("  - missing module file or wrong tier directory")
+            parts.append("  - relative import path uses old/wrong package name")
+            parts.append("  - syntax error in an emitted file")
         parts.append("")
 
     if reuse_stats:

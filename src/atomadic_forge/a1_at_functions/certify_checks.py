@@ -6,6 +6,7 @@ import time
 from pathlib import Path
 
 from ..a0_qk_constants.tier_names import TIER_NAMES
+from .import_smoke import import_smoke
 from .stub_detector import detect_stubs, stub_penalty
 from .wire_check import scan_violations
 
@@ -66,6 +67,20 @@ def certify(root: Path, *, project: str = "Atomadic project",
     stub_pen = stub_penalty(stub_findings)
     no_stubs = stub_pen == 0
 
+    # Runtime import smoke — does the package actually load?
+    # Default to False when there's nothing to import; the import-points are
+    # earned by an actual successful import, not by absence.
+    smoke: dict | None = None
+    importable = False
+    if package and (root / "src" / package).exists():
+        smoke = dict(import_smoke(output_root=root, package=package))
+        importable = smoke["importable"]
+    elif not package:
+        # No package specified and we can't run a smoke — exempt from this
+        # check so legacy callers without a package layout don't see a 40-point
+        # blanket deduction.
+        importable = True
+
     issues: list[str] = []
     recs: list[str] = []
     if not docs_ok:
@@ -86,11 +101,25 @@ def certify(root: Path, *, project: str = "Atomadic project",
         for f in stub_findings[:5]:
             issues.append(f"  · {f['file']}:{f['lineno']} {f['qualname']} ({f['kind']})")
         recs.append("Replace stub bodies with real implementations before shipping.")
+    if smoke is not None and not importable:
+        issues.append(f"Package fails to import: {smoke['error_kind']} — "
+                       f"{smoke['error_message']}")
+        recs.append("Fix the import error so the package is loadable; the "
+                     "wire scan can pass while the runtime fails.")
 
-    base_score = max(0.0, 100.0 - 25.0 * len(
-        [x for x in (not docs_ok, not tests_ok, not layout_ok, not wire_ok) if x]
-    ))
-    score = max(0.0, base_score - stub_pen)
+    # Score weights (sum to 100):
+    #   docs/tests/layout/wire   — 15 each  (60 max)
+    #   importable runtime       — 40       (heaviest — actually loads)
+    #   stub-body penalty        — up to 40 deducted
+    base_components = {
+        "docs": (docs_ok, 15),
+        "tests": (tests_ok, 15),
+        "layout": (layout_ok, 15),
+        "wire": (wire_ok, 15),
+        "import": (importable, 40),
+    }
+    score = sum(weight for ok, weight in base_components.values() if ok)
+    score = max(0.0, float(score) - stub_pen)
     return {
         "schema_version": "atomadic-forge.certify/v1",
         "project": project,
@@ -100,11 +129,13 @@ def certify(root: Path, *, project: str = "Atomadic project",
         "tier_layout_present": layout_ok,
         "no_upward_imports": wire_ok,
         "no_stub_bodies": no_stubs,
+        "package_importable": importable,
         "score": score,
         "issues": issues,
         "recommendations": recs,
         "detail": {"docs": docs_d, "tests": tests_d, "layout": layout_d,
                    "wire": wire_d,
                    "stubs": {"count": len(stub_findings),
-                             "findings": stub_findings[:20]}},
+                             "findings": stub_findings[:20]},
+                   "import_smoke": smoke},
     }

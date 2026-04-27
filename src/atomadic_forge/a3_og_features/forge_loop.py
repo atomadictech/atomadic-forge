@@ -144,10 +144,27 @@ def run_iterate(
 
     response = llm.call(prompt, system=sys_prompt)
     files = parse_files_from_response(response)
+    parse_retried = False
+    if not files and response.strip() and not response.strip().endswith("[]"):
+        # The LLM said something but Forge couldn't parse it.  One re-ask
+        # with a stricter prompt — small models often respond to direct
+        # correction better than to the original instructions.
+        retry_prompt = (
+            "Your previous response did not parse as a JSON array of "
+            "`{path, content}` objects.  Output ONLY the JSON array "
+            "literal, no prose, no markdown fences, no comments.  If you "
+            "need to indicate completion, output the exact two characters "
+            "`[]`.\n\n"
+            "Re-emit your output now."
+        )
+        response = llm.call(retry_prompt, system=sys_prompt)
+        files = parse_files_from_response(response)
+        parse_retried = True
     written = _write_files(output, files)
     history_files.extend(written)
     transcript.append({"turn": 0, "prompt": prompt, "files_written": written,
-                        "raw_response_chars": len(response)})
+                        "raw_response_chars": len(response),
+                        "parse_retried": parse_retried})
 
     # ── Iteration turns ────────────────────────────────────────────────────
     final_wire: dict[str, Any] | None = None
