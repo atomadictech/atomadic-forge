@@ -137,7 +137,7 @@ def run_evolve(
         "symbol_trajectory": [r["symbol_count"] for r in rounds_log],
         "halt_reason": halt_reason or "rounds_exhausted",
         "converged": rounds_log[-1].get("converged", False) if rounds_log else False,
-        "generated_at_utc": _dt.datetime.utcnow().isoformat(timespec="seconds") + "Z",
+        "generated_at_utc": _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds"),
     }
     ManifestStore(output).save("evolve", out)
     return out

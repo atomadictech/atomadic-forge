@@ -39,7 +39,7 @@ class ManifestStore:
     def _append_lineage(self, name: str, path: Path) -> None:
         log = self.dir / "lineage.jsonl"
         entry = {
-            "ts_utc": _dt.datetime.utcnow().isoformat(timespec="seconds") + "Z",
+            "ts_utc": _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds"),
             "artifact": name,
             "path": str(path.relative_to(self.project_root).as_posix()),
         }

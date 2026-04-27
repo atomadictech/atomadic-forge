@@ -273,7 +273,7 @@ def run_iterate(
             "issues": (final_cert or {}).get("issues", []),
         },
         "transcript": transcript,
-        "generated_at_utc": _dt.datetime.utcnow().isoformat(timespec="seconds") + "Z",
+        "generated_at_utc": _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds"),
     }
     ManifestStore(output).save("iterate", report)
     return report
