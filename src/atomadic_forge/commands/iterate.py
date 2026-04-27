@@ -57,7 +57,10 @@ def _resolve_provider(name: str) -> object:
         return GeminiClient(model=os.environ.get("FORGE_GEMINI_MODEL",
                                                    "gemini-2.5-flash"))
     if name == "ollama":
-        return OllamaClient()
+        return OllamaClient(
+            model=os.environ.get("FORGE_OLLAMA_MODEL", "qwen2.5-coder:7b"),
+            base_url=os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434"),
+        )
     if name == "auto":
         return resolve_default_client()
     raise typer.BadParameter(f"unknown provider: {name!r}")

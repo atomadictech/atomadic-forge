@@ -53,19 +53,45 @@ def _scaffold_package(output: Path, package: str) -> Path:
     return pkg_root
 
 
+_PATH_REJECT_CHARS = ("<", ">", "|", "*", "?", '"', "\x00")
+
+
+def _safe_path(rel: str) -> bool:
+    """Reject placeholder/metachar/traversal paths the LLM may have emitted.
+
+    Small models often echo template tokens like ``<pkg>`` or ``${name}``
+    verbatim instead of substituting.  We refuse those instead of crashing
+    on Windows or writing garbage files.
+    """
+    rel = rel.strip()
+    if not rel:
+        return False
+    if any(ch in rel for ch in _PATH_REJECT_CHARS):
+        return False
+    if ".." in rel.replace("\\", "/").split("/"):
+        return False
+    if not (rel.endswith(".py") or rel.endswith(".md") or rel.endswith(".toml")):
+        return False
+    return True
+
+
 def _write_files(output: Path, files: list[dict[str, str]]) -> list[str]:
     written: list[str] = []
     output_resolved = output.resolve()
     for f in files:
-        rel = f["path"].lstrip("/\\")
-        target = (output / rel).resolve()
-        # Refuse to write outside the output dir (prompt-injection guard).
-        try:
-            target.relative_to(output_resolved)
-        except ValueError:
+        rel = f.get("path", "").lstrip("/\\")
+        if not _safe_path(rel):
             continue
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(f["content"], encoding="utf-8")
+        try:
+            target = (output / rel).resolve()
+            target.relative_to(output_resolved)  # prompt-injection / traversal guard
+        except (ValueError, OSError):
+            continue
+        try:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(f.get("content", ""), encoding="utf-8")
+        except OSError:
+            continue
         written.append(str(target.relative_to(output_resolved).as_posix()))
     return written
 
