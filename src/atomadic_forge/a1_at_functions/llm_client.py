@@ -256,12 +256,25 @@ class OllamaClient:
             headers={"content-type": "application/json"},
             method="POST",
         )
-        try:
-            with urllib.request.urlopen(req, timeout=120) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-        except urllib.error.URLError as exc:
-            raise RuntimeError(f"Ollama unreachable at {self.base_url}: {exc}") from exc
-        return data.get("response", "")
+        last_exc: Exception | None = None
+        for attempt in range(3):
+            try:
+                with urllib.request.urlopen(req, timeout=300) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+                return data.get("response", "")
+            except urllib.error.HTTPError as exc:
+                if exc.code in (500, 502, 503, 504):
+                    import time
+                    last_exc = RuntimeError(f"Ollama {exc.code} at {self.base_url}")
+                    time.sleep(2.0 * (attempt + 1))
+                    continue
+                raise RuntimeError(f"Ollama HTTP {exc.code}: {exc}") from exc
+            except urllib.error.URLError as exc:
+                raise RuntimeError(
+                    f"Ollama unreachable at {self.base_url} — "
+                    f"is `ollama serve` running? Detail: {exc}"
+                ) from exc
+        raise last_exc or RuntimeError("Ollama: 3 retries exhausted")
 
 
 def resolve_default_client() -> LLMClient:
