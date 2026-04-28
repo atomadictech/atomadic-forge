@@ -12,25 +12,31 @@ from pathlib import Path
 from typing import Iterable
 
 from ..a0_qk_constants.lang_extensions import (
-    ALL_SOURCE_EXTS, JAVASCRIPT_EXTS, PYTHON_EXTS, TYPESCRIPT_EXTS,
-    lang_for_path,
+    ALL_SOURCE_EXTS, ASSET_EXTS, CONFIG_EXTS, DOC_EXTS,
+    IGNORED_DIRS, JAVASCRIPT_EXTS, PYTHON_EXTS, TYPESCRIPT_EXTS,
+    file_class_for_path, lang_for_path,
 )
 from .body_extractor import _detect_state_markers
 from .classify_tier import classify_tier, detect_effects
 from .js_parser import classify_js_tier, detect_js_effects, parse_surface
 
 
-_SKIP_DIRS = {".git", "__pycache__", ".venv", "venv", "node_modules",
-              "build", "dist", ".tox", ".mypy_cache", ".pytest_cache",
-              ".ruff_cache", ".wrangler", ".next", ".nuxt", "out",
-              "coverage", ".turbo"}
+# Backwards-compatible alias — keep _SKIP_DIRS available for any third-party
+# code that imports it.  The canonical list lives in lang_extensions.IGNORED_DIRS.
+_SKIP_DIRS = IGNORED_DIRS
 
 
 def _under_skip_dir(rel_parts: tuple[str, ...]) -> bool:
+    """Return True if any segment of the path is an ignored directory.
+
+    A leading-dot segment is only treated as ignored when it matches an
+    entry in IGNORED_DIRS (e.g. ``.github``, ``.venv``).  Application
+    folders that legitimately start with a dot (none today, but keeping
+    the door open) won't be skipped just for the leading dot — only for
+    being on the explicit list.
+    """
     for part in rel_parts:
-        if part in _SKIP_DIRS:
-            return True
-        if part.startswith("."):
+        if part in IGNORED_DIRS:
             return True
     return False
 
@@ -170,10 +176,27 @@ def _push_js_symbol(symbols: list[dict], name: str, kind: str, rel: str,
             effect_dist[e] += 1
 
 
+def _file_class_counts(root: Path) -> dict[str, int]:
+    """Count every file under ``root`` by class (source / docs / config /
+    asset / other), respecting IGNORED_DIRS.  Used by harvest_repo and
+    by certify so non-source files don't harsh the layout score."""
+    counts = {"source": 0, "documentation": 0, "config": 0, "asset": 0, "other": 0}
+    for p in root.rglob("*"):
+        if not p.is_file():
+            continue
+        rel_parts = p.relative_to(root).parts
+        if _under_skip_dir(rel_parts):
+            continue
+        cls = file_class_for_path(p.as_posix())
+        counts[cls] = counts.get(cls, 0) + 1
+    return counts
+
+
 def harvest_repo(root: Path) -> dict:
     """Walk a repo, classify every public symbol, return a scout-shaped dict."""
     root = Path(root).resolve()
     src_files = list(iter_source_files(root))
+    file_class_counts = _file_class_counts(root)
     symbols: list[dict] = []
     tier_dist: dict[str, int] = {}
     effect_dist: dict[str, int] = {"pure": 0, "state": 0, "io": 0}
@@ -230,7 +253,12 @@ def harvest_repo(root: Path) -> dict:
     return {
         "schema_version": "atomadic-forge.scout/v1",
         "repo": str(root),
+        # `file_count` is the raw rglob walk (legacy) — matches v1 callers.
         "file_count": len(list(root.rglob("*"))),
+        # `file_class_counts` excludes IGNORED_DIRS and breaks files into
+        # source / documentation / config / asset / other.  Tier-layout
+        # scoring should use this, not the raw walk.
+        "file_class_counts": file_class_counts,
         "python_file_count": py_count,
         "javascript_file_count": js_count,
         "typescript_file_count": ts_count,

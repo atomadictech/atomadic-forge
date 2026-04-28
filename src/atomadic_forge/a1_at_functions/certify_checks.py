@@ -5,6 +5,9 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
+from ..a0_qk_constants.lang_extensions import (
+    ALL_SOURCE_EXTS, IGNORED_DIRS, file_class_for_path,
+)
 from ..a0_qk_constants.tier_names import TIER_NAMES
 from .import_smoke import import_smoke
 from .stub_detector import detect_stubs, stub_penalty
@@ -12,11 +15,61 @@ from .test_runner import run_pytest
 from .wire_check import scan_violations
 
 
+def _is_under_ignored(rel_parts: tuple[str, ...]) -> bool:
+    """Path-segment check against IGNORED_DIRS (used by every walk)."""
+    return any(p in IGNORED_DIRS for p in rel_parts)
+
+
 def check_documentation(root: Path) -> tuple[bool, dict]:
-    readme = (root / "README.md").exists()
-    docs_md = list((root / "docs").glob("*.md")) if (root / "docs").exists() else []
-    ok = readme or len(docs_md) >= 2
-    return ok, {"readme": readme, "docs_md_count": len(docs_md)}
+    """Documentation signal — markdown anywhere meaningful counts.
+
+    Recognises:
+      * README at root (``.md`` / ``.rst`` / no extension)
+      * Any ``.md`` / ``.markdown`` / ``.mdx`` under ``docs/``, ``doc/``,
+        ``documentation/``, ``guides/``, ``guide/``
+      * The repo passes if README exists, OR there are ≥2 doc files
+        anywhere in the recognised doc directories.
+    """
+    readme_names = {"README.md", "README.rst", "README.markdown",
+                     "README", "readme.md"}
+    readme = any((root / n).exists() for n in readme_names)
+
+    # Find every directory anywhere in the tree whose basename matches a
+    # known doc-folder convention.  Catches both top-level (./docs/) and
+    # nested (./cognition/guides/) layouts.  IGNORED_DIRS still apply.
+    DOC_DIR_NAMES = {"docs", "doc", "documentation", "guides", "guide"}
+    doc_dirs_found: list[str] = []
+    doc_count = 0
+    samples: list[str] = []
+    seen_dirs: set[Path] = set()
+    for d in root.rglob("*"):
+        if not d.is_dir() or d.name not in DOC_DIR_NAMES:
+            continue
+        rel_parts = d.relative_to(root).parts
+        if _is_under_ignored(rel_parts):
+            continue
+        if d in seen_dirs:
+            continue
+        seen_dirs.add(d)
+        doc_dirs_found.append(d.relative_to(root).as_posix())
+        for p in d.rglob("*"):
+            if not p.is_file():
+                continue
+            rel_parts_p = p.relative_to(root).parts
+            if _is_under_ignored(rel_parts_p):
+                continue
+            if p.suffix.lower() in {".md", ".markdown", ".mdx", ".rst"}:
+                doc_count += 1
+                if len(samples) < 5:
+                    samples.append(p.relative_to(root).as_posix())
+
+    ok = readme or doc_count >= 2
+    return ok, {
+        "readme":         readme,
+        "docs_md_count":  doc_count,
+        "doc_dirs_found": doc_dirs_found,
+        "doc_samples":    samples,
+    }
 
 
 def check_tests_present(root: Path) -> tuple[bool, dict]:
@@ -60,19 +113,54 @@ def _collect_tier_dirs(root: Path) -> list[str]:
 
     Polyglot-aware: a tier-named directory anywhere in the tree (Python
     ``src/<pkg>/aN_*/`` OR JS-style top-level / nested ``aN_*/``) counts.
-    Each tier name is reported at most once.
+    Each tier name is reported at most once.  Honours IGNORED_DIRS so
+    vendored / cached / tooling folders never leak into the scan.
     """
     found: set[str] = set()
     for d in root.rglob("*"):
         if not d.is_dir():
             continue
-        if "node_modules" in d.parts or "__pycache__" in d.parts:
+        rel_parts = d.relative_to(root).parts
+        if _is_under_ignored(rel_parts):
             continue
         if d.name in TIER_NAMES:
             found.add(d.name)
             if len(found) == len(TIER_NAMES):
                 break
     return sorted(found)
+
+
+def count_untiered_source_files(root: Path) -> dict:
+    """How many SOURCE files (Python/JS/TS) live outside any tier directory?
+
+    Documentation, config, asset, and other-classed files are deliberately
+    excluded — markdown placed in ``cognition/guides/`` doesn't have a tier
+    identity and shouldn't be treated as code-out-of-place.  Scoring code
+    (e.g. future stricter layout penalties) should base its judgement on
+    this count, not the raw file count.
+    """
+    untiered: list[str] = []
+    tiered: list[str] = []
+    for p in root.rglob("*"):
+        if not p.is_file():
+            continue
+        rel_parts = p.relative_to(root).parts
+        if _is_under_ignored(rel_parts):
+            continue
+        if p.suffix.lower() not in ALL_SOURCE_EXTS:
+            continue
+        # Source file — check if any of its path segments is a tier dir.
+        in_tier = any(seg in TIER_NAMES for seg in rel_parts)
+        rel_path = p.relative_to(root).as_posix()
+        if in_tier:
+            tiered.append(rel_path)
+        else:
+            untiered.append(rel_path)
+    return {
+        "untiered_source_count": len(untiered),
+        "tiered_source_count":   len(tiered),
+        "untiered_samples":      untiered[:10],
+    }
 
 
 def check_tier_layout(root: Path, package: str | None = None) -> tuple[bool, dict]:
@@ -235,5 +323,6 @@ def certify(root: Path, *, project: str = "Atomadic project",
                    "stubs": {"count": len(stub_findings),
                              "findings": stub_findings[:20]},
                    "import_smoke": smoke,
-                   "test_run": test_run},
+                   "test_run": test_run,
+                   "untiered_source": count_untiered_source_files(root)},
     }
