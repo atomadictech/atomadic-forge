@@ -106,6 +106,16 @@ def run_cmd(
         return
 
     arc = " → ".join(f"{s:.0f}" for s in result.score_trajectory)
+    # Showcase presets bypass the LLM entirely — print "static showcase"
+    # in the LLM slot so output stays consistent across both kinds.
+    from atomadic_forge.a3_og_features.demo_runner import get_preset
+    try:
+        preset_obj = get_preset(preset)
+    except KeyError:
+        preset_obj = None
+    is_showcase = preset_obj is not None and preset_obj.kind == "showcase"
+    llm_label = "static showcase (no LLM)" if is_showcase else llm.name
+
     typer.echo("")
     typer.echo("=" * 60)
     typer.echo(f"  forge demo: {preset}")
@@ -113,7 +123,7 @@ def run_cmd(
     typer.echo("")
     typer.echo(f"  {result.headline}")
     typer.echo("")
-    typer.echo(f"  llm:          {llm.name}")
+    typer.echo(f"  llm:          {llm_label}")
     typer.echo(f"  package:      {result.package}")
     typer.echo(f"  rounds:       {result.rounds_completed}")
     typer.echo(f"  trajectory:   {arc}")
@@ -121,11 +131,12 @@ def run_cmd(
     typer.echo(f"  converged:    {result.converged}")
     typer.echo(f"  duration:     {result.duration_s:.1f}s")
     typer.echo("")
-    typer.echo("  Generated CLI:")
-    typer.echo(f"    $ {' '.join(result.cli_demo_command)}")
-    for line in (result.cli_demo_stdout or "(no output)").splitlines()[:6]:
-        typer.echo(f"    {line}")
-    typer.echo("")
+    if result.cli_demo_command:
+        typer.echo("  Generated CLI:")
+        typer.echo(f"    $ {' '.join(result.cli_demo_command)}")
+        for line in (result.cli_demo_stdout or "(no output)").splitlines()[:6]:
+            typer.echo(f"    {line}")
+        typer.echo("")
     typer.echo(f"  Artifact:     {result.artifact_md_path}")
     typer.echo(f"  Output:       {result.output_root}")
     typer.echo("")

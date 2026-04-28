@@ -1,13 +1,15 @@
 # Atomadic Forge — Command Reference
 
-All verbs available in the `forge` CLI as of 0.1.0.
+All verbs available in the `forge` CLI as of 0.2.0.
 
 ## Pipeline / absorption
 
 ### `forge auto SOURCE OUTPUT`
 
 Flagship: scout → cherry-pick → assimilate → wire → certify in one shot.
-Dry-run by default; `--apply` writes files.
+Dry-run by default; `--apply` writes files. Walks `.py`, `.js`, `.mjs`,
+`.cjs`, `.jsx`, `.ts`, `.tsx`. `node_modules/`, `dist/`, `.next/`,
+`.wrangler/` and friends are skipped automatically.
 
 ```bash
 forge auto ./legacy-repo ./out --package absorbed --apply
@@ -16,7 +18,10 @@ forge auto ./legacy-repo ./out --package absorbed --apply
 ### `forge recon SOURCE`
 
 Walk a repo, classify every public symbol by tier and effect, surface
-recommendations. Writes `.atomadic-forge/scout.json`.
+recommendations. Writes `.atomadic-forge/scout.json`. Prints per-language
+counts (`python files`, `javascript files`, `typescript files`) and a
+`primary_language` verdict; emits a recommendation when JS/TS files exist
+outside `aN_*` tier directories.
 
 ### `forge cherry SOURCE`
 
@@ -30,12 +35,24 @@ Assimilate cherry-picked symbols + wire + certify. Honours `--on-conflict`
 
 ### `forge wire DIR`
 
-Scan a tier-organized package for upward-import violations.
+Scan a tier-organized package for upward-import violations. Polyglot —
+detects upward imports in JS/TS specifiers (`"../a3_og_features/foo"`)
+and Python `from`-imports alike. Each violation in the JSON report
+carries a `language` field (`"python"` / `"javascript"` / `"typescript"`).
 
 ### `forge certify ROOT --package <name>`
 
 Score docs, tests, layout, imports, importability, behavior, stub bodies.
 Returns 0–100 honest score with component breakdown.
+
+JS/TS-specific behaviour:
+- `tests` PASS recognises `tests/*.test.{js,mjs,jsx,cjs,ts,tsx}`,
+  `*.spec.*`, and the Jest `__tests__/` directory convention.
+- `tier_layout` PASS counts JS-style top-level or nested `aN_*`
+  directories anywhere under the repo root, not just under `src/<pkg>/`.
+- The runtime-import smoke (+25 points) and behavioural pytest gate
+  (+30 points) remain Python-only — JS/TS packages are scored on the
+  +45 polyglot-aware structural axes.
 
 ## Code generation (LLM-driven)
 
@@ -56,10 +73,23 @@ the prior round's growing catalog. Halts on convergence, regression
 
 ### `forge demo run --preset NAME`
 
-One-shot launch-video verb: preset evolve + post-run CLI invocation +
-DEMO.md artifact. Presets: `calc`, `kv`, `slug`. Each writes to
-`./forge-demo-<preset>/` and emits a stunning README synthesised from
-the actual emitted code.
+One-shot launch verb. Two preset families:
+
+- **LLM-driven Python presets** (`calc`, `kv`, `slug`) — preset evolve +
+  post-run CLI invocation + DEMO.md artifact. Each writes to
+  `./forge-demo-<preset>/` and emits a stunning README synthesised from
+  the actual emitted code. Requires an LLM (Gemini free tier, Ollama,
+  Anthropic, OpenAI, or stub).
+- **Static polyglot showcases** (`js-counter`, `js-bad-wire`,
+  `mixed-py-js`) — pre-built source packages used to exercise
+  `recon → wire → certify` on real JS/TS/polyglot code. **No LLM
+  required.** Each writes a `DEMO.md` summarising the scan results.
+
+```bash
+forge demo list                          # all presets, both kinds
+forge demo run --preset calc             # LLM Python preset
+forge demo run --preset js-counter       # static JS showcase, runs offline
+```
 
 ### `forge feature-then-emergent run FEATURE -- ARGS`
 

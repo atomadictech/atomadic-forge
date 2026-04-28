@@ -99,12 +99,35 @@ Sometimes the right architecture isn't 5 tiers — embedded systems,
 research notebooks, single-script tools. Forge isn't the right tool
 for those.
 
-For everything that's a multi-file Python codebase you intend to
-maintain past 3 months, the 5-tier law is a useful constraint. The
-proof is in the certify scores you see across runs.
+For everything that's a multi-file Python *or* JavaScript / TypeScript
+codebase you intend to maintain past 3 months, the 5-tier law is a
+useful constraint. The proof is in the certify scores you see across
+runs.
+
+## Same law, different language
+
+The tier directories are language-agnostic — `a0_qk_constants/` /
+`a1_at_functions/` / `a2_mo_composites/` / `a3_og_features/` /
+`a4_sy_orchestration/` mean the same thing whether the file inside ends
+in `.py`, `.js`, `.ts`, or `.tsx`. As of 0.2, `forge wire` enforces the
+upward-only rule on JS specifiers (`"../a3_og_features/foo"`) the same
+way it has always enforced it on Python `from`-imports, and `forge
+certify` counts JS-style `aN_*` directories anywhere under the repo
+root toward the `tier_layout` PASS.
+
+A Cloudflare Worker shaped like `export default { fetch, scheduled }`
+is classified as a4. A `class Counter { … }` module is a2. An
+`export-const`-only constants file is a0. The classifier reads a
+parsed surface; the wire scanner reads the same `aN_*` path tokens
+whether they live in a Python import or a JS specifier.
+
+For a hands-on JS walk-through, see
+[06-javascript-quickstart.md](06-javascript-quickstart.md).
 
 ## Read further
 
 - [04-plug-in-llms.md](04-plug-in-llms.md) — choosing a generator.
 - [05-multi-repo-absorb.md](05-multi-repo-absorb.md) — the absorb flow,
   applying the law to existing flat-layout repositories.
+- [06-javascript-quickstart.md](06-javascript-quickstart.md) — same law,
+  applied to JS / TS source.

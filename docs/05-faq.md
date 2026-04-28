@@ -20,9 +20,39 @@ For **code generation**, use `forge iterate` or `forge evolve` (LLM loops).
 
 ### Can Forge handle non-Python languages?
 
-Not yet. 0.1 supports Python only. TypeScript, Rust, and Go are on the roadmap.
+**Yes — as of 0.2, Forge classifies JavaScript and TypeScript with the
+same 5-tier law it has always applied to Python.** Walked extensions:
+`.py`, `.js`, `.mjs`, `.cjs`, `.jsx`, `.ts`, `.tsx`. `node_modules/`,
+`dist/`, `.next/`, `.wrangler/`, and other vendored / build directories
+are skipped automatically; no Node install required.
 
-The monadic tiers are language-agnostic (a0–a4 are architectural principles), but the AST walker is Python-specific.
+`forge recon` reports per-language counts and a `primary_language`
+verdict. `forge wire` detects upward imports in JS specifiers
+(`"../a3_og_features/foo"`) the same way it does in Python `from`-imports;
+each violation in the JSON report is tagged with `language`. `forge
+certify` recognises JS test conventions (`*.test.*`, `*.spec.*`,
+`__tests__/`) and JS-style `aN_*/` directories anywhere under the root.
+
+What's still Python-only:
+- The runtime-import smoke check (the +25 score component for "package
+  actually loads in a fresh subprocess").
+- The behavioural pytest gate (the +30 component for "the package's own
+  tests pass").
+
+JS/TS-only packages are scored on the +45 polyglot-aware structural
+axes (docs / tests-present / tier layout / upward-import discipline)
+plus the stub-body penalty. Wiring `npm test` / Vitest into the
+behavioural gate is on the 0.3 roadmap. Rust and Go remain on the
+roadmap.
+
+Try the showcase presets to see the pipeline against real JS source —
+no LLM key needed:
+
+```bash
+forge demo run --preset js-counter   # clean JS package, certify 100/100
+forge demo run --preset js-bad-wire  # one upward import; wire flags it
+forge demo run --preset mixed-py-js  # Python tier + JS tier in one root
+```
 
 ### What if my repo doesn't have tests or documentation?
 
@@ -83,7 +113,7 @@ This is a known environment issue (httpbin/werkzeug version conflict). It's not 
 ```bash
 pip uninstall pytest-httpbin -y
 python -m pytest tests/
-# Should pass (90 tests)
+# Should pass (192 tests as of 0.2)
 ```
 
 ### DeprecationWarning about `datetime.utcnow()`

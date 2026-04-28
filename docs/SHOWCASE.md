@@ -6,7 +6,12 @@
 
 _Live `forge demo` and `forge evolve` runs against Gemini 2.5 Flash on
 free tier and codellama:7b-instruct on Ollama. Same loop, same constraint
-substrate, swap the LLM, watch the trajectory carry harder tasks higher._
+substrate, swap the LLM, watch the trajectory carry harder tasks higher.
+**As of 0.2, the same constraint substrate also classifies JavaScript and
+TypeScript** — the polyglot showcases at the bottom of this page run
+without an LLM key._
+
+## LLM-driven Python presets
 
 | Preset | Headline | Trajectory | Final | Duration | Wire | Tests |
 |--------|----------|------------|-------|---------:|------|-------|
@@ -22,6 +27,36 @@ forge demo run --preset calc --provider gemini
 forge demo run --preset kv   --provider gemini
 forge demo run --preset slug --provider gemini
 ```
+
+## Polyglot static showcases (no LLM key required)
+
+| Preset | What it shows | Wire | Tests | Certify |
+|--------|---------------|------|-------|---------|
+| `js-counter` | A clean `a0..a4` JavaScript package — Worker-style `index.js` (a4) on top of a `Counter` class (a2), pure helpers (a1), and a constants module (a0) | PASS | PASS | **60/100** (max for a JS-only package today) |
+| `js-bad-wire` | The same package shape with one deliberate sin: `a1_at_functions/echo.js` imports from `a3_og_features/counter_feature.js`. Wire surfaces the violation with `language: "javascript"`. | FAIL (1) | PASS | 50/100 |
+| `mixed-py-js` | Python `a1_at_functions/util.py` plus a JS `a4_sy_orchestration/server.js` under the same root — proof that one layout works for both languages. | PASS | PASS | 60+/100 |
+
+```bash
+forge demo run --preset js-counter
+forge demo run --preset js-bad-wire
+forge demo run --preset mixed-py-js
+```
+
+These run offline — no API key, no Ollama, no network. They demonstrate
+the `recon → wire → certify` pipeline on pre-built source the way a
+reviewer would expect to see it.
+
+**Why 60/100 is the JS ceiling today (and not a bug):** the certify
+score has six axes — docs / tests-present / tier-layout /
+upward-import-discipline / runtime-importability / behavioural
+test-pass-ratio. The first four are polyglot-aware as of 0.2 (worth
++45 points). The +25 runtime importability check (`python -c "import
+<pkg>"` in a fresh subprocess) credits a JS-only package vacuously
+because there's no `--package` to import — net +25. The +30
+behavioural axis, however, is wired only to pytest. Wiring `npm test`
+/ Vitest into the behavioural gate is on the 0.3 roadmap. Until then,
+60/100 with `wire: PASS` and `tests: PASS` is the honest ceiling for a
+JS-only package — and we're not going to fake the missing 30 points.
 
 ---
 

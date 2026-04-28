@@ -9,12 +9,13 @@
 [![Tests](https://img.shields.io/badge/tests-passing-green.svg)](tests/)
 [![Forge certify](https://img.shields.io/badge/forge_certify-100%2F100-brightgreen)](docs/SHOWCASE.md)
 
-> **Absorb. Enforce. Emerge.** The architecture substrate for AI-generated code.
+> **Absorb. Enforce. Emerge.** The architecture substrate for AI-generated code — now polyglot (Python, JavaScript, TypeScript).
 
 Forge is a monadic-architecture engine that does three things no existing
 tool combines:
 
-1. **Absorbs** Python repositories into a verified 5-tier layout.
+1. **Absorbs** Python or JavaScript / TypeScript repositories into a verified
+   5-tier layout.
 2. **Enforces** the upward-only import law on every emitted file.
 3. **Emerges** new capabilities by composing what already exists — and
    refuses to credit code that lies about what it does.
@@ -23,20 +24,60 @@ It's the substrate Cursor and Devin and Lovable don't have. It runs on
 free local models, free cloud tiers, or paid frontier models — same
 loop, swap the LLM, watch the trajectory carry harder tasks higher.
 
+**Languages:** Python (`.py`), JavaScript (`.js` / `.mjs` / `.cjs` / `.jsx`),
+TypeScript (`.ts` / `.tsx`). Cloudflare Workers, Node back-ends, and mixed
+Python+JS repositories all classify in a single pass — no Node dependency,
+`node_modules/` skipped automatically.
+
 ## 90-second demo
 
 ```bash
 pip install -e ".[dev]"
 export GEMINI_API_KEY=$(your-free-key)   # https://aistudio.google.com/apikey
 
+# LLM-driven Python packages (need an API key or local Ollama):
 forge demo run --preset calc --provider gemini   # 30s, score 90/100
 forge demo run --preset kv   --provider gemini   # ~70s, KvStore + tests + CLI
 forge demo run --preset slug --provider gemini   # ~22s, regex slugifier
+
+# Static polyglot showcases (no LLM key required — runs offline):
+forge demo run --preset js-counter   # clean a0..a4 JS package; wire PASS, certify 60/100*
+forge demo run --preset js-bad-wire  # JS package with an upward import — wire flags it
+forge demo run --preset mixed-py-js  # Python tier + JS tier in the same root
 ```
 
-Each preset produces a real, importable, pip-installable Python package
+The LLM presets produce real, importable, pip-installable Python packages
 with auto-generated README, passing tests, and a logged transcript of
-every LLM exchange. Live trajectories in [`docs/SHOWCASE.md`](docs/SHOWCASE.md).
+every LLM exchange. The polyglot showcase presets ship as pre-built
+source — they exercise `recon → wire → certify` on existing code so you
+can read the reports without spending a token. Live trajectories in
+[`docs/SHOWCASE.md`](docs/SHOWCASE.md).
+
+\* 60/100 is the honest ceiling for a JS-only package today. The +30
+behavioural pytest axis remains Python-only; wiring `npm test` / Vitest
+into that gate is on the 0.3 roadmap. The four polyglot-aware structural
+checks (docs / tests-present / tier-layout / upward-import-discipline)
+all PASS on `js-counter`. We're not going to fake the missing 30 points.
+
+### Polyglot recon (JS/TS in a single pass)
+
+```bash
+$ forge recon ./my-cloudflare-worker
+
+Recon: ./my-cloudflare-worker
+------------------------------------------------------------
+  python files:     0
+  javascript files: 4
+  typescript files: 1
+  primary language: javascript
+  symbols:          17
+  tier dist:        {'a0_qk_constants': 1, 'a1_at_functions': 2,
+                     'a2_mo_composites': 1, 'a4_sy_orchestration': 1}
+  effect dist:      {'pure': 9, 'state': 5, 'io': 3}
+  recommendations:
+    - JS/TS files are not yet split into aN_* tier directories —
+      see suggested_tier per file in symbols[].
+```
 
 ## Pipeline lanes
 
@@ -47,9 +88,9 @@ forge demo run --preset NAME                # Click-to-launch-video preset
 ```
 
 **What Forge does:**
-- Walks any Python repo, classifies every symbol into one of 5 architectural tiers
+- Walks any Python or JavaScript/TypeScript repo, classifies every symbol into one of 5 architectural tiers
 - Materializes into a tier-organized tree with strict upward-only imports
-- Detects architecture violations (upward imports, misclassified symbols)
+- Detects architecture violations (upward imports, misclassified symbols) — Python or JS, same law
 - Scores conformance: documentation, tests, tier layout, import discipline
 - Works with AI-generated code — absorbs it, fixes the architecture, ships it
 
@@ -75,7 +116,9 @@ Forge is **not a style checker**. It's an **architecture rebuilder**. It absorbs
 
 ## The 5-tier monadic law
 
-Every Python file belongs to exactly one tier. **Tiers compose upward only** — never sideways, never downward.
+Every source file (Python `.py`, JavaScript `.js`/`.mjs`/`.cjs`/`.jsx`, or
+TypeScript `.ts`/`.tsx`) belongs to exactly one tier. **Tiers compose upward
+only** — never sideways, never downward.
 
 ```
   a4_sy_orchestration/       ← CLI, entry points, top-level orchestration
@@ -231,7 +274,7 @@ forge emergent scan
 
 Forge ships with named limits. No overpromise.
 
-1. **Python only (for now).** TypeScript / Rust / Go are on the roadmap. The monadic tiers are language-agnostic; the 0.1 AST walker is Python-specific.
+1. **Python and JavaScript/TypeScript today; Rust / Go on the roadmap.** As of 0.2, `recon`, `wire`, and `certify` classify `.py`, `.js`, `.mjs`, `.cjs`, `.jsx`, `.ts`, and `.tsx`. The runtime-import smoke check (the +25 score component for "package actually loads in a fresh subprocess") and the behavioural pytest gate remain Python-only — JS/TS packages are scored on documentation, tests-present, tier layout, and upward-import discipline. The JS parser is regex + brace-walking, not a real AST; it handles the surface (imports, exports, class signals, Worker default-`{ fetch, scheduled }` shape) the tier law cares about.
 
 2. **Building material, not shipping software.** `forge auto` output is a **tier-organised starter skeleton**, not a deployable app. Every `--apply` emits `STATUS.md` listing required follow-up:
    - Integration tests against real inputs
@@ -239,13 +282,13 @@ Forge ships with named limits. No overpromise.
    - Observability (logging, metrics, tracing)
    - Cross-symbol reconciliation (two `User` classes need unification, not duplication)
 
-3. **Tier classification is heuristic.** Forge uses word-boundary tokens + body-state detection (mutable instance variables). The scout report logs the rationale per symbol so you can override misclassifications via `--override-tier`.
+3. **Tier classification is heuristic.** Forge uses word-boundary tokens + body-state detection (mutable instance variables in Python; class declarations + module-level `let`/`var` in JS). The scout report logs the rationale per symbol so you can override misclassifications via `--override-tier`.
 
 4. **No semantic merge.** Two `class User` from different repos don't auto-unify. Forge detects the collision via `--on-conflict` (rename | first | last | fail) and reports it. **You** decide how to reconcile.
 
 5. **Auto-generated adapters are scaffolding.** The `synergy` pipeline emits adapters marked with `# REVIEW:` blocks. Read them. Refine them. They're templates, not production code.
 
-6. **Certificates are not yet signed.** The conformance schema is finalized. Cryptographic signing ships in 0.2.
+6. **Certificates are not yet signed.** The conformance schema is finalized. Cryptographic signing remains on the 0.3 roadmap.
 
 ## Design philosophy
 
@@ -264,7 +307,7 @@ Forge ships with named limits. No overpromise.
 | Product | What it is | Status |
 |---------|------------|--------|
 | **AAAA-Nexus** | Trust/safety/payments substrate for autonomous agents | Live at [atomadic.tech](https://atomadic.tech) |
-| **Atomadic Forge** | Absorb-and-emerge engine for developers (this repo) | 0.1.0 |
+| **Atomadic Forge** | Absorb-and-emerge engine for developers (this repo) | 0.2.0 (polyglot — Python + JS/TS) |
 | **Atomadic Assistant** | Sovereign AI assistant with cognitive loop on Cloudflare | In development |
 
 ## License
@@ -290,7 +333,7 @@ Apache 2.0.
 **Forge itself is monadic.** Every source file belongs to one tier. The repo is a worked example:
 
 ```bash
-python -m pytest tests/          # 90 tests, all passing
+python -m pytest tests/          # 212 tests, all passing
 python -m atomadic_forge doctor  # Environment check
 python -m atomadic_forge wire src/atomadic_forge  # Scan for violations
 python -m atomadic_forge certify .  # Score the repo
@@ -307,8 +350,9 @@ python -m atomadic_forge certify .  # Score the repo
 **Experimental, working, honest.**
 
 - ✓ Tested end-to-end on its own codebase
-- ✓ Tested on reference Python repos
-- ✓ 90 tests, all passing
+- ✓ Tested on reference Python and JavaScript / TypeScript repos
+- ✓ 212 tests, all passing
 - ✓ Schema finalized (conformance, lineage, scaffold)
+- ✓ Polyglot — Python + JavaScript + TypeScript classified by the same 5-tier law (0.2)
 - ✗ Not yet on PyPI (coming soon)
-- ✗ Cryptographic signing (0.2)
+- ✗ Cryptographic signing (0.3)

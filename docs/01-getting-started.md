@@ -2,15 +2,21 @@
 
 ## What is Forge?
 
-Forge absorbs Python repositories and rebuilds them into certified monadic structure. It enforces the 5-tier architectural law across every file, detects violations, and scores conformance.
+Forge absorbs Python or JavaScript / TypeScript repositories and rebuilds
+them into certified monadic structure. It enforces the 5-tier
+architectural law across every file, detects violations, and scores
+conformance.
 
 **Key insight:** Forge is an architecture compiler, not a code generator. It reorganizes existing code.
 
 ## Before you start
 
-- Python 3.10+
+- Python 3.10+ (Forge itself is a Python tool)
 - pip or conda
-- A Python repository you want to reorganize (or an LLM API key / local Ollama for code generation)
+- A repository you want to reorganize — Python (`.py`), JavaScript
+  (`.js` / `.mjs` / `.cjs` / `.jsx`), or TypeScript (`.ts` / `.tsx`); or
+  an LLM API key / local Ollama for code generation
+- No Node.js install required — the JS parser is pure Python
 
 ## Installation
 
@@ -131,6 +137,30 @@ forge wire ./output/src/my_project
 # Score the result (docs, tests, layout, imports)
 forge certify ./output --package my_project
 ```
+
+### 5. JavaScript / TypeScript? Same verbs, no extra setup.
+
+`forge recon`, `wire`, and `certify` work on JS and TS the same way they
+work on Python. Try one of the static showcase presets to see the output
+shape:
+
+```bash
+forge demo run --preset js-counter   # clean a0..a4 JavaScript package
+forge demo run --preset js-bad-wire  # the same, with one upward import
+```
+
+For your own JS/TS repo:
+
+```bash
+forge recon ./my-cloudflare-worker
+# Shows: javascript files: N, typescript files: M,
+#        primary_language: javascript, suggested_tier per file.
+
+forge wire ./my-cloudflare-worker     # detects upward imports in JS too
+forge certify ./my-cloudflare-worker  # scores docs/tests/layout/imports
+```
+
+There's a full walk-through in [tutorials/06-javascript-quickstart.md](tutorials/06-javascript-quickstart.md).
 
 Example output:
 

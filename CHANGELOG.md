@@ -1,5 +1,104 @@
 # Changelog
 
+## 0.2.0 — _Polyglot (JavaScript / TypeScript) support_
+
+Forge is no longer Python-only. `recon`, `wire`, and `certify` now classify
+JavaScript and TypeScript files into the same 5-tier monadic layout that has
+always governed Python source. The same constraint substrate now answers for
+Cloudflare Workers, Node back-ends, React-Native modules, and any mixed-language
+repository — without adding a Node dependency to Forge itself.
+
+### What landed
+
+- **Polyglot file scanning.** `recon` walks `.py`, `.js`, `.mjs`, `.cjs`,
+  `.jsx`, `.ts`, and `.tsx` in a single pass. `node_modules/`, `.next/`,
+  `.wrangler/`, `dist/`, `build/`, `coverage/`, and `.turbo/` are skipped
+  automatically.
+- **Pure-Python JS parser.** ES6 `import` (named, default, namespace,
+  side-effect, `import type` for TS), dynamic `import()`, and CommonJS
+  `require()` (including destructured) are all parsed via regex + a
+  brace-walking surface scanner. Comments and string literals are stripped
+  first so a fake `import x from 'y'` inside a string never registers.
+- **Tier classification for JS/TS.** Files placed inside an `aN_*` directory
+  obey the law strictly. Files outside get a `suggested_tier` inferred from
+  their character — a Cloudflare Worker default-`{ fetch, scheduled }` is a4,
+  a class-with-state module is a2, an `export-const`-only module is a0, and so on.
+- **Polyglot wire-check.** Upward-import detection works against JS specifiers
+  like `"../a3_og_features/foo"` exactly as it works for Python `from`-imports.
+  Each violation now carries a `language` field (`"python"` / `"javascript"`
+  / `"typescript"`) so reports can group by source.
+- **Polyglot certify.**
+  - `tests` PASS recognises `tests/*.test.{js,mjs,jsx,cjs,ts,tsx}`,
+    `*.spec.*`, and the Jest `__tests__/` convention alongside Python's
+    `tests/test_*.py` and `*_test.py`.
+  - Tier-layout PASS counts JS-style top-level or nested `aN_*` directories
+    anywhere under the repo root, not just under `src/<pkg>/`.
+  - Failure messages are now specific (e.g. *"found 2 tier directories
+    (a1_at_functions, a4_sy_orchestration); need 3+"*).
+- **Per-language recon output.** `forge recon` prints
+  `python files: N`, `javascript files: M`, `typescript files: K`, plus a
+  `primary_language` verdict and a `recommendations` list when JS/TS files
+  exist outside tier directories.
+- **Three static showcase demo presets.** `forge demo` now ships
+  `js-counter` (clean a0..a4 JS package; wire PASS, certify 60/100 —
+  the honest ceiling for a JS-only package while behavioural scoring
+  remains Python-only), `js-bad-wire` (deliberately upward-imports —
+  wire surfaces the violation with `language: "javascript"`), and
+  `mixed-py-js` (one Python tier and one JS tier under the same root).
+  These run *without an LLM* — they showcase recon/wire/certify on
+  pre-built source, no API key required.
+
+### New / changed modules (monadic tier placement)
+
+| File | Tier | Purpose |
+|------|------|---------|
+| `a0_qk_constants/lang_extensions.py` | a0 (new) | Canonical `.py` / `.js` / `.mjs` / `.cjs` / `.jsx` / `.ts` / `.tsx` extension sets + `lang_for_path` lookup |
+| `a1_at_functions/js_parser.py` | a1 (new) | Pure regex + brace-walker for ES6 / CommonJS imports, exports, default-object handlers (Worker shape), state signals, tier classifier, effect detector |
+| `a1_at_functions/scout_walk.py` | a1 (extended) | Walks JS/TS as well as Python; per-file `suggested_tier`; per-language counts in the report |
+| `a1_at_functions/wire_check.py` | a1 (extended) | Polyglot upward-import scanner; each violation carries a `language` field; `node_modules/` and `__pycache__/` skipped |
+| `a1_at_functions/certify_checks.py` | a1 (extended) | `tests` and `tier_layout` checks recognise JS conventions; specific failure messages |
+| `a4_sy_orchestration/cli.py` | a4 (extended) | `forge recon` prints per-language counts and detected `primary_language` |
+| `a3_og_features/demo_runner.py` | a3 (extended) | `DemoPreset.kind` (`"llm"` / `"showcase"`) + `run_showcase` for static-package demos |
+| `a3_og_features/demo_packages/` | a3 (new) | Source files for `js-counter`, `js-bad-wire`, `mixed-py-js` showcase presets |
+
+### Tests
+
+42 new tests for the JS/TS scanner (ES6 / dynamic / CommonJS imports,
+TypeScript imports, comment + string-literal stripping, classifying a
+`worker.js` as a4, classifying a constants module as a0, JS-only repo
+recon, TypeScript counted, JS/TS upward-import detection in wire, JS
+test recognition in certify, polyglot tier-layout detection, and the
+specific layout-failure message), plus 20 follow-up tests for the
+canonical `IGNORED_DIRS` list, the file-class taxonomy
+(`source` / `documentation` / `config` / `asset` / `other`), and
+nested-`docs/` / `guides/` discovery in `check_documentation`.
+
+Total: **212 tests**, all passing.
+
+### Atomadic recon proof point
+
+| Repo state | Python | JavaScript | Primary | Certify |
+|------------|-------:|-----------:|---------|--------:|
+| Atomadic — before 0.2 | 1 | 0 (not seen) | python | 45/100 (tests FAIL) |
+| Atomadic — after  0.2 | 1 | 3 | javascript | 50/100 (tests PASS via `cognition.test.js`; layout still FAIL with specific reason: "0 tier directories present") |
+
+The remaining gap is real architecture work, not Forge limitation.
+
+### Known limits (still honest)
+
+- The JS parser is regex-based, not a real AST. It handles the surface
+  (imports / exports / class / default-object handlers / state signals)
+  the tier law cares about. JSX expressions, decorators, and exotic-shape
+  TypeScript generics are silently ignored where they would not affect the
+  tier verdict.
+- The runtime importability check (the +25 score component for "package
+  actually loads in a fresh subprocess") remains Python-only. JS/TS packages
+  are scored on documentation, tests, layout, and upward-import discipline;
+  the behavioural pytest gate stays a Python-side check too.
+- Rust / Go support is still on the roadmap.
+
+---
+
 ## 0.1.1 — _forge init setup wizard + forge config management_
 
 First-run experience: new users can configure Forge in 60 seconds without

@@ -4,14 +4,15 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "atomadic-forge"
-version = "0.1.0"
-description = "Atomadic Forge — absorb, enforce, emerge. Architecture guardian for AI-generated code."
+version = "0.2.0"
+description = "Atomadic Forge — absorb, enforce, emerge. Polyglot (Python + JavaScript/TypeScript) architecture guardian for AI-generated code."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Business Source License 1.1 (converts to Apache 2.0 on 2030-04-27)" }
 authors = [{ name = "Atomadic" }]
 keywords = ["atomadic", "ass-ade", "monadic", "architecture", "forge",
-            "code-quality", "ai", "agents"]
+            "code-quality", "ai", "agents", "javascript", "typescript",
+            "polyglot"]
 classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",

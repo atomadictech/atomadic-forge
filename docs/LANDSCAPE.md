@@ -11,7 +11,7 @@ genuinely uncommon._
 | **Cursor** | LLM-driven editor + chat | Excellent IDE, but no architectural law; codebases drift past 50k LOC | Forge is the architecture layer Cursor doesn't have |
 | **Cognition Devin** | Autonomous SWE agent | $2B valuation, 13–15% real-world SWE-bench; expensive | Forge is the substrate for *any* agent; cheap, deterministic |
 | **Replit Agent** | Build apps from prompts | Web-app focused; opinionated stack; closed ecosystem | Forge produces real Python packages you own and can ship anywhere |
-| **Lovable / Bolt / V0** | Prompt → web frontend | Frontend-only; backends and complex logic break down | Forge is language- and framework-agnostic substrate (Python now; multi-lang later) |
+| **Lovable / Bolt / V0** | Prompt → web frontend | Frontend-only; backends and complex logic break down | Forge is a polyglot substrate (Python + JavaScript/TypeScript today; Rust/Go on the roadmap) — the same 5-tier law governs Worker JS and Python back-ends in one repo |
 | **GitHub Copilot Workspace** | Plan → patch → PR | Tied to GitHub; PR-shaped workflows; closed | Forge runs locally, no platform lock-in |
 | **AutoGPT / MetaGPT / CrewAI** | Multi-agent orchestration | Frequently chaos; no architectural constraint | Forge gives any agent a hard constraint (the 5-tier law) |
 | **import-linter / archunit** | Layered architecture checks | Static enforcement only; no generation | Forge enforces AND generates within the law |
@@ -67,7 +67,10 @@ Be honest about this — it's how launch positioning survives contact with skept
 
 - **Forge is not an editor.** Don't try to use it like Cursor.
 - **Forge is not an agent platform.** Don't try to use it like Devin.
-- **Forge is not language-agnostic yet.** Python only as of 0.1.
+- **Forge is not omnilingual yet.** As of 0.2 it classifies Python and
+  JavaScript / TypeScript (`.py`, `.js`, `.mjs`, `.cjs`, `.jsx`, `.ts`,
+  `.tsx`). Rust and Go are on the roadmap. The runtime-import smoke and
+  behavioural pytest gates remain Python-only.
 - **Forge is not a hosted service yet.** It runs on your machine.
 - **Forge does not write production-ready apps from a prompt.** It produces
   bootstrapped, architecturally-coherent material that needs human review

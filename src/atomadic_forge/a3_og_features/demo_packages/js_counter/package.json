@@ -1,0 +1,11 @@
+{
+  "name": "js-counter-showcase",
+  "version": "0.1.0",
+  "description": "A clean a0..a4 JavaScript package — Forge showcase demo",
+  "type": "module",
+  "main": "a4_sy_orchestration/index.js",
+  "scripts": {
+    "test": "node --test tests/"
+  },
+  "license": "BSL-1.1"
+}

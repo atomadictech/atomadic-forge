@@ -219,7 +219,11 @@ forge auto ./repo-a ./output --apply --package merged --on-conflict rename
 
 ### forge recon
 
-Walk a repository, classify every public symbol, show tier/effect distributions.
+Walk a repository, classify every public symbol, show tier/effect
+distributions. Polyglot: walks Python (`.py`), JavaScript
+(`.js`/`.mjs`/`.cjs`/`.jsx`), and TypeScript (`.ts`/`.tsx`) in a single
+pass; `node_modules/`, `dist/`, `.next/`, `.wrangler/` and friends are
+skipped automatically.
 
 ```bash
 forge recon TARGET [OPTIONS]
@@ -229,22 +233,48 @@ forge recon TARGET [OPTIONS]
 - `TARGET` — Path to repository to analyze
 
 **Options:**
-- `--json` — Output full JSON report (includes per-symbol rationale)
+- `--json` — Output full JSON report (includes per-symbol rationale and `suggested_tier`)
 
-**Example:**
+**Example (Python repo):**
 
 ```bash
 forge recon ./repo
-# Output:
 # Recon: ./repo
-# ----
-#   python files: 45
-#   symbols:      222
-#   tier dist:    {a0: 7, a1: 130, a2: 42, a3: 32, a4: 11}
-#   effect dist:  {pure: 210, state: 0, io: 12}
+# ------------------------------------------------------------
+#   python files:     45
+#   javascript files: 0
+#   typescript files: 0
+#   primary language: python
+#   symbols:          222
+#   tier dist:        {a0: 7, a1: 130, a2: 42, a3: 32, a4: 11}
+#   effect dist:      {pure: 210, state: 0, io: 12}
+```
 
+**Example (JavaScript / Cloudflare Worker repo):**
+
+```bash
+forge recon ./my-worker
+# Recon: ./my-worker
+# ------------------------------------------------------------
+#   python files:     0
+#   javascript files: 4
+#   typescript files: 1
+#   primary language: javascript
+#   symbols:          17
+#   tier dist:        {a0: 1, a1: 2, a2: 1, a4: 1}
+#   effect dist:      {pure: 9, state: 5, io: 3}
+#   recommendations:
+#     - JS/TS files are not yet split into aN_* tier directories —
+#       see suggested_tier per file in symbols[].
+```
+
+The JSON output contains a `language_distribution` map keyed by
+`"python"` / `"javascript"` / `"typescript"`, and per-symbol
+`suggested_tier` so you can see where Forge would place each file under
+the 5-tier law.
+
+```bash
 forge recon ./repo --json > report.json
-# Full report with classification rationale per symbol
 ```
 
 ---
@@ -312,7 +342,9 @@ forge finalize ./repo ./output --apply --package myapp
 
 ### forge wire
 
-Scan a tier-organized package for upward-import violations.
+Scan a tier-organized package for upward-import violations. Polyglot —
+detects violations in Python `from`-imports and JS/TS module specifiers
+(`"../a3_og_features/foo"`) alike. `node_modules/` is skipped.
 
 ```bash
 forge wire PACKAGE [OPTIONS]
@@ -322,20 +354,48 @@ forge wire PACKAGE [OPTIONS]
 - `PACKAGE` — Path to tier-organized package root (a0, a1, a2, a3, a4 directories)
 
 **Options:**
-- `--json` — Output JSON violation list
+- `--json` — Output JSON violation list (each violation includes `language: "python" | "javascript" | "typescript"`)
 
-**Example:**
+**Example (Python):**
 
 ```bash
 forge wire ./output/src/myapp
 
-# Output:
 # Wire scan: ./output/src/myapp
 #   verdict:    FAIL
 #   violations: 5
 #     - a1_at_functions/helper.py: a1 ← a2_mo_composites.Store (upward import)
 #     - a0_qk_constants/config.py: a0 ← a1_at_functions.parse_config
 #     ... (list of violations)
+```
+
+**Example (JavaScript):**
+
+```bash
+forge wire ./packages/web
+
+# Wire scan: ./packages/web
+#   verdict:    FAIL
+#   violations: 1
+#     - a1_at_functions/echo.js: a1 ⟵ a3_og_features.../a3_og_features/feature.js
+```
+
+The JSON form makes the language explicit:
+
+```json
+{
+  "schema_version": "atomadic-forge.wire/v1",
+  "violations": [
+    {
+      "file": "a1_at_functions/echo.js",
+      "from_tier": "a1_at_functions",
+      "to_tier": "a3_og_features",
+      "imported": "../a3_og_features/feature.js",
+      "language": "javascript"
+    }
+  ],
+  "verdict": "FAIL"
+}
 ```
 
 **What violations mean:**
@@ -350,7 +410,23 @@ Move the offending import to a higher tier, or move the imported symbol to a low
 
 ### forge certify
 
-Score conformance: documentation, tests, tier layout, import discipline.
+Score conformance: documentation, tests, tier layout, import discipline,
+runtime importability (Python only), and behavioural pytest pass-ratio
+(Python only). Polyglot-aware where it can be:
+
+- `tests` PASS recognises Python (`tests/test_*.py`, `*_test.py`) AND
+  JavaScript / TypeScript (`tests/*.test.{js,mjs,jsx,cjs,ts,tsx}`,
+  `*.spec.*`, and the Jest `__tests__/` directory convention).
+- `tier_layout` PASS counts JS-style top-level or nested `aN_*`
+  directories anywhere under the repo root, not just under
+  `src/<pkg>/`. Failure messages name how many tiers were found and
+  which (e.g. *"found 2 tier directories (a1_at_functions,
+  a4_sy_orchestration); need 3+"*).
+- The runtime-import smoke (+25 points, runs `python -c "import <pkg>"`
+  in a fresh subprocess) and the behavioural pytest gate (+30 points)
+  remain Python-only. JS/TS-only packages are scored on the +45
+  polyglot-aware structural axes (docs / tests-present / tier layout /
+  upward-import discipline).
 
 ```bash
 forge certify OUTPUT [OPTIONS]

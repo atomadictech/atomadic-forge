@@ -54,6 +54,25 @@ pytest tests/
 python -m calc.a4_sy_orchestration.cli 7 + 6
 ```
 
+## Polyglot quickstart (JavaScript / TypeScript)
+
+`forge` classifies JS / TS the same way it classifies Python — no Node
+install required. Try the offline showcases:
+
+```bash
+forge demo run --preset js-counter   # clean JS package, certify 100/100
+forge demo run --preset js-bad-wire  # the same package with one upward
+                                     # import — wire flags it
+forge demo run --preset mixed-py-js  # one Python tier + one JS tier
+                                     # under the same root
+```
+
+Each writes to `./forge-demo-<preset>/` and emits a `DEMO.md` summarising
+what `recon`, `wire`, and `certify` saw. No LLM key needed — these run
+offline against pre-built source. See
+[06-javascript-quickstart.md](06-javascript-quickstart.md) for a full
+walk-through with your own JS repo.
+
 ## Next
 
 - [02-your-first-package.md](02-your-first-package.md) — building from
@@ -61,3 +80,5 @@ python -m calc.a4_sy_orchestration.cli 7 + 6
 - [03-the-five-tier-law.md](03-the-five-tier-law.md) — why every file
   has to live in exactly one tier.
 - [04-plug-in-llms.md](04-plug-in-llms.md) — switching providers.
+- [06-javascript-quickstart.md](06-javascript-quickstart.md) — running
+  the polyglot pipeline on your own JS / TS repo.

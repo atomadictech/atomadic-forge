@@ -2,9 +2,7 @@
 
 _Version-paced. Each line is a real, tractable next step, not a vision._
 
-## 0.1 — _Today_
-
-What ships:
+## 0.1 — _Shipped_
 
 - 5-tier monadic standard with `import-linter` contract
 - `forge auto` / `recon` / `cherry` / `finalize` (absorption pipeline)
@@ -15,17 +13,42 @@ What ships:
 - Tier `__init__` re-export rebuilder (idempotent, banner-gated)
 - LLM provider matrix: Gemini (free tier) / Anthropic / OpenAI / Ollama / stub
 - Auto-appending evolution log + transcript log per run
-- 90+ pytest tests, all live-validated trajectories
+- 90+ pytest tests
 
-**0.1 is shippable today.** Real packages emerge with honest scores.
+## 0.2 — _Today (polyglot)_
 
-## 0.2 — _Next 90 days_
+JavaScript and TypeScript classified by the same 5-tier law as Python:
+
+- **Polyglot file scanning** — `recon`, `wire`, `certify` walk `.py`,
+  `.js`, `.mjs`, `.cjs`, `.jsx`, `.ts`, `.tsx`. `node_modules/` and
+  friends skipped automatically.
+- **Pure-Python JS parser** — ES6 / dynamic / CommonJS imports, exports,
+  Worker default-`{ fetch, scheduled }` shape, class / state signals.
+  No Node dependency.
+- **Tier classification for JS/TS** — explicit `aN_*/` directory wins;
+  otherwise inferred from surface signals (Worker → a4, class with
+  state → a2, export-const-only → a0, pure-functions module → a1).
+- **Polyglot wire-check** — upward-import detection for JS specifiers
+  (`"../a3_og_features/foo"`) alongside Python `from`-imports; each
+  violation tagged with `language`.
+- **Polyglot certify** — JS test conventions (`*.test.*`, `*.spec.*`,
+  `__tests__/`) and JS-style `aN_*/` directories anywhere under the
+  root count toward `tests` and `tier_layout` PASS.
+- **Per-language recon output** — `python files: N`, `javascript
+  files: M`, `typescript files: K`, plus `primary_language` and
+  recommendations.
+- **Three static showcase demos** — `js-counter`, `js-bad-wire`,
+  `mixed-py-js`. No LLM key required.
+- **192 passing tests.**
+
+The runtime-import smoke (+25 score points) and behavioural pytest gate
+(+30 points) remain Python-only; JS/TS packages are scored on the +45
+polyglot-aware structural axes.
+
+## 0.3 — _Next 90 days_
 
 Sharpening for adoption:
 
-- **Wrong-package gating** — refuse to credit behavioral score when LLM
-  emits to a package other than the one requested (partial fix shipped this
-  session; more robust enforcement coming).
 - **Adversarial test inputs** — Forge itself generates 3–5 random inputs
   for each emitted public function and asserts non-degenerate output.
   Catches gameable LLM-written tests.
@@ -37,15 +60,16 @@ Sharpening for adoption:
   so editors and CI can pipe code through Forge as a service.
 - **Cryptographic certificate signing** — bind the `signed_by` field to
   a real key, make certificates verifiable.
-- **TypeScript proof-of-concept** — apply the 5-tier law to a TS package
-  via tree-sitter parsing.
+- **JS/TS behavioural gate** — wire `npm test` / Vitest into the
+  certify scorer so JS packages can earn the +30 behavioural points
+  the same way Python does.
+- **Rust support** — apply the 5-tier law via tree-sitter parsing.
 
-## 0.3 — _3–6 months_
+## 0.4 — _3–6 months_
 
 Multi-language + ecosystem:
 
-- TypeScript / JavaScript first-class support
-- Rust support
+- Rust + Go first-class support
 - Plugin system: per-language tier classifiers, per-language wire scanners
 - Pypi-hosted release with the `forge` console script
 - VS Code extension that surfaces wire violations inline

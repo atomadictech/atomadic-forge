@@ -94,8 +94,9 @@ Today: zero established players. **The pole position is open.**
 ## Forge isn't trying to be everything
 
 It's trying to be the **best** at one specific thing: keeping
-AI-generated Python coherent at scale, with cryptographically verifiable
-provenance and a behavior-honest score.
+AI-generated code coherent at scale (Python and JavaScript / TypeScript
+today, Rust and Go next), with cryptographically verifiable provenance
+and a behavior-honest score.
 
 That's a defensible niche. It's a fundable category. It pairs with
 everything else in the stack (Cursor in the editor, Forge enforcing the
@@ -104,10 +105,14 @@ viable past the 50k LOC mark.
 
 ## Three milestones
 
-- **0.1 (today)**: Python-only, working substrate, 9 commits, real demos.
-- **0.2 (next 90 days)**: TypeScript support, GitHub Action variant, CI
-  conformance gates, hosted certify dashboard.
-- **1.0 (12 months)**: Multi-language, signed certificates, plug-in
+- **0.1 (shipped)**: Python-only working substrate, real demos, behavioural
+  gating closed identity-stub gameability.
+- **0.2 (today)**: Polyglot — JavaScript and TypeScript classified by the
+  same 5-tier law in a single recon pass. `js-counter`, `js-bad-wire`,
+  and `mixed-py-js` showcase presets ship with the package.
+- **0.3 (next)**: Rust support, GitHub Action variant, hosted certify
+  dashboard, cryptographic certificate signing.
+- **1.0 (12 months)**: 5+ language support, signed certificates, plug-in
   ecosystem, the architecture-aware coding standard most teams default to.
 
 That's the case. The substrate exists, the receipts are in `git log`, the

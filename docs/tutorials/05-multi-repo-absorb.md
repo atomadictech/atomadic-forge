@@ -1,7 +1,10 @@
 # 05 — Multi-repo absorb
 
-Forge's other lane: take an existing flat-layout Python repository and
-materialise it into a clean, tier-organised, certifiable package.
+Forge's other lane: take an existing flat-layout Python *or JavaScript /
+TypeScript* repository and materialise it into a clean, tier-organised,
+certifiable package. The CLI verbs are identical across languages —
+`recon`, `cherry`, `finalize`, `wire`, `certify` all walk `.py`, `.js`,
+`.mjs`, `.cjs`, `.jsx`, `.ts`, and `.tsx` in a single pass.
 
 ## When you'd do this
 

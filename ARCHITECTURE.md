@@ -33,13 +33,14 @@ nothing new.
 
 ```
 src/atomadic_forge/
-├── a0_qk_constants/        # tier_names, forge_types, *_types.py
+├── a0_qk_constants/        # tier_names, forge_types, lang_extensions, *_types.py
 ├── a1_at_functions/        # classify_tier, scout_walk, cherry_pick, wire_check,
 │                            # certify_checks, body_extractor, import_repair,
-│                            # commandsmith_*, emergent_*, synergy_*
+│                            # js_parser, commandsmith_*, emergent_*, synergy_*
 ├── a2_mo_composites/       # manifest_store
 ├── a3_og_features/         # forge_pipeline (run_auto/run_recon/run_cherry/run_finalize),
-│                            # emergent_feature, synergy_feature, commandsmith_feature
+│                            # emergent_feature, synergy_feature, commandsmith_feature,
+│                            # demo_runner + demo_packages/ (static showcase presets)
 ├── a4_sy_orchestration/    # cli.py — Typer app with `auto` flagship
 └── commands/               # Per-verb Typer modules (specialty surfaces)
 ```
@@ -47,6 +48,38 @@ src/atomadic_forge/
 `tests/` mirrors the same shape. `pyproject.toml` declares a layered
 `import-linter` contract — `tox -e import-linter` (or just running the
 contracts directly) blocks CI on any violation.
+
+## File scanner (polyglot)
+
+Forge classifies Python AND JavaScript / TypeScript source. Two small
+modules carry the language layer; everything downstream stays
+language-agnostic:
+
+- `a0_qk_constants/lang_extensions.py` — canonical extension sets
+  (`PYTHON_EXTS = {.py}`, `JAVASCRIPT_EXTS = {.js, .mjs, .cjs, .jsx}`,
+  `TYPESCRIPT_EXTS = {.ts, .tsx}`) + the pure `lang_for_path` lookup.
+  Adding a language is a one-line change here.
+- `a1_at_functions/js_parser.py` — pure regex + brace-walker that extracts
+  what the rest of the pipeline needs from JS/TS without a Node dependency:
+  ES6 / dynamic / CommonJS imports, top-level exports (including
+  `export default { fetch, scheduled }` Worker shape), cheap effect /
+  state signals, and a `classify_js_tier` that honours explicit `aN_*`
+  placement first, then infers from surface signals.
+
+`scout_walk.iter_source_files` walks every recognised extension in one
+pass and skips vendored / build / cache directories
+(`node_modules`, `dist`, `build`, `coverage`, `.next`, `.nuxt`,
+`.wrangler`, `.turbo`, plus the Python equivalents). `wire_check`
+classifies each file by the tier directory it lives in and dispatches
+to a Python-AST or JS-regex import scanner. `certify_checks` recognises
+JS test conventions (`*.test.*`, `*.spec.*`, `__tests__/`) alongside
+the Python `tests/test_*.py` shape.
+
+The behavioural pytest runner and the runtime-import smoke check remain
+Python-only — they're the +55 score components that prove "the package
+actually does what its tests say." JS / TS packages are scored on the
++45 polyglot-aware structural axes (docs, tests-present, tier layout,
+upward-import discipline).
 
 ## Principal data flows
 

@@ -1,6 +1,9 @@
 # Atomadic Forge Documentation
 
-Welcome to the Forge documentation. Start with the guide that matches your goal:
+Welcome to the Forge documentation. Forge is a polyglot architecture
+substrate — as of 0.2 it classifies Python and JavaScript / TypeScript
+under the same 5-tier monadic law. Start with the guide that matches
+your goal:
 
 ## 🚀 New to Forge?
 
@@ -9,6 +12,10 @@ Start here: **[Getting Started](01-getting-started.md)** (5 minutes)
 - What Forge is and what it does
 - Installation instructions
 - Your first absorption (dry-run → apply → verify)
+- JavaScript / TypeScript quick example
+
+For a JS/TS-only walk-through, jump to
+**[tutorials/06-javascript-quickstart.md](tutorials/06-javascript-quickstart.md)**.
 
 ## 📚 How-to guides
 
@@ -74,21 +81,26 @@ See [CONTRIBUTING.md](../CONTRIBUTING.md) for:
 
 ## 📊 Versions
 
-This documentation is for **Atomadic Forge 0.1.0**.
+This documentation is for **Atomadic Forge 0.2.0**.
 
-- **0.1.0** — Initial release (current)
+- **0.1.0** — Initial release
   - Core absorption pipeline
   - LLM loops (iterate, evolve)
-  - 90 passing tests
-  - Python 3.10+ support
-  
-- **0.2.0** (upcoming)
-  - Cryptographic signing of conformance certificates
-  - Customizable tier classification
-  - TypeScript support (beta)
-  
+  - 90+ passing tests
+  - Python only
+
+- **0.2.0** (current) — Polyglot
+  - JavaScript and TypeScript classified under the same 5-tier law
+  - Pure-Python JS parser (no Node dependency); `node_modules/` skipped
+  - Wire scan, certify checks, recon recommendations all polyglot-aware
+  - Three new static showcase demo presets (`js-counter`, `js-bad-wire`, `mixed-py-js`)
+  - Canonical `IGNORED_DIRS` + file-class taxonomy (source / docs / config / asset) and nested-`docs/`/`guides/` discovery
+  - 212 passing tests
+
 - **0.3.0** (roadmap)
   - Rust support
+  - Cryptographic signing of conformance certificates
+  - GitHub Action variant + hosted certify dashboard
   - Semantic merge (intelligent handling of duplicate classes)
   - IDE plugins (VS Code, JetBrains)
 
