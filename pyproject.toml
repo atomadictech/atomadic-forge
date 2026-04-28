@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Atomadic Forge — absorb, enforce, emerge. Architecture guardian for AI-generated code."
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "BSL-1.1" }
+license = { text = "Business Source License 1.1 (converts to Apache 2.0 on 2030-04-27)" }
 authors = [{ name = "Atomadic" }]
 keywords = ["atomadic", "ass-ade", "monadic", "architecture", "forge",
             "code-quality", "ai", "agents"]
