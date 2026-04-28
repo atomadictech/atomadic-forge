@@ -10,7 +10,7 @@ Forge absorbs Python repositories and rebuilds them into certified monadic struc
 
 - Python 3.10+
 - pip or conda
-- A Python repository you want to reorganize
+- A Python repository you want to reorganize (or an LLM API key / local Ollama for code generation)
 
 ## Installation
 
@@ -22,7 +22,53 @@ pip install atomadic-forge
 git clone https://github.com/atomadictech/atomadic-forge
 cd atomadic-forge
 pip install -e ".[dev]"
-python -m pytest tests/  # Verify: 90 tests pass
+python -m pytest tests/  # Verify: 150 tests pass
+```
+
+## Step 0: Configure Forge (do this first)
+
+Before running any Forge command, run the setup wizard. It takes 60 seconds and saves your LLM provider, API keys, and defaults so you never need to pass them on the command line.
+
+```bash
+forge init
+```
+
+The wizard walks you through 5 steps:
+
+1. **LLM Provider** — Ollama (local, free), Gemini, Claude, OpenAI, or Auto
+2. **Model** — lists available Ollama models; recommends best cloud model
+3. **API key** — masked input, validated immediately (skipped for Ollama)
+4. **Defaults** — target score, auto-apply toggle, output/source directories
+5. **Verify** — tests the connection and prints a summary
+
+Config is written to `.atomadic-forge/config.json` in the current directory.
+
+```
+╭─ Configuration Summary ──────────────────────────────╮
+│                                                       │
+│  Provider:      Ollama                                │
+│  Model:         mistral:7b-instruct                   │
+│  URL:           http://localhost:11434                 │
+│  Target Score:  75/100                                │
+│  Auto-Apply:    No (dry-run by default)               │
+│  Output Dir:    ./forged                              │
+│  Sources Dir:   ./sources                             │
+│  Config File:   .atomadic-forge/config.json           │
+│                                                       │
+│  ✓ LLM connection tested — OK (245ms)                │
+│  ✓ Python 3.12 detected                               │
+│  ✓ Config saved                                       │
+│                                                       │
+╰───────────────────────────────────────────────────────╯
+```
+
+You can view or change individual settings at any time:
+
+```bash
+forge config show                          # print current config
+forge config set provider ollama           # change provider
+forge config set default_target_score 80   # change threshold
+forge config test                          # test connection
 ```
 
 ## Your first run (5 minutes)
@@ -137,6 +183,7 @@ This directory contains diagnostic JSON:
 
 ## Next steps
 
+- Run `forge init` to configure your LLM provider (if you haven't already)
 - Read the [Command Reference](02-commands.md) for details on each verb
 - See [Tutorial: Absorb a Real Repo](03-tutorial.md) for a full walkthrough
 - Learn [Advanced: LLM Loops](04-llm-loops.md) to generate code with Forge
