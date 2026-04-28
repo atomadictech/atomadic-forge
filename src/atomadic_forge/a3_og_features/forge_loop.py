@@ -34,6 +34,7 @@ from ..a1_at_functions.scaffold_starter import (
 )
 from ..a1_at_functions.scout_walk import harvest_repo
 from ..a1_at_functions.tier_init_rebuild import rebuild_tier_inits
+from ..a1_at_functions.transcript_log import TranscriptLog
 from ..a1_at_functions.wire_check import scan_violations
 from ..a2_mo_composites.manifest_store import ManifestStore
 
@@ -166,6 +167,7 @@ def run_iterate(
     llm = llm or resolve_default_client()
     pkg_root = (_scaffold_package(output, package, intent=intent)
                 if apply else output / "src" / package)
+    transcript = TranscriptLog(output) if apply else None
 
     # Optional seed catalog from a sibling repo.
     seed_catalog: list[dict] = []
@@ -173,7 +175,7 @@ def run_iterate(
         scout = harvest_repo(Path(seed_repo))
         seed_catalog = scout.get("symbols", [])
 
-    transcript: list[dict[str, Any]] = []
+    turn_log: list[dict[str, Any]] = []
     history_files: list[str] = []
     sys_prompt = system_prompt()
 
@@ -189,13 +191,17 @@ def run_iterate(
             "llm": llm.name,
         }
 
+    if transcript:
+        transcript.append("system", sys_prompt, role="system", llm=llm.name)
+        transcript.append("prompt", prompt, role="user", llm=llm.name,
+                          extra={"turn": 0, "phase": "initial"})
     response = llm.call(prompt, system=sys_prompt)
+    if transcript:
+        transcript.append("response", response, role="assistant",
+                          llm=llm.name, extra={"turn": 0})
     files = parse_files_from_response(response)
     parse_retried = False
     if not files and response.strip() and not response.strip().endswith("[]"):
-        # The LLM said something but Forge couldn't parse it.  One re-ask
-        # with a stricter prompt — small models often respond to direct
-        # correction better than to the original instructions.
         retry_prompt = (
             "Your previous response did not parse as a JSON array of "
             "`{path, content}` objects.  Output ONLY the JSON array "
@@ -204,16 +210,24 @@ def run_iterate(
             "`[]`.\n\n"
             "Re-emit your output now."
         )
+        if transcript:
+            transcript.append("prompt", retry_prompt, role="user",
+                              llm=llm.name,
+                              extra={"turn": 0, "phase": "parse-retry"})
         response = llm.call(retry_prompt, system=sys_prompt)
+        if transcript:
+            transcript.append("response", response, role="assistant",
+                              llm=llm.name,
+                              extra={"turn": 0, "phase": "parse-retry"})
         files = parse_files_from_response(response)
         parse_retried = True
     written = _write_files(output, files)
     if pkg_root.exists():
         rebuild_tier_inits(pkg_root)
     history_files.extend(written)
-    transcript.append({"turn": 0, "prompt": prompt, "files_written": written,
-                        "raw_response_chars": len(response),
-                        "parse_retried": parse_retried})
+    turn_log.append({"turn": 0, "prompt": prompt, "files_written": written,
+                     "raw_response_chars": len(response),
+                     "parse_retried": parse_retried})
 
     # ── Iteration turns ────────────────────────────────────────────────────
     final_wire: dict[str, Any] | None = None
@@ -244,18 +258,25 @@ def run_iterate(
                                    emergent_overlay=emergent,
                                    reuse_stats=reuse,
                                    iteration=turn)
+        if transcript:
+            transcript.append("prompt", feedback, role="user", llm=llm.name,
+                              extra={"turn": turn, "phase": "iterate"})
         response = llm.call(feedback, system=sys_prompt)
+        if transcript:
+            transcript.append("response", response, role="assistant",
+                              llm=llm.name, extra={"turn": turn})
         files = parse_files_from_response(response)
         if not files:
-            # LLM signalled done.
-            transcript.append({"turn": turn, "prompt_chars": len(feedback),
-                                "files_written": [], "signal": "llm_done"})
+            turn_log.append({"turn": turn, "prompt_chars": len(feedback),
+                             "files_written": [], "signal": "llm_done"})
             break
         written = _write_files(output, files)
+        if pkg_root.exists():
+            rebuild_tier_inits(pkg_root)
         history_files.extend(written)
-        transcript.append({"turn": turn, "prompt_chars": len(feedback),
-                            "files_written": written,
-                            "raw_response_chars": len(response)})
+        turn_log.append({"turn": turn, "prompt_chars": len(feedback),
+                         "files_written": written,
+                         "raw_response_chars": len(response)})
 
     report: dict[str, Any] = {
         "schema_version": "atomadic-forge.iterate/v1",
@@ -264,7 +285,7 @@ def run_iterate(
         "package": package,
         "output_root": str(output),
         "llm": llm.name,
-        "iterations": len(transcript),
+        "iterations": len(turn_log),
         "files_written_total": len(set(history_files)),
         "converged": converged,
         "final_wire": final_wire,
@@ -272,7 +293,8 @@ def run_iterate(
             "score": (final_cert or {}).get("score", 0),
             "issues": (final_cert or {}).get("issues", []),
         },
-        "transcript": transcript,
+        "transcript": turn_log,
+        "transcript_log_path": (str(transcript.path) if transcript else None),
         "generated_at_utc": _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds"),
     }
     ManifestStore(output).save("iterate", report)
