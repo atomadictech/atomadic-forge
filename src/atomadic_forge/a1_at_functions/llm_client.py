@@ -310,6 +310,13 @@ class AAAANexusClient:
             endpoint,
             data=body,
             headers={
+                # AAAA-Nexus auth: the storefront worker reads ``X-API-Key``
+                # (NOT ``Authorization: Bearer``) and matches against keys
+                # registered in NONCE_CACHE KV.  Sending only Bearer falls
+                # through to the 3-call/day/IP trial path with HTTP 402.
+                # We send both headers so the same client also works against
+                # any future Bearer-style endpoint without a code change.
+                "X-API-Key": api_key,
                 "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json",
                 # Cloudflare Worker WAF rejects urllib's default UA

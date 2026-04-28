@@ -156,13 +156,25 @@ def test_call_uses_correct_endpoint_per_wrapper(monkeypatch):
         assert captured["url"].endswith(expected_path)
 
 
-def test_call_sends_bearer_auth_and_useragent(monkeypatch):
-    """Cloudflare WAF rejects the default urllib UA — client must override."""
+def test_call_sends_xapikey_bearer_and_useragent(monkeypatch):
+    """The Nexus storefront reads X-API-Key (Bearer falls through to trial).
+
+    The client sends BOTH headers so the same code works against
+    operator-tier (X-API-Key matches NONCE_CACHE) AND any future
+    Bearer-style endpoint.  Cloudflare WAF also rejects urllib's default
+    UA, so the User-Agent must be overridden.
+    """
     monkeypatch.setenv("AAAA_NEXUS_API_KEY", "secret-token")
     captured: dict = {}
     monkeypatch.setattr(urllib.request, "urlopen", _capture_request(captured))
     c = AAAANexusClient()
     c.call("x")
+    # X-API-Key is the load-bearing header for AAAA-Nexus auth.
+    xapi = captured["headers"].get("X-api-key", "") or captured["headers"].get("X-API-Key", "")
+    assert xapi == "secret-token", (
+        f"X-API-Key must equal the raw key (Nexus auth gate); got {xapi!r}"
+    )
+    # Bearer is also sent for forward-compat with hypothetical Bearer endpoints.
     auth = captured["headers"].get("Authorization", "")
     assert auth == "Bearer secret-token"
     ua = captured["headers"].get("User-agent", "") or captured["headers"].get("User-Agent", "")
