@@ -217,6 +217,8 @@ def doctor_cmd(
 # break the others.
 def _register_specialty_apps() -> None:
     for module_path, name, help_text in (
+        ("atomadic_forge.commands.demo", "demo",
+         "One-shot launch-video verb: preset evolve + DEMO.md artifact."),
         ("atomadic_forge.commands.iterate", "iterate",
          "LLM ↔ Forge loop: intent → architecturally-coherent code."),
         ("atomadic_forge.commands.evolve", "evolve",
