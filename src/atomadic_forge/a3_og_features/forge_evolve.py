@@ -24,6 +24,9 @@ import datetime as _dt
 from pathlib import Path
 from typing import Any
 
+from ..a0_qk_constants.gen_language import (
+    Language, normalize_language, pkg_root_for,
+)
 from ..a1_at_functions.evolution_log import append_evolve_run
 from ..a1_at_functions.llm_client import LLMClient, resolve_default_client
 from ..a1_at_functions.scout_walk import harvest_repo
@@ -43,6 +46,7 @@ def run_evolve(
     target_score: float = 75.0,
     stop_on_regression: bool = False,
     stagnation_threshold: int = 3,
+    language: Language | str = "python",
 ) -> dict[str, Any]:
     """Recursive iterate.
 
@@ -52,11 +56,16 @@ def run_evolve(
     ``stagnation_threshold`` halts evolve when the score AND symbol count
     are unchanged for that many consecutive rounds — saves tokens when the
     LLM is stuck re-emitting the same files.  Set to 0 to disable.
+
+    ``language`` is forwarded to ``run_iterate`` and determines the output
+    layout (``"python"`` → ``output/src/<package>/aN_*/*.py``,
+    ``"javascript"`` → ``output/<package>/aN_*/*.js``).
     """
     output = Path(output).resolve()
     output.mkdir(parents=True, exist_ok=True)
     llm = llm or resolve_default_client()
-    pkg_root = output / "src" / package
+    lang: Language = normalize_language(language)
+    pkg_root = output / pkg_root_for(lang, package)
 
     rounds_log: list[dict[str, Any]] = []
     last_symbol_count = 0
@@ -75,6 +84,7 @@ def run_evolve(
             max_iterations=iterations_per_round,
             target_score=target_score,
             apply=True,
+            language=lang,
         )
         # Re-scout the generated package to grow the catalog.
         catalog = harvest_repo(pkg_root) if pkg_root.exists() else {"symbols": [], "symbol_count": 0}
@@ -127,6 +137,7 @@ def run_evolve(
         "schema_version": "atomadic-forge.evolve/v1",
         "intent": intent,
         "package": package,
+        "language": lang,
         "output_root": str(output),
         "llm": llm.name,
         "rounds": rounds_log,

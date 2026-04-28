@@ -82,6 +82,8 @@ def run_cmd(
         exists=True, file_okay=False, dir_okay=True, resolve_path=True)] = None,
     provider: Annotated[str, typer.Option("--provider",
         help="auto | gemini | anthropic | openai | ollama | stub")] = "auto",
+    language: Annotated[str, typer.Option("--language", "-l",
+        help="Output language: python | javascript | typescript")] = "python",
     stop_on_regression: Annotated[bool, typer.Option("--stop-on-regression")] = False,
     json_out: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
@@ -98,17 +100,23 @@ def run_cmd(
         iterations_per_round=iterations_per_round,
         target_score=target_score,
         stop_on_regression=stop_on_regression,
+        language=language,
     )
     if json_out:
         typer.echo(json.dumps(report, indent=2, default=str))
         return
 
+    # Output path varies by language: python uses src/, JS/TS uses pkg root directly.
+    lang = report.get("language", "python")
+    pkg_path = (f"src/{report['package']}" if lang == "python"
+                else report["package"])
     typer.echo(f"\nForge evolve — {auto} round(s) requested, "
                 f"{report['rounds_completed']} completed")
     typer.echo("-" * 60)
     typer.echo(f"  llm:      {report['llm']}")
     typer.echo(f"  package:  {report['package']}")
-    typer.echo(f"  output:   {report['output_root']}/src/{report['package']}")
+    typer.echo(f"  language: {lang}")
+    typer.echo(f"  output:   {report['output_root']}/{pkg_path}")
     typer.echo("")
     typer.echo("  Round │ Iters │ Files │ Symbols (Δ)    │ Score (Δ)      │ Wire │ Conv")
     typer.echo("  ──────┼───────┼───────┼────────────────┼────────────────┼──────┼──────")

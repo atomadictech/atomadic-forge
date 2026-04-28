@@ -9,6 +9,11 @@ The packing is designed to make the LLM's job easy:
 * exact line content of violating imports
 * explicit "fix this by …" hints when the rule is mechanical
 * a single ``CHANGE_REQUEST`` block at the bottom describing what to emit next
+
+System prompts come in language-specific variants (Python / JavaScript /
+TypeScript) — the structural feedback (wire violations, score gaps, reuse
+ratio) is language-agnostic, but the emit-format and import-style
+instructions differ per language.
 """
 
 from __future__ import annotations
@@ -16,7 +21,7 @@ from __future__ import annotations
 from typing import Any
 
 
-_SYSTEM_PROMPT = """\
+_SYSTEM_PROMPT_PYTHON = """\
 You are a code-generation engine constrained by Atomadic Forge's 5-tier
 monadic architecture.
 
@@ -71,20 +76,92 @@ package with real bodies scores high; stubs and broken imports lose points.
 """
 
 
-def system_prompt() -> str:
-    return _SYSTEM_PROMPT
+_SYSTEM_PROMPT_JS = """\
+You are a code-generation engine constrained by Atomadic Forge's 5-tier
+monadic architecture, emitting JavaScript (ES modules) for Cloudflare
+Workers / Node 20+ / browsers.
+
+Forge has ALREADY scaffolded the surrounding package for you:
+  - ``package.json`` with ``"type": "module"`` so ES6 imports resolve
+  - ``README.md`` describing the intent and layout
+  - ``.gitignore``
+  - All five tier directories (no ``__init__.py`` — ES modules don't need them)
+
+You should focus on emitting the actual ``.js`` files.  DO NOT re-emit
+``package.json`` or ``README.md`` — they are already correct.
+
+The 5-tier law (compose UPWARD only):
+  a0_qk_constants   — exported constants, enums, type-shape JSDoc.  Imports nothing.
+  a1_at_functions   — pure stateless functions.  Imports a0 only.
+  a2_mo_composites  — stateful classes / clients / stores.  Imports a0, a1.
+  a3_og_features    — feature orchestrators.  Imports a0, a1, a2.
+  a4_sy_orchestration — Worker entry / CLI / top-level dispatch.  Imports a0–a3.
+
+When you emit code, you MUST:
+  1. Place each new file under the correct ``a{N}_*/`` directory.
+  2. Never import upward (lower tier importing from higher tier).
+  3. One responsibility per file.
+  4. File-leading docstring comment of the form: ``// Tier aN — <one-line>.``
+  5. Write COMPLETE function bodies — no `throw new Error("not impl")`,
+     no `// TODO`, no empty bodies that just return undefined.  If you
+     don't know how to implement something, choose a simpler design.
+  6. Use ES module syntax — ``import { x } from "./other.js"`` and
+     ``export function …`` / ``export const …`` / ``export default …``.
+     Cross-tier imports MUST include the full relative path with the
+     ``.js`` extension: ``import { foo } from "../a1_at_functions/foo.js"``.
+     No bare specifiers, no CommonJS ``require()``, no default-only exports
+     for libraries (default-export the Worker handler at a4 ONLY).
+  7. Output as a JSON array of file objects ONLY — no prose, no fences:
+       [{"path": "<pkg>/aN_…/foo.js", "content": "…"}, ...]
+  8. SUBSTITUTE the actual package name into every `<pkg>` placeholder.
+     Note: there is NO ``src/`` prefix — the package directory sits at
+     the output root.
+  9. For a Cloudflare Worker, the a4 entry file exports a ``default``
+     object with ``fetch(request, env, ctx)`` and/or ``scheduled(event,
+     env, ctx)``.  Helpers it calls live in a1–a3.
+
+Example (intent: "counter with increment() at a1, Worker at a4", package: "counter"):
+
+[
+  {"path": "counter/a1_at_functions/increment.js",
+   "content": "// Tier a1 — pure increment.\\nexport function increment(n) { return n + 1; }\\n"},
+  {"path": "counter/a4_sy_orchestration/worker.js",
+   "content": "// Tier a4 — Worker entry.\\nimport { increment } from \\"../a1_at_functions/increment.js\\";\\nexport default {\\n  async fetch(request) {\\n    const url = new URL(request.url);\\n    const n = Number(url.searchParams.get(\\"n\\")) || 0;\\n    return new Response(String(increment(n)));\\n  }\\n};\\n"}
+]
+
+Forge then materialises your output, runs wire + certify, and feeds any
+violations back to you on the next turn.  Clean ES-module imports score
+high; broken imports and upward-tier violations lose points.
+"""
+
+
+def system_prompt(language: str = "python") -> str:
+    """Return the language-appropriate system prompt for the LLM.
+
+    ``language`` accepts ``"python"`` (default), ``"javascript"``, or
+    ``"typescript"`` (typescript reuses the JS prompt today; tsconfig
+    polish is on the 0.3 roadmap).
+    """
+    if language in ("javascript", "typescript"):
+        return _SYSTEM_PROMPT_JS
+    return _SYSTEM_PROMPT_PYTHON
 
 
 def pack_initial_intent(intent: str, *, package: str = "absorbed",
-                          seed_catalog: list[dict] | None = None) -> str:
+                          seed_catalog: list[dict] | None = None,
+                          language: str = "python") -> str:
     """Build the first-turn prompt: the user's intent + (optional) seed material."""
+    if language in ("javascript", "typescript"):
+        target_path = f"`{package}/` — emit files under the 5-tier layout below."
+    else:
+        target_path = f"`src/{package}/` — emit files under the 5-tier layout below."
     parts = [
         f"# Intent",
         f"",
         intent.strip(),
         f"",
         f"# Target package",
-        f"`src/{package}/` — emit files under the 5-tier layout below.",
+        target_path,
         f"",
     ]
     if seed_catalog:
@@ -99,8 +176,13 @@ def pack_initial_intent(intent: str, *, package: str = "absorbed",
         if len(seed_catalog) > 40:
             parts.append(f"- … {len(seed_catalog) - 40} more symbols available")
         parts.append("")
-        parts.append("Reuse these where possible by importing from "
-                      f"`{package}.aN_…` paths.")
+        if language in ("javascript", "typescript"):
+            parts.append("Reuse these where possible — import from the "
+                          f"corresponding `{package}/aN_*/<file>.js` paths "
+                          "with relative ES-module specifiers.")
+        else:
+            parts.append("Reuse these where possible by importing from "
+                          f"`{package}.aN_…` paths.")
         parts.append("")
     parts.extend([
         "# CHANGE_REQUEST",
