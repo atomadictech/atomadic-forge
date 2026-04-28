@@ -4,6 +4,179 @@ All Forge commands are available via `forge VERB [OPTIONS] [ARGS]`.
 
 For help: `forge --help` or `forge VERB --help`.
 
+## Setup and configuration
+
+### forge init
+
+**Start here.** Interactive 5-step wizard that configures your LLM provider, API keys, project defaults, and writes `.atomadic-forge/config.json`.
+
+```bash
+forge init
+```
+
+**What it does (5 steps):**
+
+1. **LLM Provider** — choose Ollama, Gemini, Claude, OpenAI, or Auto
+2. **Model selection** — lists available Ollama models; recommends cloud models
+3. **API key** — masked password input with immediate validation (skipped for Ollama/Auto)
+4. **Project defaults** — target score, auto-apply flag, output/source directories
+5. **Verification** — tests the LLM connection and prints a configuration summary
+
+**Example flow:**
+
+```
+╭─ Atomadic Forge — Setup   [Step 1/5: LLM Provider] ─╮
+│                                                       │
+│  [1] Ollama (local, free, private)                    │
+│  [2] Gemini (Google)                                  │
+│  [3] Claude (Anthropic)                               │
+│  [4] OpenAI (GPT)                                     │
+│  [5] Auto (detect best available)                     │
+│                                                       │
+╰───────────────────────────────────────────────────────╯
+Select provider [5]:
+```
+
+After all steps, a summary panel is printed and config is saved to `.atomadic-forge/config.json`.
+
+**Notes:**
+- Completely safe to re-run; existing values are offered as defaults at every prompt.
+- Use `forge config wizard` for the same wizard from within the `config` sub-group.
+- Config priority: local `.atomadic-forge/config.json` → global `~/.atomadic-forge/config.json` → built-in defaults.
+
+---
+
+### forge config
+
+Config management sub-group: show, set, test, wizard.
+
+```bash
+forge config SUBCOMMAND [OPTIONS]
+```
+
+**Subcommands:**
+
+#### forge config show
+
+Print the current merged configuration (local → global → defaults).
+
+```bash
+forge config show [--project DIR] [--json]
+```
+
+**Options:**
+- `--project DIR` — project directory to load local config from (default: cwd)
+- `--json` — emit a JSON object `{config: {...}, issues: [...]}`
+
+**Example:**
+
+```bash
+forge config show
+# Output:
+# Atomadic Forge — config
+# --------------------------------------------
+#   provider                     auto
+#   ollama_url                   http://localhost:11434
+#   ollama_model                 mistral:7b-instruct
+#   gemini_key                   (not set)
+#   default_target_score         75.0
+#   auto_apply                   False
+#   output_dir                   ./forged
+#   sources_dir                  ./sources
+#   package_prefix               forged
+#
+#   Config is valid.
+
+forge config show --json
+```
+
+API keys are automatically masked (first 8 + last 4 chars) in human-readable output.
+
+---
+
+#### forge config set
+
+Set a single config key in the local (or global) config file.
+
+```bash
+forge config set KEY VALUE [--project DIR] [--global]
+```
+
+**Arguments:**
+- `KEY` — config key to set (e.g. `provider`, `ollama_model`, `default_target_score`)
+- `VALUE` — value to assign (automatically coerced: `true`/`false` → bool, numeric → int/float)
+
+**Options:**
+- `--project DIR` — project directory (default: cwd)
+- `--global` — write to `~/.atomadic-forge/config.json` instead of `.atomadic-forge/config.json`
+
+**Examples:**
+
+```bash
+# Set provider for this project
+forge config set provider ollama
+
+# Set target score (auto-coerced to float)
+forge config set default_target_score 80.0
+
+# Enable auto-apply globally
+forge config set auto_apply true --global
+
+# Set Ollama model
+forge config set ollama_model qwen2.5-coder:7b
+```
+
+---
+
+#### forge config test
+
+Test the configured LLM provider connection.
+
+```bash
+forge config test [--project DIR] [--provider PROVIDER] [--json]
+```
+
+**Options:**
+- `--provider PROVIDER` — override the configured provider for this test only
+- `--project DIR` — project directory (default: cwd)
+- `--json` — emit `{ok, model, error, latency_ms}`
+
+**Examples:**
+
+```bash
+# Test whatever provider is configured
+forge config test
+
+# Test a specific provider
+forge config test --provider ollama
+forge config test --provider stub   # always succeeds, no network call
+
+# JSON output (good for scripting)
+forge config test --json
+```
+
+**Output:**
+
+```
+Provider test — ollama
+
+  Status:    OK
+  Model:     mistral:7b-instruct
+  Latency:   143ms
+```
+
+---
+
+#### forge config wizard
+
+Same as `forge init` — runs the interactive 5-step setup wizard.
+
+```bash
+forge config wizard [--project DIR]
+```
+
+---
+
 ## Core commands (the absorb pipeline)
 
 ### forge auto

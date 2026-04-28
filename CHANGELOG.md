@@ -1,5 +1,51 @@
 # Changelog
 
+## 0.1.1 — _forge init setup wizard + forge config management_
+
+First-run experience: new users can configure Forge in 60 seconds without
+touching environment variables or config files by hand.
+
+### New commands
+
+- `forge init` — top-level alias for the interactive setup wizard.
+- `forge config wizard` — same wizard from within the config sub-group.
+- `forge config show` — print the current merged config (local > global > defaults);
+  API keys are masked automatically. `--json` for scripting.
+- `forge config set KEY VALUE` — set a single key in the local (or `--global`) config file;
+  booleans and numbers are auto-coerced.
+- `forge config test [--provider P]` — live-test the configured LLM connection and
+  print status, model, and round-trip latency.
+
+### New modules (monadic tier placement)
+
+| File | Tier | Purpose |
+|------|------|---------|
+| `a0_qk_constants/config_defaults.py` | a0 | `DEFAULT_CONFIG`, `ForgeConfig` TypedDict, file-location constants |
+| `a1_at_functions/config_io.py` | a1 | `load_config`, `save_config`, `merge_configs`, `validate_config`, `read_config_file` |
+| `a1_at_functions/provider_detect.py` | a1 | `detect_ollama`, `list_ollama_models`, `test_provider` |
+| `a3_og_features/setup_wizard.py` | a3 | `run_wizard` — 5-step interactive wizard with rich panels |
+| `commands/config_cmd.py` | a4 | Typer sub-app with `wizard`, `show`, `set`, `test` sub-commands |
+
+### Config merge priority
+
+`local .atomadic-forge/config.json` → `global ~/.atomadic-forge/config.json` → built-in defaults.
+`None` values are skipped so keys always fall through to the next layer.
+
+### Tests
+
+56 new tests covering:
+- All default key presence and value ranges
+- `save_config` / `read_config_file` round-trip and error paths
+- `merge_configs` all priority combinations
+- `load_config` with and without local config files
+- `validate_config` valid/invalid providers, scores, and URLs
+- `detect_ollama` / `test_provider` error paths (monkeypatched urllib)
+- CLI smoke: `config show`, `config show --json`, `config set`, `config test --json`, `init --help`
+
+Total: **150 tests**, all passing.
+
+---
+
 ## 0.1.0 — _Initial cut + 6 refine cycles + breakthrough + showcase_
 
 First public-shaped release. Forged out of `ASS-ADE-SEED` by isolating the

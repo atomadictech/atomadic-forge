@@ -1,12 +1,14 @@
 """Atomadic Forge — unified CLI.
 
 Public verbs:
+    forge init        — interactive setup wizard (configure LLM, defaults)
     forge auto        — flagship: scout + cherry + assimilate + wire + certify
     forge recon       — scout walk only (writes scout.json)
     forge cherry      — cherry-pick from latest scout (writes cherry.json)
     forge finalize    — assimilate + wire + certify (consumes cherry.json)
     forge wire        — upward-import scanner over a tier-organized package
     forge certify     — score documentation/tests/layout/imports
+    forge config      — show / set / test configuration
 
 Specialty verbs (advanced):
     forge emergent    — symbol-level composition discovery
@@ -42,6 +44,13 @@ def _force_utf8() -> None:
 
 app = typer.Typer(no_args_is_help=True,
                   help="Atomadic Forge — absorb · enforce · emerge.")
+
+
+@app.command("init")
+def init_cmd() -> None:
+    """Interactive setup wizard — configure LLM, defaults, and workspace."""
+    from atomadic_forge.a3_og_features.setup_wizard import run_wizard
+    run_wizard(Path.cwd())
 
 
 @app.command("auto")
@@ -231,6 +240,8 @@ def _register_specialty_apps() -> None:
          "Auto-register / document / smoke CLI commands."),
         ("atomadic_forge.commands.feature_then_emergent", "feature-then-emergent",
          "Run any feature → fan its output into emergent scan."),
+        ("atomadic_forge.commands.config_cmd", "config",
+         "Configure Atomadic Forge — show / set / test config + wizard."),
     ):
         try:
             mod = __import__(module_path, fromlist=["app"])
