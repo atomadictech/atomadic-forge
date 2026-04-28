@@ -33,8 +33,8 @@ from typing import Annotated
 import typer
 
 from atomadic_forge.a1_at_functions.llm_client import (
-    AnthropicClient, GeminiClient, OllamaClient, OpenAIClient,
-    StubLLMClient, resolve_default_client,
+    AAAANexusClient, AnthropicClient, GeminiClient, OllamaClient,
+    OpenAIClient, StubLLMClient, resolve_default_client,
 )
 from atomadic_forge.a3_og_features.forge_evolve import run_evolve
 
@@ -58,6 +58,9 @@ def _resolve_provider(name: str) -> object:
     if name in ("gemini", "google"):
         return GeminiClient(model=os.environ.get("FORGE_GEMINI_MODEL",
                                                    "gemini-2.5-flash"))
+    if name in ("nexus", "aaaa-nexus", "aaaa_nexus", "helix"):
+        # Default wrapper "helix-standard" — override with AAAA_NEXUS_WRAPPER.
+        return AAAANexusClient()
     if name == "ollama":
         return OllamaClient(
             model=os.environ.get("FORGE_OLLAMA_MODEL", "qwen2.5-coder:7b"),
@@ -81,7 +84,7 @@ def run_cmd(
     seed_repo: Annotated[Path | None, typer.Option("--seed",
         exists=True, file_okay=False, dir_okay=True, resolve_path=True)] = None,
     provider: Annotated[str, typer.Option("--provider",
-        help="auto | gemini | anthropic | openai | ollama | stub")] = "auto",
+        help="auto | nexus | gemini | anthropic | openai | ollama | stub")] = "auto",
     language: Annotated[str, typer.Option("--language", "-l",
         help="Output language: python | javascript | typescript")] = "python",
     stop_on_regression: Annotated[bool, typer.Option("--stop-on-regression")] = False,
