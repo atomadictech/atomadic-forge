@@ -103,10 +103,15 @@ def recon_cmd(
         return
     typer.echo(f"\nRecon: {target}")
     typer.echo("-" * 60)
-    typer.echo(f"  python files: {report['python_file_count']}")
-    typer.echo(f"  symbols:      {report['symbol_count']}")
-    typer.echo(f"  tier dist:    {report['tier_distribution']}")
-    typer.echo(f"  effect dist:  {report['effect_distribution']}")
+    typer.echo(f"  python files:     {report['python_file_count']}")
+    typer.echo(f"  javascript files: {report.get('javascript_file_count', 0)}")
+    typer.echo(f"  typescript files: {report.get('typescript_file_count', 0)}")
+    primary = report.get("primary_language")
+    if primary:
+        typer.echo(f"  primary language: {primary}")
+    typer.echo(f"  symbols:          {report['symbol_count']}")
+    typer.echo(f"  tier dist:        {report['tier_distribution']}")
+    typer.echo(f"  effect dist:      {report['effect_distribution']}")
     if report["recommendations"]:
         typer.echo("  recommendations:")
         for r in report["recommendations"]:

@@ -20,23 +20,80 @@ def check_documentation(root: Path) -> tuple[bool, dict]:
 
 
 def check_tests_present(root: Path) -> tuple[bool, dict]:
-    tests = []
+    """Return (ok, detail). Recognises Python AND JS/TS test conventions.
+
+    Counts:
+      Python  — ``tests/test_*.py`` or ``tests/*_test.py``
+      JS/TS   — ``tests/*.test.{js,mjs,jsx,ts,tsx}`` or ``*.spec.{js,…}``,
+                 plus the ``__tests__/`` directory convention.
+    """
+    py_tests: list[Path] = []
+    js_tests: list[Path] = []
+    seen_dirs: set[Path] = set()
     for d in root.rglob("tests"):
-        if "__pycache__" in d.parts or not d.is_dir():
+        if "__pycache__" in d.parts or "node_modules" in d.parts or not d.is_dir():
             continue
-        tests.extend(d.rglob("test_*.py"))
-        tests.extend(d.rglob("*_test.py"))
-    return bool(tests), {"test_files_found": len(tests)}
+        if d in seen_dirs:
+            continue
+        seen_dirs.add(d)
+        py_tests.extend(d.rglob("test_*.py"))
+        py_tests.extend(d.rglob("*_test.py"))
+        for ext in (".js", ".mjs", ".jsx", ".cjs", ".ts", ".tsx"):
+            js_tests.extend(d.rglob(f"*.test{ext}"))
+            js_tests.extend(d.rglob(f"*.spec{ext}"))
+    # __tests__ convention (Jest etc.)
+    for d in root.rglob("__tests__"):
+        if "node_modules" in d.parts or not d.is_dir():
+            continue
+        for ext in (".js", ".mjs", ".jsx", ".cjs", ".ts", ".tsx"):
+            js_tests.extend(d.rglob(f"*{ext}"))
+    total = len(py_tests) + len(js_tests)
+    return total > 0, {
+        "test_files_found": total,
+        "python_tests": len(py_tests),
+        "javascript_tests": len(js_tests),
+    }
+
+
+def _collect_tier_dirs(root: Path) -> list[str]:
+    """Return tier directories present anywhere under ``root``.
+
+    Polyglot-aware: a tier-named directory anywhere in the tree (Python
+    ``src/<pkg>/aN_*/`` OR JS-style top-level / nested ``aN_*/``) counts.
+    Each tier name is reported at most once.
+    """
+    found: set[str] = set()
+    for d in root.rglob("*"):
+        if not d.is_dir():
+            continue
+        if "node_modules" in d.parts or "__pycache__" in d.parts:
+            continue
+        if d.name in TIER_NAMES:
+            found.add(d.name)
+            if len(found) == len(TIER_NAMES):
+                break
+    return sorted(found)
 
 
 def check_tier_layout(root: Path, package: str | None = None) -> tuple[bool, dict]:
     src = root / "src"
     base = src if src.exists() else root
     if package:
-        base = base / package
+        candidate = base / package
+        if candidate.exists():
+            base = candidate
     present = [t for t in TIER_NAMES if (base / t).exists()]
+    polyglot_present: list[str] = []
+    if len(present) < 3:
+        polyglot_present = _collect_tier_dirs(root)
+        if len(polyglot_present) > len(present):
+            present = polyglot_present
     ok = len(present) >= 3
-    return ok, {"tiers_present": present}
+    return ok, {
+        "tiers_present": present,
+        "tiers_present_count": len(present),
+        "tiers_required": 3,
+    }
 
 
 def check_no_upward_imports(root: Path, package: str | None = None) -> tuple[bool, dict]:
@@ -104,8 +161,16 @@ def certify(root: Path, *, project: str = "Atomadic project",
         issues.append("No test files under tests/")
         recs.append("Add tests/test_*.py before claiming production-ready.")
     if not layout_ok:
-        issues.append("Tier layout missing — Forge enforces 5-tier directories.")
-        recs.append("Run `forge assimilate` to materialize the tier tree.")
+        present_count = layout_d.get("tiers_present_count", 0)
+        present_list = ", ".join(layout_d.get("tiers_present", [])) or "none"
+        issues.append(
+            f"Tier layout missing — found {present_count} tier "
+            f"director{'y' if present_count == 1 else 'ies'} ({present_list}); "
+            "need 3+ of a0_qk_constants/a1_at_functions/a2_mo_composites/"
+            "a3_og_features/a4_sy_orchestration."
+        )
+        recs.append("Split your code into the canonical aN_* directories "
+                    "(or run `forge auto` to scaffold them).")
     if not wire_ok:
         issues.append(f"Upward-import violations: {wire_d['violation_count']}")
         recs.append("Run `forge wire --apply` to auto-fix where unambiguous.")
