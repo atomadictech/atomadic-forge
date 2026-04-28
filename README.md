@@ -1,14 +1,49 @@
+<p align="center">
+  <img src="assets/Atomadic-Forge-01.png" alt="Atomadic Forge" width="720"/>
+</p>
+
 # Atomadic Forge
 
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: BSL-1.1](https://img.shields.io/badge/License-BSL--1.1-yellow.svg)](LICENSE)
-[![Tests: 90 passing](https://img.shields.io/badge/Tests-90%20passing-green.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-passing-green.svg)](tests/)
+[![Forge certify](https://img.shields.io/badge/forge_certify-100%2F100-brightgreen)](docs/SHOWCASE.md)
 
-**The Architecture Compiler.** Absorbs Python codebases. Rebuilds into certified monadic structure. Enforces the 5-tier law across every file.
+> **Absorb. Enforce. Emerge.** The architecture substrate for AI-generated code.
+
+Forge is a monadic-architecture engine that does three things no existing
+tool combines:
+
+1. **Absorbs** Python repositories into a verified 5-tier layout.
+2. **Enforces** the upward-only import law on every emitted file.
+3. **Emerges** new capabilities by composing what already exists — and
+   refuses to credit code that lies about what it does.
+
+It's the substrate Cursor and Devin and Lovable don't have. It runs on
+free local models, free cloud tiers, or paid frontier models — same
+loop, swap the LLM, watch the trajectory carry harder tasks higher.
+
+## 90-second demo
 
 ```bash
-forge auto ./messy-repo ./out          # Dry-run: what would happen?
-forge auto ./messy-repo ./out --apply  # Actually materialize
+pip install -e ".[dev]"
+export GEMINI_API_KEY=$(your-free-key)   # https://aistudio.google.com/apikey
+
+forge demo run --preset calc --provider gemini   # 30s, score 90/100
+forge demo run --preset kv   --provider gemini   # ~70s, KvStore + tests + CLI
+forge demo run --preset slug --provider gemini   # ~22s, regex slugifier
+```
+
+Each preset produces a real, importable, pip-installable Python package
+with auto-generated README, passing tests, and a logged transcript of
+every LLM exchange. Live trajectories in [`docs/SHOWCASE.md`](docs/SHOWCASE.md).
+
+## Pipeline lanes
+
+```bash
+forge auto ./messy-repo ./out --apply       # Absorb a flat repo into 5-tier layout
+forge evolve run "<intent>" ./out --auto 5  # LLM-driven recursive generation
+forge demo run --preset NAME                # Click-to-launch-video preset
 ```
 
 **What Forge does:**
@@ -240,7 +275,13 @@ Apache 2.0.
 
 ## Documentation
 
+- **[Showcase](docs/SHOWCASE.md)** — Live runs with live results (start here)
+- **[Landscape](docs/LANDSCAPE.md)** — How Forge sits next to Cursor / Devin / Lovable / Copilot Workspace
+- **[Why now](docs/WHY_NOW.md)** — The urgency case for an architecture substrate
+- **[Commands](docs/COMMANDS.md)** — Full reference for all 13+ verbs
+- **[Roadmap](docs/ROADMAP.md)** — 0.2 / 0.3 / 1.0 milestones
 - **[Architecture guide](ARCHITECTURE.md)** — How Forge itself is built (monadic tiers, data flows, design)
+- **[Tutorials](docs/tutorials/)** — Quickstart, your-first-package, the 5-tier law, plug-in-LLMs, multi-repo absorb
 - **[Contributing guide](CONTRIBUTING.md)** — How to extend Forge
 - **[Changelog](CHANGELOG.md)** — Version history and roadmap
 

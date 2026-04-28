@@ -78,7 +78,8 @@ def test_certify_deducts_for_stubs(tmp_path):
     (tmp_path / "README.md").write_text("# demo\n", encoding="utf-8")
     (tmp_path / "tests").mkdir()
     (tmp_path / "tests" / "test_x.py").write_text(
-        "def test_one():\n    assert True\n", encoding="utf-8")
+        "import demo\ndef test_one():\n    assert demo is not None\n",
+        encoding="utf-8")
     result = certify(tmp_path, project="demo", package="demo")
     # New score weights:
     #   structural: docs(10)+layout(10)+wire(10)+tests-present(5) = 35
@@ -106,7 +107,8 @@ def test_certify_score_pristine_with_no_stubs(tmp_path):
     (tmp_path / "README.md").write_text("# demo\n", encoding="utf-8")
     (tmp_path / "tests").mkdir()
     (tmp_path / "tests" / "test_x.py").write_text(
-        "def test_x():\n    assert True\n", encoding="utf-8")
+        "import demo\ndef test_x():\n    assert demo is not None\n",
+        encoding="utf-8")
     result = certify(tmp_path, project="demo", package="demo")
     # 35 (structural) + 25 (runtime) + 30 (1/1 pass) = 90 — losing 10pts
     # because tests-present is now 5pt and behavioral is 30pt.  No, wait:

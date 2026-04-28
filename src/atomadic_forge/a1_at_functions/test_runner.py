@@ -82,10 +82,37 @@ def _extract_failure_excerpts(stdout: str, max_failures: int = 5) -> list[str]:
     return out
 
 
+def _filter_tests_to_package(tests_dir: Path, package: str) -> list[str]:
+    """Return list of test file paths whose imports reference ``package``.
+
+    Closes the wrong-package gameability hole: an LLM that emits files into
+    `forge_greeter` but tests for `forge_greeter` shouldn't credit the
+    behavioural score against a request for `mdconv`.  This requires every
+    counted test file to import the requested package.
+    """
+    out: list[str] = []
+    for f in sorted(tests_dir.rglob("test_*.py")):
+        if "__pycache__" in f.parts:
+            continue
+        try:
+            text = f.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        # Match `from <pkg>.…` or `import <pkg>` (word-boundary).
+        if re.search(rf"\b(?:from|import)\s+{re.escape(package)}\b", text):
+            out.append(str(f))
+    return out
+
+
 def run_pytest(*, output_root: Path, package: str | None = None,
                tests_subdir: str = "tests",
                timeout_s: float = 60.0) -> TestRunReport:
     """Run ``pytest <tests_subdir>`` inside ``output_root``.
+
+    When ``package`` is given, ONLY tests that import that package count
+    toward the pass-ratio.  This prevents wrong-package gaming where the
+    LLM emits code into ``forge_greeter`` but the request was ``mdconv`` —
+    forge_greeter's tests would otherwise credit the score.
 
     ``PYTHONPATH`` is set so ``src/`` is importable without a pip install.
     Skips cleanly when the tests dir doesn't exist.
@@ -102,6 +129,22 @@ def run_pytest(*, output_root: Path, package: str | None = None,
             pytest_summary="(no tests/ directory)",
             failure_excerpts=[],
         )
+
+    # Filter to tests that actually target the requested package.
+    targeted: list[str] | None = None
+    if package:
+        targeted = _filter_tests_to_package(tests_dir, package)
+        if not targeted:
+            return TestRunReport(
+                schema_version="atomadic-forge.test_run/v1",
+                tests_dir=str(tests_dir), ran=True, passed=0, failed=0,
+                errors=0, skipped=0, total=0, pass_ratio=0.0, duration_ms=0,
+                pytest_summary=(
+                    f"(no test files import package {package!r} — refused to "
+                    "credit unrelated tests)"
+                ),
+                failure_excerpts=[],
+            )
     env = {**os.environ}
     pp = env.get("PYTHONPATH", "")
     sep = ";" if sys.platform == "win32" else ":"
@@ -110,10 +153,11 @@ def run_pytest(*, output_root: Path, package: str | None = None,
     env["PYTHONIOENCODING"] = "utf-8"
     env["PYTEST_DISABLE_PLUGIN_AUTOLOAD"] = "1"
 
+    pytest_targets = targeted if targeted else [str(tests_dir)]
     start = time.perf_counter()
     try:
         proc = subprocess.run(
-            [sys.executable, "-m", "pytest", str(tests_dir),
+            [sys.executable, "-m", "pytest", *pytest_targets,
              "--tb=line", "-q", "--no-header", "-p", "no:cacheprovider"],
             cwd=str(output_root), env=env,
             capture_output=True, text=True, timeout=timeout_s,

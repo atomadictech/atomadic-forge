@@ -41,7 +41,8 @@ def test_certify_scores_full_repo(tmp_path):
     (tmp_path / "README.md").write_text("# demo\n", encoding="utf-8")
     (tmp_path / "tests").mkdir()
     (tmp_path / "tests" / "test_x.py").write_text(
-        "def test_one():\n    assert True\n", encoding="utf-8")
+        "import demo\ndef test_one():\n    assert demo is not None\n",
+        encoding="utf-8")
     result = certify(tmp_path, project="demo", package="demo")
     assert result["documentation_complete"] is True
     assert result["tests_present"] is True

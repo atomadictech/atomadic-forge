@@ -1,8 +1,12 @@
+<p align="center">
+  <img src="../assets/Atomadic-Forge-01.png" alt="Atomadic Forge" width="640"/>
+</p>
+
 # Atomadic Forge — Showcase
 
-_Three live `forge demo` runs against Gemini 2.5 Flash (free tier).
-Same loop, same constraint substrate, three distinct intents. Total
-duration: ~2 minutes._
+_Live `forge demo` and `forge evolve` runs against Gemini 2.5 Flash on
+free tier and codellama:7b-instruct on Ollama. Same loop, same constraint
+substrate, swap the LLM, watch the trajectory carry harder tasks higher._
 
 | Preset | Headline | Trajectory | Final | Duration | Wire | Tests |
 |--------|----------|------------|-------|---------:|------|-------|
@@ -139,6 +143,63 @@ forge demo run --preset slug
 
 Each preset writes a per-run `DEMO.md` artifact alongside the generated
 package, plus the manifest at `.atomadic-forge/demo.json`.
+
+---
+
+## Bonus run: the redemption + the gap it exposed
+
+The same markdown-converter intent that codellama:7b plateaued on
+(score `60 → 60 → 60 → 60 → 60`, identity-function stubs that gamed
+every check) was rerun against Gemini 2.5 Flash:
+
+| LLM | Same intent | Trajectory | Time | Verdict |
+|-----|-------------|-----------|-----:|---------|
+| codellama:7b-instruct | mdconv | `60 → 60 → 60 → 60 → 60` (5 rounds) | ~3 min | Stuck — model can't write a real parser |
+| gemini-2.5-flash | mdconv | `90` (1 round, converged) | ~30s | Score 90/100, real implementations |
+
+**Redemption confirmed.** Same Forge, same intent, swap the model,
+watch the trajectory carry the harder task higher.
+
+### …And a real gap surfaced in the same run
+
+Gemini emitted code into a *different package name* (`forge_greeter`,
+a greeting utility — apparently the LLM thought it was a more elegant
+solution!) instead of the requested `mdconv`. Score still hit 90 because
+Forge's behavioral check counted tests for the wrong package as
+satisfying the request.
+
+**This is the kind of gap Forge needs to find — and did.** The fix was
+shipped in the same session: the test runner now refuses to credit
+behavioral score against tests that don't import the requested package.
+This is exactly the ratchet pattern: every refine cycle exposes a new
+gameability hole, the ratchet tightens, the score gets harder to fake.
+
+```python
+# atomadic_forge/a1_at_functions/test_runner.py
+def _filter_tests_to_package(tests_dir: Path, package: str) -> list[str]:
+    """Return list of test file paths whose imports reference `package`.
+
+    Closes the wrong-package gameability hole: an LLM that emits files
+    into `forge_greeter` but tests for `forge_greeter` shouldn't credit
+    the behavioural score against a request for `mdconv`.
+    """
+```
+
+## Why this matters
+
+These trajectories are the receipts behind the
+[architecture-substrate hypothesis](LANDSCAPE.md):
+
+- **Free 7B local model** (`codellama:7b-instruct`) → honest 60–90 score
+  across task complexity. Plateaus where model capability ends.
+- **Free cloud Gemini** (`gemini-2.5-flash`) → 90+ across all preset tasks,
+  closes the gap codellama couldn't.
+- **Same Forge, swap the LLM** — the substrate is the constant. The
+  generator is the variable. The trajectory tells you which one is
+  bottlenecking.
+
+That's the whole pitch. Every line of it is a thing you can re-run in
+under 2 minutes with `forge demo run`.
 
 ---
 

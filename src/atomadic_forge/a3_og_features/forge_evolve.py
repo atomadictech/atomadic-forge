@@ -24,6 +24,7 @@ import datetime as _dt
 from pathlib import Path
 from typing import Any
 
+from ..a1_at_functions.evolution_log import append_evolve_run
 from ..a1_at_functions.llm_client import LLMClient, resolve_default_client
 from ..a1_at_functions.scout_walk import harvest_repo
 from ..a2_mo_composites.manifest_store import ManifestStore
@@ -140,4 +141,23 @@ def run_evolve(
         "generated_at_utc": _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds"),
     }
     ManifestStore(output).save("evolve", out)
+
+    # Auto-append to the evolution log so every run is documented permanently.
+    try:
+        append_evolve_run(
+            project_root=output,
+            package=package,
+            intent=intent,
+            llm_name=llm.name,
+            rounds_completed=len(rounds_log),
+            score_trajectory=out["score_trajectory"],
+            final_score=final_score,
+            converged=out["converged"],
+            halt_reason=out["halt_reason"],
+            extra={"final_symbol_count": final_symbols,
+                    "rounds_requested": rounds},
+        )
+    except Exception:  # noqa: BLE001 — logging must never break the run
+        pass
+
     return out
