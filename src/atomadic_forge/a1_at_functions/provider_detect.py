@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import http.client
 import json
 import time
 import urllib.error
@@ -73,29 +74,29 @@ def _test_ollama(config: dict, t0: float) -> dict:
 
 def _test_gemini(config: dict, t0: float) -> dict:
     key = config.get("gemini_key") or ""
+    model = config.get("gemini_model") or "gemini-2.5-flash"
     if not key:
-        return {"ok": False, "model": "gemini-2.5-flash",
-                "error": "gemini_key not set", "latency_ms": 0}
+        return {"ok": False, "model": model, "error": "gemini_key not set", "latency_ms": 0}
     try:
         req = urllib.request.Request(
             f"https://generativelanguage.googleapis.com/v1beta/models?key={key}",
             headers={"Accept": "application/json"},
         )
         with urllib.request.urlopen(req, timeout=8) as resp:
-            ok = resp.status == 200
-        return {"ok": ok, "model": "gemini-2.5-flash", "error": None,
+            resp.read()
+        return {"ok": True, "model": model, "error": None,
                 "latency_ms": int((time.monotonic() - t0) * 1000)}
     except urllib.error.HTTPError as exc:
-        return {"ok": False, "model": "gemini-2.5-flash",
+        return {"ok": False, "model": model,
                 "error": f"HTTP {exc.code}", "latency_ms": int((time.monotonic() - t0) * 1000)}
-    except (urllib.error.URLError, OSError) as exc:
-        return {"ok": False, "model": "gemini-2.5-flash",
+    except (urllib.error.URLError, OSError, http.client.HTTPException) as exc:
+        return {"ok": False, "model": model,
                 "error": str(exc), "latency_ms": int((time.monotonic() - t0) * 1000)}
 
 
 def _test_anthropic(config: dict, t0: float) -> dict:
     key = config.get("anthropic_key") or ""
-    model = "claude-sonnet-4-6"
+    model = config.get("anthropic_model") or "claude-sonnet-4-6"
     if not key:
         return {"ok": False, "model": model, "error": "anthropic_key not set", "latency_ms": 0}
     try:
@@ -104,20 +105,20 @@ def _test_anthropic(config: dict, t0: float) -> dict:
             headers={"x-api-key": key, "anthropic-version": "2023-06-01"},
         )
         with urllib.request.urlopen(req, timeout=8) as resp:
-            ok = resp.status == 200
-        return {"ok": ok, "model": model, "error": None,
+            resp.read()
+        return {"ok": True, "model": model, "error": None,
                 "latency_ms": int((time.monotonic() - t0) * 1000)}
     except urllib.error.HTTPError as exc:
         return {"ok": False, "model": model,
                 "error": f"HTTP {exc.code}", "latency_ms": int((time.monotonic() - t0) * 1000)}
-    except (urllib.error.URLError, OSError) as exc:
+    except (urllib.error.URLError, OSError, http.client.HTTPException) as exc:
         return {"ok": False, "model": model,
                 "error": str(exc), "latency_ms": int((time.monotonic() - t0) * 1000)}
 
 
 def _test_openai(config: dict, t0: float) -> dict:
     key = config.get("openai_key") or ""
-    model = "gpt-4o-mini"
+    model = config.get("openai_model") or "gpt-4o-mini"
     if not key:
         return {"ok": False, "model": model, "error": "openai_key not set", "latency_ms": 0}
     try:
@@ -126,13 +127,13 @@ def _test_openai(config: dict, t0: float) -> dict:
             headers={"Authorization": f"Bearer {key}"},
         )
         with urllib.request.urlopen(req, timeout=8) as resp:
-            ok = resp.status == 200
-        return {"ok": ok, "model": model, "error": None,
+            resp.read()
+        return {"ok": True, "model": model, "error": None,
                 "latency_ms": int((time.monotonic() - t0) * 1000)}
     except urllib.error.HTTPError as exc:
         return {"ok": False, "model": model,
                 "error": f"HTTP {exc.code}", "latency_ms": int((time.monotonic() - t0) * 1000)}
-    except (urllib.error.URLError, OSError) as exc:
+    except (urllib.error.URLError, OSError, http.client.HTTPException) as exc:
         return {"ok": False, "model": model,
                 "error": str(exc), "latency_ms": int((time.monotonic() - t0) * 1000)}
 

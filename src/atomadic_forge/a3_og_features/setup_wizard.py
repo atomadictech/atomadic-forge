@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import getpass
+import re
 import sys
 from pathlib import Path
 
@@ -205,7 +206,9 @@ def _step3_api_key(provider: str, config: dict) -> dict:
         if keep:
             return {}
 
-    raw = getpass.getpass(f"  Paste your {_PROVIDER_LABEL.get(provider, provider)} API key: ").strip()
+    raw = getpass.getpass(f"  Paste your {_PROVIDER_LABEL.get(provider, provider)} API key: ")
+    # Strip control characters that Windows terminals inject on paste (e.g. \x16 = ^V)
+    raw = re.sub(r"[\x00-\x1f\x7f-\x9f]", "", raw).strip()
     if not raw:
         return {}
 
