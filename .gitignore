@@ -17,3 +17,8 @@ htmlcov/
 .vscode/
 .idea/
 .claude/
+
+# Demo / evolve / iterate output directories (generated artifacts)
+forge-demo-*/
+forge-evolve-*/
+forge-iterate-*/
