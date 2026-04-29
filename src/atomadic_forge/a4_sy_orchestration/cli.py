@@ -31,6 +31,7 @@ import typer
 from .. import __version__
 from ..a1_at_functions.certify_checks import certify as certify_checks
 from ..a1_at_functions.manifest_diff import diff_manifests
+from ..a1_at_functions.progress_reporter import make_stderr_reporter
 from ..a1_at_functions.wire_check import scan_violations
 from ..a3_og_features.forge_pipeline import (
     run_auto,
@@ -77,11 +78,18 @@ def auto_cmd(
     on_conflict: Annotated[str, typer.Option("--on-conflict",
         help="rename | first | last | fail")] = "rename",
     json_out: Annotated[bool, typer.Option("--json")] = False,
+    progress: Annotated[bool | None, typer.Option(
+        "--progress/--no-progress",
+        help="Emit per-file scout progress to stderr. Default: auto "
+             "(on when stderr is a TTY, off in CI / pipes / --json).")] = None,
 ) -> None:
     """Flagship: scout → cherry-pick → assimilate → wire → certify in one shot."""
     output.mkdir(parents=True, exist_ok=True)
+    reporter = make_stderr_reporter(
+        enabled=False if json_out else progress, label="scout")
     report = run_auto(target=target, output=output, package=package,
-                      apply=apply, on_conflict=on_conflict)
+                      apply=apply, on_conflict=on_conflict,
+                      progress=reporter)
     if json_out:
         typer.echo(json.dumps(report, indent=2, default=str))
         return
@@ -104,9 +112,15 @@ def recon_cmd(
     target: Annotated[Path, typer.Argument(
         exists=True, file_okay=False, dir_okay=True, resolve_path=True)],
     json_out: Annotated[bool, typer.Option("--json")] = False,
+    progress: Annotated[bool | None, typer.Option(
+        "--progress/--no-progress",
+        help="Emit per-file scout progress to stderr. Default: auto "
+             "(on when stderr is a TTY, off in CI / pipes / --json).")] = None,
 ) -> None:
     """Walk a repo, classify every public symbol, surface tier/effect distributions."""
-    report = run_recon(target)
+    reporter = make_stderr_reporter(
+        enabled=False if json_out else progress, label="scout")
+    report = run_recon(target, progress=reporter)
     if json_out:
         typer.echo(json.dumps(report, indent=2, default=str))
         return

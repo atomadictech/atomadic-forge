@@ -15,7 +15,7 @@ from __future__ import annotations
 import hashlib
 import json
 import shutil
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import Any
 
@@ -65,10 +65,20 @@ def _target_file_for_symbol(target_dir: Path, slug: str, source_file: Path) -> P
     return target_dir / f"{slug}{suffix}"
 
 
-def run_recon(target: Path, *, store_manifest: bool = True) -> dict[str, Any]:
-    """``forge recon`` — scout walk + persist scout.json under .atomadic-forge/."""
+def run_recon(
+    target: Path,
+    *,
+    store_manifest: bool = True,
+    progress: Callable[[int, int, str], None] | None = None,
+) -> dict[str, Any]:
+    """``forge recon`` — scout walk + persist scout.json under .atomadic-forge/.
+
+    ``progress`` (optional): forwarded to ``harvest_repo`` for per-file
+    reporting on big repos. The CLI builds a stderr reporter; library
+    callers can pass any callback or ``None``.
+    """
     target = Path(target).resolve()
-    report = harvest_repo(target)
+    report = harvest_repo(target, progress=progress)
     if store_manifest:
         ManifestStore(target).save("scout", report)
     return report
@@ -76,11 +86,13 @@ def run_recon(target: Path, *, store_manifest: bool = True) -> dict[str, Any]:
 
 def run_cherry(target: Path, *, names: Iterable[str] | None = None,
                pick_all: bool = False, only_tier: str | None = None,
-               store_manifest: bool = True) -> dict[str, Any]:
+               store_manifest: bool = True,
+               progress: Callable[[int, int, str], None] | None = None,
+               ) -> dict[str, Any]:
     """``forge cherry`` — derive a cherry-pick manifest from the latest scout."""
     target = Path(target).resolve()
     store = ManifestStore(target)
-    scout = store.load("scout") or harvest_repo(target)
+    scout = store.load("scout") or harvest_repo(target, progress=progress)
     if not store.load("scout") and store_manifest:
         store.save("scout", scout)
     manifest = select_items(scout, names=names, pick_all=pick_all,
@@ -208,14 +220,19 @@ def run_finalize(*, target: Path, output: Path, package: str = "absorbed",
 
 
 def run_auto(*, target: Path, output: Path, package: str = "absorbed",
-             apply: bool = False, on_conflict: str = "rename") -> dict[str, Any]:
+             apply: bool = False, on_conflict: str = "rename",
+             progress: Callable[[int, int, str], None] | None = None,
+             ) -> dict[str, Any]:
     """``forge auto`` — the flagship single-command pipeline.
 
     Runs: scout → cherry-pick (all) → finalize (assimilate + wire + certify).
     Always returns a structured report.  Set ``apply=True`` to actually write
     files; otherwise it's a deterministic dry-run.
+
+    ``progress`` (optional): per-file scout-phase reporter. Cherry/finalize
+    are typically fast enough to skip; only the scout walk is plumbed.
     """
-    scout = run_recon(target)
+    scout = run_recon(target, progress=progress)
     cherry = run_cherry(target, pick_all=True)
     final = run_finalize(target=target, output=output, package=package,
                           cherry_manifest=cherry, apply=apply,
