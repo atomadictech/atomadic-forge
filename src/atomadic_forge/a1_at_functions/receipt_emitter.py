@@ -45,6 +45,7 @@ from ..a0_qk_constants.receipt_schema import (
     ReceiptCertifyAxes,
     ReceiptLean4Attestation,
     ReceiptLineage,
+    ReceiptPolyglotBreakdown,
     ReceiptProject,
     ReceiptScout,
     ReceiptSignatures,
@@ -176,6 +177,28 @@ def _scout_block(scout_report: dict) -> ReceiptScout:
     )
 
 
+def _polyglot_breakdown(scout_report: dict) -> ReceiptPolyglotBreakdown:
+    """Codex-6 — Receipt v1.1 polyglot_breakdown seed.
+
+    Pulls per-language file + symbol counts from the scout report.
+    Per-language certify scores ship in a future minor (Lane A W8 has
+    that on the roadmap once the JS/TS behavioural-pytest gate lands).
+    """
+    languages = (scout_report.get("language_distribution")
+                 or scout_report.get("languages") or {})
+    symbols_by_lang: dict[str, int] = {}
+    for s in scout_report.get("symbols", []) or []:
+        lang = s.get("language", "python")
+        symbols_by_lang[lang] = symbols_by_lang.get(lang, 0) + 1
+    return ReceiptPolyglotBreakdown(
+        file_count=sum(int(v) for v in languages.values()),
+        languages=dict(languages),
+        symbol_count=int(scout_report.get("symbol_count", 0)),
+        symbols_by_language=symbols_by_lang,
+        primary_language=str(scout_report.get("primary_language", "python")),
+    )
+
+
 def build_receipt(
     *,
     certify_result: dict,
@@ -244,6 +267,8 @@ def build_receipt(
         compliance_mappings=dict(compliance_mappings or {}),
         notes=list(notes or []),
         extra=dict(extra or {}),
+        # Codex-6 / Lane A W8 seed: per-language file + symbol breakdown.
+        polyglot_breakdown=_polyglot_breakdown(scout_report),
     )
     # Spot-check that we populated every required v1 field. Defensive
     # — TypedDict does not enforce at runtime.

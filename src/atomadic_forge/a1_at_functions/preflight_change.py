@@ -157,13 +157,39 @@ def preflight_change(
     Pure: takes paths + intent, walks the local filesystem only to
     check sibling presence. Does NOT read the proposed_files
     themselves — they may not exist yet.
+
+    Codex-6: when [tool.forge.agent] is declared in the project's
+    pyproject.toml, ``max_files_per_patch`` overrides the default
+    threshold and ``protected_files`` adds per-file warnings.
     """
+    from .policy_loader import file_is_protected, load_policy
     project_root = Path(project_root).resolve()
+    policy = load_policy(project_root)
+    if scope_threshold == _DEFAULT_SCOPE_TOO_BROAD and \
+            isinstance(policy.get("max_files_per_patch"), int):
+        scope_threshold = int(policy["max_files_per_patch"])
     files: list[PreflightFile] = [
         _file_preflight(p, project_root=project_root)
         for p in proposed_files
     ]
+    for f in files:
+        if file_is_protected(f["path"], policy):
+            notes = list(f.get("notes") or [])
+            notes.append(
+                "policy: this file is in [tool.forge.agent] "
+                "protected_files — agent should request human review"
+            )
+            f["notes"] = notes
     overall: list[str] = []
+    protected_in_scope = [f["path"] for f in files
+                           if any("protected_files" in n
+                                  for n in f.get("notes", []))]
+    if protected_in_scope:
+        overall.append(
+            f"{len(protected_in_scope)} protected file(s) in scope "
+            f"(per [tool.forge.agent]): {protected_in_scope[:5]} — "
+            "request human review before applying."
+        )
     too_broad = len(proposed_files) > scope_threshold
     if too_broad:
         overall.append(

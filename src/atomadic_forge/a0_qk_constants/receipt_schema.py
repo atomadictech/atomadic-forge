@@ -200,6 +200,21 @@ class ReceiptLineage(TypedDict, total=False):
     chain_depth: int                # 1 for first Receipt; n+1 for each successor
 
 
+class ReceiptPolyglotBreakdown(TypedDict, total=False):
+    """v1.1 — per-language file + symbol counts (Lane A W8 seed).
+
+    Forward-compat: v0.4+ will add per-language certify scores; today
+    we only ship the file + symbol breakdown so consumers can render
+    'this repo is 80% Python, 15% TypeScript' badges from the Receipt
+    alone (no separate scout call needed).
+    """
+    file_count: int
+    languages: dict[str, int]            # {lang: file_count}
+    symbol_count: int
+    symbols_by_language: dict[str, int]  # {lang: symbol_count}
+    primary_language: str
+
+
 class ForgeReceiptV1(TypedDict, total=False):
     """The Forge Receipt v1.0 wire format.
 
@@ -246,6 +261,8 @@ class ForgeReceiptV1(TypedDict, total=False):
     compliance_mappings: dict[str, str]    # mapping_name → status
     notes: list[str]                       # free-form human-facing notes
     extra: dict[str, object]               # forward-compat escape hatch
+    # v1.1 (Lane A W8) — optional in v1.0, required in v1.1+:
+    polyglot_breakdown: ReceiptPolyglotBreakdown
 
 
 REQUIRED_RECEIPT_V1_FIELDS: tuple[str, ...] = (
