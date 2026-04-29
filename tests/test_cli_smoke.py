@@ -29,6 +29,44 @@ def test_recon_runs(sample_repo):
     assert data["python_file_count"] == 2
 
 
+def test_certify_emit_receipt_writes_v1_json(tmp_path, sample_repo):
+    """GP-A W1: forge certify --emit-receipt PATH writes a valid v1 Receipt."""
+    out = tmp_path / "receipt.json"
+    runner.invoke(
+        app, ["auto", str(sample_repo), str(tmp_path / "tree"),
+              "--apply", "--package", "demo"]
+    )
+    pkg_root = tmp_path / "tree"
+    result = runner.invoke(
+        app, ["certify", str(pkg_root), "--package", "demo",
+              "--emit-receipt", str(out)]
+    )
+    assert result.exit_code == 0
+    data = json.loads(out.read_text(encoding="utf-8"))
+    assert data["schema_version"] == "atomadic-forge.receipt/v1"
+    assert data["verdict"] in {"PASS", "FAIL", "REFINE", "QUARANTINE"}
+    for f in ("schema_version", "generated_at_utc", "forge_version",
+              "verdict", "project", "certify", "wire", "scout"):
+        assert f in data
+
+
+def test_certify_print_card_renders_box(tmp_path, sample_repo):
+    """GP-A W1: --print-card emits a 60-wide box-drawing card."""
+    runner.invoke(
+        app, ["auto", str(sample_repo), str(tmp_path / "tree"),
+              "--apply", "--package", "demo"]
+    )
+    result = runner.invoke(
+        app, ["certify", str(tmp_path / "tree"), "--package", "demo",
+              "--print-card"]
+    )
+    assert result.exit_code == 0
+    assert "Atomadic Forge Receipt" in result.stdout
+    assert "atomadic-forge.receipt/v1" in result.stdout
+    # Box-drawing characters present
+    assert "╔" in result.stdout and "╚" in result.stdout
+
+
 def test_wire_fail_on_violations_clean_tree(tmp_path, sample_repo):
     """G1: wire exits 0 on a clean tree even with --fail-on-violations."""
     output = tmp_path / "out"

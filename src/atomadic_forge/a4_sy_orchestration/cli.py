@@ -29,10 +29,13 @@ from typing import Annotated
 import typer
 
 from .. import __version__
+from ..a1_at_functions.card_renderer import render_receipt_card
 from ..a1_at_functions.certify_checks import certify as certify_checks
 from ..a1_at_functions.error_hints import format_hint
 from ..a1_at_functions.manifest_diff import diff_manifests
 from ..a1_at_functions.progress_reporter import make_stderr_reporter
+from ..a1_at_functions.receipt_emitter import build_receipt, receipt_to_json
+from ..a1_at_functions.scout_walk import harvest_repo
 from ..a1_at_functions.wire_check import scan_violations
 from ..a3_og_features.forge_pipeline import (
     run_auto,
@@ -252,6 +255,14 @@ def certify_cmd(
     fail_under: Annotated[float | None, typer.Option("--fail-under",
         help="Exit 1 when the certify score is below this threshold.")] = None,
     json_out: Annotated[bool, typer.Option("--json")] = False,
+    emit_receipt: Annotated[Path | None, typer.Option(
+        "--emit-receipt",
+        help="Write a Forge Receipt v1 JSON to PATH "
+             "(see docs/RECEIPT.md for the schema).")] = None,
+    print_card: Annotated[bool, typer.Option(
+        "--print-card",
+        help="Print the receipt as a 60-wide box-drawing card to stdout. "
+             "Powers the '62 -> 5' viral demo.")] = False,
 ) -> None:
     """Score documentation, tests, tier layout, import discipline."""
     if fail_under is not None and not 0 <= fail_under <= 100:
@@ -274,6 +285,28 @@ def certify_cmd(
     typer.echo(f"  wire:  {'PASS' if report['no_upward_imports'] else 'FAIL'}")
     for issue in report["issues"]:
         typer.echo(f"    - {issue}")
+    if emit_receipt is not None or print_card:
+        # The Receipt needs a scout summary; if scout didn't already
+        # run via forge auto, harvest a cheap one now (no symbol dump
+        # written; we only need counts + tier_distribution).
+        scout_for_receipt = harvest_repo(project_root)
+        wire_for_receipt = scan_violations(project_root)
+        receipt = build_receipt(
+            certify_result=report,
+            wire_report=wire_for_receipt,
+            scout_report=scout_for_receipt,
+            project_name=project_root.name,
+            project_root=project_root,
+            forge_version=__version__,
+            package=package,
+            certify_threshold=fail_under or 100.0,
+        )
+        if emit_receipt is not None:
+            emit_receipt.parent.mkdir(parents=True, exist_ok=True)
+            emit_receipt.write_text(receipt_to_json(receipt), encoding="utf-8")
+        if print_card:
+            typer.echo("")
+            typer.echo(render_receipt_card(receipt))
     if failed_gate:
         typer.echo(f"  gate:  FAIL (score below --fail-under {fail_under:g})")
         typer.echo(
