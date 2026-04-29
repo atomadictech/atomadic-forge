@@ -1,5 +1,7 @@
 # 01 — Quickstart (60 seconds)
 
+> **Looking for the canonical first-10-minutes path?** See [../FIRST_10_MINUTES.md](../FIRST_10_MINUTES.md). This document covers a deeper specific topic.
+
 This is the shortest path from "never seen Forge" to "watching it
 generate a working Python package."
 

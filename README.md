@@ -29,42 +29,20 @@ TypeScript (`.ts` / `.tsx`). Cloudflare Workers, Node back-ends, and mixed
 Python+JS repositories all classify in a single pass — no Node dependency,
 `node_modules/` skipped automatically.
 
-## 90-second demo
+## Get started in 10 minutes
 
-```bash
-pip install -e ".[dev]"
-export GEMINI_API_KEY=$(your-free-key)   # https://aistudio.google.com/apikey
+**Read [docs/FIRST_10_MINUTES.md](docs/FIRST_10_MINUTES.md).** It is
+the canonical onboarding path: install, a 30-second offline demo, a
+10-second free recon on your own repo, then a fork into either
+"absorb existing code" or "generate from intent" with explicit cost,
+privacy, and wallclock numbers.
 
-# LLM-driven Python packages (need an API key or local Ollama):
-forge demo run --preset calc --provider gemini   # 30s, score 90/100*
-forge demo run --preset kv   --provider gemini   # ~70s, KvStore + tests + CLI
-forge demo run --preset slug --provider gemini   # ~22s, regex slugifier
+For deeper paths once you have done the 10-minute path:
 
-# Static polyglot showcases (no LLM key required — runs offline):
-forge demo run --preset js-counter   # clean a0..a4 JS package; wire PASS, certify 60/100*
-forge demo run --preset js-bad-wire  # JS package with an upward import — wire flags it
-forge demo run --preset mixed-py-js  # Python tier + JS tier in the same root
-```
-
-The LLM presets produce real, importable, pip-installable Python packages
-with auto-generated README, passing tests, and a logged transcript of
-every LLM exchange. The polyglot showcase presets ship as pre-built
-source — they exercise `recon → wire → certify` on existing code so you
-can read the reports without spending a token. Live trajectories in
-[`docs/SHOWCASE.md`](docs/SHOWCASE.md).
-
-\* The demo presets score **90/100** because the generated packages
-have no `.github/workflows/` and no `CHANGELOG.md` — the v0.2.2
-**operational axis** (CI workflow + changelog, 5 + 5) is unearned by a
-just-generated demo package. Forge itself, which has both, certifies
-**100/100** (the badge above). Generating a demo and then committing it
-behind a CI workflow + a CHANGELOG would also score 100/100.
-
-\* 60/100 is the honest ceiling for a JS-only package today. The +30
-behavioural pytest axis remains Python-only; wiring `npm test` / Vitest
-into that gate is on the 0.3 roadmap. The four polyglot-aware structural
-checks (docs / tests-present / tier-layout / upward-import-discipline)
-all PASS on `js-counter`. We're not going to fake the missing 30 points.
+- [docs/MULTI_REPO.md](docs/MULTI_REPO.md) — absorb more than one repo at once.
+- [docs/CI_CD.md](docs/CI_CD.md) — GitHub Actions, GitLab CI, pre-commit.
+- [docs/AIR_GAPPED.md](docs/AIR_GAPPED.md) — offline / on-prem install.
+- [docs/SHOWCASE.md](docs/SHOWCASE.md) — live trajectories of real runs.
 
 ### Polyglot recon (JS/TS in a single pass)
 
@@ -164,11 +142,7 @@ Each tier is a layer of **verified building blocks**. Higher tiers never invent 
 
 ## Installation
 
-```bash
-pip install atomadic-forge
-```
-
-Or, for development:
+PyPI is **coming soon**. Until then, install editable from source:
 
 ```bash
 git clone https://github.com/atomadictech/atomadic-forge && cd atomadic-forge
@@ -177,34 +151,9 @@ python -m pytest               # Verify the full local suite
 python -m atomadic_forge --help
 ```
 
-## Quick start (3 minutes)
-
-```bash
-# 1. Dry-run: what would Forge do to this repo?
-forge auto /path/to/messy-repo ./output
-
-# 2. Look at the analysis
-forge recon /path/to/messy-repo
-
-# 3. Actually apply the transformation
-forge auto /path/to/messy-repo ./output --apply --package my_project
-
-# 4. Check for import violations
-forge wire ./output/src/my_project
-
-# 5. Score the result (docs, tests, layout, imports)
-forge certify ./output --package my_project
-forge certify ./output --package my_project --fail-under 90
-```
-
-**What you get back:**
-- `output/src/my_project/a0_qk_constants/` — Constants, enums, types
-- `output/src/my_project/a1_at_functions/` — Pure helpers
-- `output/src/my_project/a2_mo_composites/` — Stateful classes
-- `output/src/my_project/a3_og_features/` — Features combining a2
-- `output/src/my_project/a4_sy_orchestration/` — CLI entry points
-- `output/STATUS.md` — What still needs work (tests, integration, config)
-- `.atomadic-forge/` — Provenance: scout, cherry, assimilate, certify reports
+Then follow [docs/FIRST_10_MINUTES.md](docs/FIRST_10_MINUTES.md) for
+the canonical first-run path (offline demo, free recon, then absorb or
+generate).
 
 ## Code-from-intent (LLM-driven, with Forge as the architectural backbone)
 
@@ -389,7 +338,7 @@ Apache 2.0.
 **Forge itself is monadic.** Every source file belongs to one tier. The repo is a worked example:
 
 ```bash
-python -m pytest tests/          # 299 tests, all passing
+python -m pytest tests/          # 308 passing, 2 skipped
 python -m atomadic_forge doctor  # Environment check
 python -m atomadic_forge wire src/atomadic_forge  # Scan for violations
 python -m atomadic_forge certify . --fail-under 100  # Score and gate the repo
@@ -407,7 +356,7 @@ python -m atomadic_forge certify . --fail-under 100  # Score and gate the repo
 
 - ✓ Tested end-to-end on its own codebase
 - ✓ Tested on reference Python and JavaScript / TypeScript repos
-- ✓ 299 tests, all passing
+- ✓ 308 tests, all passing (2 skipped)
 - ✓ Schema finalized (conformance, lineage, scaffold)
 - ✓ Polyglot — Python + JavaScript + TypeScript classified by the same 5-tier law (0.2)
 - ✗ Not yet on PyPI (coming soon)
