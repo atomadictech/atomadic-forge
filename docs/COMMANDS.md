@@ -23,6 +23,14 @@ counts (`python files`, `javascript files`, `typescript files`) and a
 `primary_language` verdict; emits a recommendation when JS/TS files exist
 outside `aN_*` tier directories.
 
+**Long-running progress (Lane B / Golden Path W2):** add `--progress`
+to stream per-file scan status to stderr. Designed to feed the Forge
+Studio progress pane and to make CI logs readable on 100K-LOC repos.
+
+```bash
+forge recon ./monorepo --progress 2>&1 | grep -v '^\[scout\]'   # detach progress from stdout
+```
+
 ### `forge cherry SOURCE`
 
 Build a cherry-pick manifest from the latest scout. Pass `--pick all` or
@@ -40,6 +48,19 @@ detects upward imports in JS/TS specifiers (`"../a3_og_features/foo"`)
 and Python `from`-imports alike. Each violation in the JSON report
 carries a `language` field (`"python"` / `"javascript"` / `"typescript"`).
 
+**CI flags (Lane C / Golden Path W1):**
+- `--fail-on-violations` — exits non-zero when any upward import is
+  detected. Drop into `.github/workflows/*.yml` to gate every PR on
+  monadic-law conformance.
+- `--suggest-repairs` — emits a per-violation repair hint
+  (move-target tier + suggested rename) and counts how many are
+  auto-fixable. Populates the Receipt's `wire.auto_fixable` field.
+
+```bash
+forge wire src/atomadic_forge --fail-on-violations
+forge wire src/atomadic_forge --suggest-repairs --json > wire.json
+```
+
 ### `forge certify ROOT --package <name>`
 
 Score docs, tests, layout, imports, importability, behavior, stub bodies.
@@ -54,6 +75,39 @@ JS/TS-specific behaviour:
 - The runtime-import smoke (+25 points) and behavioural pytest gate
   (+30 points) remain Python-only — JS/TS packages are scored on the
   +45 polyglot-aware structural axes.
+
+## Audit / diff (Receipt-aware)
+
+### `forge audit list` / `forge audit show <id>` / `forge audit log`
+
+Surfaces the Vanguard lineage chain (Lane A / Golden Path W4) as a
+verb. Each `forge auto` / `forge certify` run appends to
+`.atomadic-forge/lineage.jsonl`; the `audit` family reads it.
+
+- `forge audit list` — shows the most recent N entries with their
+  cycle id, action, verdict, and certify score.
+- `forge audit show <id>` — full record for a single entry, including
+  the artifacts it referenced and the Receipt it produced.
+- `forge audit log` — streams the full JSONL file (pipe-friendly for
+  `jq`).
+
+```bash
+forge audit list --limit 20
+forge audit show 7cd840a-fb89-4d61-a712-…
+forge audit log | jq 'select(.verdict == "FAIL")'
+```
+
+### `forge diff MANIFEST_A MANIFEST_B`
+
+Compare two `.atomadic-forge/scout.json` (or `certify.json`) manifests.
+Schema-aware: reports added / removed / moved symbols, tier-distribution
+deltas, effect-distribution deltas, and certify-score deltas with
+component breakdown. The output feeds Lane B's "Shadow Merge" view in
+Forge Studio (W8) and Lane E's PR-comment delta on the Forge Action.
+
+```bash
+forge diff baseline/scout.json head/scout.json --json > delta.json
+```
 
 ## Code generation (LLM-driven)
 

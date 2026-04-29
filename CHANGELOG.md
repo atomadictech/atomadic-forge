@@ -1,5 +1,81 @@
 # Changelog
 
+## Unreleased — _Pre-audit lanes + Golden Path Lane A W0_
+
+10 commits accumulated since `0.2.2` ship, mapped onto the lanes in
+`launch/forge/GOLDEN_PATH-20260428.md`. Test trajectory: **301 → 363
+passing, 2 skipped**. `forge wire src/atomadic_forge` PASS at every
+commit. `forge certify .` = **100/100** held.
+
+### Added — pre-audit operational scaffolding
+
+- **`forge audit list / show / log`** (`7cd840a`, audit-D1) — surfaces
+  the Vanguard lineage chain as a verb. Reads
+  `.atomadic-forge/lineage.jsonl`; populates Receipt's
+  `lineage.lineage_path` field at GP Lane A W4. New module:
+  `a1_at_functions/lineage_reader.py`.
+- **`forge wire --suggest-repairs`** (`4786836`, audit-D2) — emits a
+  per-violation repair hint and an `auto_fixable` count; populates
+  Receipt's `wire.auto_fixable` field. Prerequisite for `forge enforce`
+  at GP Lane A W6.
+- **`forge wire --fail-on-violations`** (`8385cea`, audit-G1) — exits
+  non-zero when any upward import is detected. Drop-in CI gate
+  consumed by `forge-action` at GP Lane C W1.
+- **`forge diff MANIFEST_A MANIFEST_B`** (`6249e74`, audit-D4) —
+  schema-aware compare of two scout/certify manifests. Powers Lane B's
+  "Shadow Merge" view (W8) and Lane E's PR-comment delta.
+- **`--progress` on `forge recon` / `forge auto`** (`ec59a75`, audit-B2)
+  — per-file stderr progress line. New module:
+  `a1_at_functions/progress_reporter.py`. Feeds Lane B Forge Studio's
+  progress pane.
+- **F-coded error hints in CLI errors** (`375fe85`, audit-B4) —
+  recovery-template hints attached to common CLI failure modes.
+  Scaffolding for Lane A W5's full F0001–F0099 catalog. New module:
+  `a1_at_functions/error_hints.py`.
+- **Pre-audit smoke test** (`b4c8579`, audit-H1) — pins file:line
+  claims so `lane-plan.md` cannot drift from the source.
+- **`docs/FIRST_10_MINUTES.md` consolidation** (`109e857`, audit-F) —
+  unifies onboarding; `docs/CI_CD.md`, `docs/MULTI_REPO.md`,
+  `docs/AIR_GAPPED.md` are the deeper paths.
+
+### Added — Golden Path Lane A W0 (critical-path)
+
+- **Forge Receipt JSON v1 wire-format schema** (`f6c487a`, GP-A W0) at
+  `a0_qk_constants/receipt_schema.py` (278 LOC) + `docs/RECEIPT.md`
+  (305 lines) + `tests/test_receipt_schema.py` (206 LOC). Versioning
+  roadmap explicit (v1.0 → v1.1 W8 polyglot_breakdown → v1.2 W12
+  slsa_attestation → v2.0 W24 bao_rompf_witnesses). Both Lean4 corpora
+  cited (`aethel-nexus-proofs` — 29 theorems, 0 sorry, 0 axioms — and
+  `mhed-toe-codex-v22` — 538 theorems, 0 sorry). All signing / lineage
+  / attestation fields default to `None` so unsigned dev Receipts
+  remain structurally valid. Tier-pure a0 (imports limited to
+  `__future__` and `typing`).
+
+### Fixed
+
+- **`datetime.utcnow()` deprecation sweep** (`3359fb6`, audit-A1) —
+  replaced with `datetime.now(timezone.utc)` across a3 features.
+  Prerequisite for the GP P1 self-certify gate.
+
+### Documentation
+
+- `docs/COMMANDS.md` updated with the 5 new user-facing surfaces:
+  `forge audit list/show/log`, `forge diff`, `forge wire
+  --fail-on-violations`, `forge wire --suggest-repairs`,
+  `forge recon --progress`.
+
+### Notes for downstream consumers
+
+- The Receipt schema is **forward-compatible by design** — every new
+  field defaults to `None` or `[]` / `{}`. Adding a *required* field is
+  a major version bump; reserved field names are documented in the
+  schema docstring.
+- `forge wire --fail-on-violations` is the load-bearing primitive for
+  the planned `atomadictech/forge-action` GitHub Action (GP Lane C W1).
+- 9 audit-lane commits + 1 GP-A W0 commit currently sit on a feature
+  branch. Cut as `0.3.0-rc1` when GP-A W1 (`receipt_emitter` +
+  `card_renderer`) lands.
+
 ## 0.2.2 — _Operational axis + 100/100 self-certify_
 
 `forge certify` now scores the full 0–100 range.  The v1 rubric topped
