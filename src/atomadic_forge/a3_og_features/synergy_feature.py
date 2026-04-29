@@ -38,7 +38,7 @@ class SynergyScan:
         candidates = detect_synergies(self.features)[:top_n]
         return SynergyScanReport(
             schema_version="atomadic-forge.synergy.scan/v1",
-            generated_at_utc=_dt.datetime.utcnow().isoformat(timespec="seconds") + "Z",
+            generated_at_utc=_dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             feature_count=len(self.features),
             candidate_count=len(candidates),
             candidates=candidates,

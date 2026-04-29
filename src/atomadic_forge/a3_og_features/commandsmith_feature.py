@@ -96,7 +96,7 @@ class Commandsmith:
                        smoke_results: dict[str, bool] | None = None) -> Path:
         manifest = RegistryManifestCard(
             schema_version="atomadic-forge.commandsmith.registry/v1",
-            generated_at_utc=_dt.datetime.utcnow().isoformat(timespec="seconds") + "Z",
+            generated_at_utc=_dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             commands=cards,
             smoke_results=smoke_results or {},
         )
@@ -261,7 +261,7 @@ class Commandsmith:
         self.write_manifest(cards, smoke_results)
         return RegistryManifestCard(
             schema_version="atomadic-forge.commandsmith.registry/v1",
-            generated_at_utc=_dt.datetime.utcnow().isoformat(timespec="seconds") + "Z",
+            generated_at_utc=_dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             commands=cards,
             smoke_results=smoke_results,
         )

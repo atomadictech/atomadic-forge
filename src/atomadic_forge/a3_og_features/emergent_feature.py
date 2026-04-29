@@ -66,7 +66,7 @@ class EmergentScan:
 
         return EmergentScanReport(
             schema_version="atomadic-forge.emergent.scan/v1",
-            generated_at_utc=_dt.datetime.utcnow().isoformat(timespec="seconds") + "Z",
+            generated_at_utc=_dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             catalog_size=len(catalog),
             chain_count_considered=len(chains),
             candidates=candidates,
