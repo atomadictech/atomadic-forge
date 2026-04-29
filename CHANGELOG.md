@@ -1,10 +1,78 @@
 # Changelog
 
-## Unreleased — _Codex-6 + Lane D W8 sidecar + Lane D W11 sidecar-validate_
+## Unreleased — _Codex-6 + Lane D W8/W11/W12 sidecar arc complete_
 
-Three commits since `v0.3.0`. Trajectory: 643 → **682 passing**, 2
-skipped (+39). `forge wire src/atomadic_forge` PASS. `forge certify .`
-= 100/100 held.
+Five commits since `v0.3.0`. Trajectory: 643 → **702 passing**, 2
+skipped (+59). `forge wire src/atomadic_forge` PASS at every commit.
+`forge certify .` = 100/100 held.
+
+### Added — Lane D W12 forge-lsp stdio LSP server (`d23005f`)
+
+Closes Lane D W12. **Editor-agnostic LSP server** gives every client
+(VS Code, Neovim, Helix, IntelliJ) live diagnostics + hover +
+goto-source on `.forge` sidecar files. The Lane D arc reaches the
+in-editor surface — sidecar feedback now arrives where the agent
+actually edits.
+
+- **`a1_at_functions/lsp_protocol.py`** — pure dispatcher (~280 LOC).
+  `dispatch_request(req, *, state) -> (responses, notifications)`.
+  In-memory `LspState` document store keyed by URI.
+  - `initialize` / `initialized` / `shutdown` / `exit` — handshake +
+    clean shutdown
+  - `textDocument/didOpen` / `didChange` / `didSave` / `didClose` —
+    document lifecycle
+  - `textDocument/hover` — markdown summary of the cursor's symbol
+    (effect, tier, `compose_with`, `proves`)
+  - `textDocument/definition` — goto-source: `name: login` line in
+    `foo.py.forge` → `foo.py:login`
+  - `textDocument/publishDiagnostics` (server-initiated) — emitted
+    after every did{Open,Change,Save} with the validator's findings
+    promoted to F0100-F0106 codes
+  Pure: bounded I/O for source-file resolution only (no LSP-side
+  shell-out, no LLM call).
+- **`a3_og_features/lsp_server.py`** — stdio LSP framing (~70 LOC).
+  `serve_stdio(*, stdin, stdout, stderr) -> int`. Reads
+  Content-Length-framed JSON-RPC, dispatches, writes responses +
+  notifications back. Bad JSON surfaces `-32700` without killing the
+  loop.
+- **`forge lsp serve`** — sub-app verb. Docstring includes VS Code +
+  Neovim `lspconfig` snippets so consumers can drop the server in
+  without hunting docs.
+
+**Tests** (+18 in `tests/test_lsp_protocol.py`): handshake (4),
+diagnostics (3), hover (2), definition (2), lifecycle (3), URI
+parsing (2). 702 passing / 2 skipped (was 684).
+
+### Added — Lane D W11 follow-up: F0100-F0106 sidecar drift codes (`7099360`)
+
+Promotes the local `S0xxx` labels emitted by `sidecar_validator` into
+the **global F-code registry** so downstream tools (`forge audit` /
+`agent_summary` / `score_patch` / `plan-apply`) can address sidecar
+drift in the same namespace as wire violations.
+
+- **`a0_qk_constants/error_codes.py`** registry seeds:
+  | F-code | Severity | What |
+  |---|---|---|
+  | `F0100` | error | sidecar source unparseable |
+  | `F0101` | error | sidecar declares missing symbol |
+  | `F0102` | warn | sidecar coverage incomplete |
+  | `F0103` | error | `Pure`-declared violates purity |
+  | `F0106` | warn | sidecar tier mismatch |
+- **`SIDECAR_S_TO_F`** mapping (`S0000 -> F0100`, `S0001 -> F0101`,
+  …) so the validator doesn't have to know the F-code seeding
+  pattern.
+- `ValidationFinding` gains an optional `f_code` field. Every
+  finding whose `code` is in the mapping gets the registered F-code
+  attached automatically before the report returns.
+
+Lane D W8/W11 drift codes are now **first-class F-coded errors** —
+addressable, dashboard-friendly, route-able through
+`forge enforce` (when an auto-fix path lands in W14).
+
+**Tests** (+2 in `tests/test_error_codes.py`): registry pinned set
+extended with F0100-F0106 by name; `SIDECAR_S_TO_F` mapping pinned;
+validator dogfood test confirms a synthesized `S0001` finding
+carries `f_code='F0101'`. 684 passing.
 
 ### Added — Lane D W11 sidecar cross-validator (`60c174e`)
 

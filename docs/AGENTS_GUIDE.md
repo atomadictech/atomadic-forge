@@ -166,6 +166,42 @@ surfaces.*
 
 ---
 
+## In-editor surface — `forge lsp serve` (Lane D W12)
+
+When the agent is **co-driving with a human in an editor** (Cursor,
+VS Code, Neovim, Helix, IntelliJ), MCP isn't the right surface for
+sidecar feedback — it should land where the cursor is. Forge ships
+an **LSP server** for that:
+
+```bash
+forge lsp serve   # speaks stdio JSON-RPC, LSP-spec-compliant
+```
+
+What the agent gets through the LSP surface:
+
+- **`textDocument/publishDiagnostics`** — every sidecar drift
+  finding from `sidecar_validator` published with its **F0100-F0106
+  code**, so an agent reading the editor's "Problems" panel can
+  route fixes through the same F-code namespace it already uses for
+  wire violations and certify failures.
+- **`textDocument/hover`** — markdown summary of the cursor's
+  symbol (effect, tier, `compose_with`, `proves`).
+- **`textDocument/definition`** — goto-source: `name: login` line
+  in `foo.py.forge` jumps to `foo.py:login`.
+
+VS Code + Neovim drop-in snippets are in
+[`docs/COMMANDS.md`](COMMANDS.md) under `forge lsp serve`. Reserved
+for **W14** (VS Code extension packaging) and **W18** (JetBrains
+plugin).
+
+This is the third axis of agent integration — alongside the MCP
+tool surface and the Receipt JSON wire format. **Coding agents
+that wrap a real editor (Cursor, Continue, Aider) should consume
+both the MCP surface AND the LSP surface** — MCP for the action
+loop, LSP for the in-line drift feedback as the human types.
+
+---
+
 ## The Forge Receipt — what it tells you
 
 When an agent calls `certify` (or follows `forge auto`), it gets a

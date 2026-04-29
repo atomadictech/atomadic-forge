@@ -162,6 +162,20 @@ Namespace allocation (defined at `a0_qk_constants/error_codes.py`):
 | F0070–F0079 | import-repair |
 | F0080–F0089 | assimilate conflicts |
 | F0090–F0099 | receipt / signing |
+| F0100–F0109 | sidecar drift (Lane D W11 — `S0xxx` promotion) |
+
+The sidecar drift band is populated today (Lane D W11):
+
+| F-code | Severity | What |
+|---|---|---|
+| `F0100` | error | sidecar source unparseable |
+| `F0101` | error | sidecar declares a symbol the source doesn't have |
+| `F0102` | warn  | source has an undeclared public symbol |
+| `F0103` | error | `Pure`-declared symbol violates purity |
+| `F0106` | warn  | sidecar tier mismatches detected path tier |
+
+Reserved (Lane D W20): `F0105` `compose_with` mismatch, `F0107`
+`proves:` clause unverified.
 
 ## Agent integration (MCP)
 
@@ -435,9 +449,67 @@ forge sidecar validate users/auth.py --json | jq
 
 Pure AST walk + sidecar dict walk; no exec, no LLM, no network.
 
-Reserved for **W12** (`forge-lsp` server / VS Code extension /
-JetBrains plugin) and **W20** (Bao-Rompf `compose_with` checker
-[`S0005`] + Lean4 `proves:` discharger [`S0007`]).
+Reserved for **W14** (VS Code extension), **W18** (JetBrains
+plugin), and **W20** (Bao-Rompf `compose_with` checker [`S0005`] +
+Lean4 `proves:` discharger [`S0007`]).
+
+### `forge lsp serve` (Lane D W12)
+
+Editor-agnostic Language Server Protocol implementation for `.forge`
+sidecar files. Speaks stdio JSON-RPC; connects to any LSP client
+(VS Code, Neovim, Helix, IntelliJ).
+
+**LSP slice supported (the methods that light up sidecar feedback in
+every modern editor):**
+
+- `initialize` / `initialized` — capability handshake (advertises
+  `textDocumentSync = full`, `hoverProvider`, `definitionProvider`).
+- `textDocument/didOpen` / `didChange` / `didSave` / `didClose` —
+  document lifecycle. Each `didOpen`/`didChange`/`didSave` triggers
+  a server-initiated `textDocument/publishDiagnostics` for the
+  sibling source file.
+- `textDocument/hover` — markdown summary of the cursor's symbol
+  (`effect`, `tier`, `compose_with`, `proves`).
+- `textDocument/definition` — goto-source: `name: login` line in
+  `foo.py.forge` → `foo.py:login`.
+- `textDocument/publishDiagnostics` (server-initiated) — every
+  finding from `sidecar_validator` published with its **F0100-F0106
+  code**, severity, and range.
+
+**VS Code (vscode/lspconfig.json or extension authoring):**
+
+```json
+{
+  "languageserver": {
+    "atomadic-forge": {
+      "command": "forge",
+      "args": ["lsp", "serve"],
+      "filetypes": ["yaml"],
+      "rootPatterns": [".atomadic-forge/", "pyproject.toml"]
+    }
+  }
+}
+```
+
+**Neovim (nvim-lspconfig):**
+
+```lua
+vim.lsp.config['forge_lsp'] = {
+  cmd = { 'forge', 'lsp', 'serve' },
+  filetypes = { 'yaml' },
+  root_markers = { '.atomadic-forge', 'pyproject.toml' },
+}
+vim.lsp.enable('forge_lsp')
+```
+
+Pure dispatcher at `a1_at_functions/lsp_protocol.py`; stdio framing
+at `a3_og_features/lsp_server.py`. Bad JSON surfaces `-32700`
+without killing the loop. The reasonable LSP failure modes
+(client-disconnect, malformed request, etc.) all degrade gracefully.
+
+Reserved for **W14** (VS Code extension packaging) and **W18**
+(JetBrains plugin) — `forge lsp serve` is the substrate they will
+consume.
 
 ### `forge recipes [NAME]` (Codex-6)
 
