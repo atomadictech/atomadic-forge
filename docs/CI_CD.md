@@ -2,12 +2,19 @@
 
 Copy-paste-ready integrations for running Forge gates in CI.
 
-> **Roadmap note.** A native `--fail-below-score` flag is **Lane G1**
-> future work. Today, you read the JSON output and exit non-zero
-> yourself; the recipes below show exactly that. A signed-certificate
-> output is **Lane G5** future work, and a published
-> `atomadictech/forge-action` GitHub Action is **Lane G2** future work.
-> Until those land, the patterns below are the canonical CI integration.
+> **Status of native fail flags.**
+>
+> - `forge certify --fail-under N` — **shipped**. Exits 1 when score < N.
+> - `forge wire --fail-on-violations` — **shipped (Lane G1)**. Exits 1
+>   when any upward-import violation is found.
+>
+> Roadmap items still pending:
+>
+> - **Lane G2** — published `atomadictech/forge-action` GitHub Action.
+> - **Lane G5** — signed certificate output.
+>
+> Until those land, the recipes below pair the native flags with a
+> small `python -c` fallback for fields the CLI doesn't yet gate on.
 
 ---
 
@@ -43,17 +50,15 @@ jobs:
 
       - name: Wire scan (upward-import discipline)
         run: |
-          forge wire src/your_package --json > wire.json
-          python -c "import json,sys; r=json.load(open('wire.json')); \
-            sys.exit(0 if r.get('verdict')=='PASS' else 1)"
+          # Native gate (Lane G1): non-zero exit on any violation.
+          forge wire src/your_package --fail-on-violations --json > wire.json
 
       - name: Certify (gate at score >= 75)
         run: |
-          forge certify . --package your_package --json > certify.json
-          python -c "import json,sys; r=json.load(open('certify.json')); \
-            s=r.get('total_score',0); \
-            print(f'forge certify score: {s}/100'); \
-            sys.exit(0 if s >= 75 else 1)"
+          # Native gate: --fail-under exits 1 below the threshold.
+          forge certify . --package your_package --fail-under 75 --json > certify.json
+          python -c "import json; r=json.load(open('certify.json')); \
+            print(f\"forge certify score: {r.get('total_score', r.get('score', 0))}/100\")"
 
       - name: Upload reports
         if: always()
@@ -93,11 +98,8 @@ forge-certify:
   before_script:
     - pip install "git+https://github.com/atomadictech/atomadic-forge@v0.2.2"
   script:
-    - forge wire src/your_package --json > wire.json
-    - |
-      python -c "import json,sys; r=json.load(open('wire.json')); \
-        sys.exit(0 if r.get('verdict')=='PASS' else 1)"
-    - forge certify . --package your_package --json > certify.json
+    - forge wire src/your_package --fail-on-violations --json > wire.json
+    - forge certify . --package your_package --fail-under 75 --json > certify.json
     - |
       python -c "import json,sys; r=json.load(open('certify.json')); \
         s=r.get('total_score',0); \
@@ -131,21 +133,20 @@ repo. The shape is:
 ```yaml
 - id: forge-wire
   name: forge wire (upward-import discipline)
-  description: Scan src/ for upward imports across the 5 tiers.
+  description: Scan src/ for upward imports; fails the hook on any violation.
   entry: forge wire
   language: system
   pass_filenames: false
-  args: [src]
+  args: [src, --fail-on-violations]
   stages: [pre-commit, pre-push]
 
 - id: forge-certify
   name: forge certify (architecture conformance)
-  description: Score architecture conformance; fails below threshold.
-  entry: bash -c 'forge certify . --json > /tmp/certify.json && \
-    python -c "import json,sys; r=json.load(open(\"/tmp/certify.json\")); \
-    sys.exit(0 if r.get(\"total_score\",0) >= 75 else 1)"'
+  description: Score architecture conformance; fails below the threshold.
+  entry: forge certify
   language: system
   pass_filenames: false
+  args: [., --fail-under, "75"]
   stages: [pre-push]
 ```
 
@@ -173,8 +174,10 @@ fire on every commit / push.
 
 ## What's still on the roadmap
 
-- **Lane G1** — a native `forge certify --fail-below-score 75` flag.
-  Once shipped, every recipe above collapses to a single line. The
+- **Lane G1** — ✅ shipped. `forge certify --fail-under N` and
+  `forge wire --fail-on-violations` are now the canonical CI gates.
+  Earlier `python -c` workarounds for these specific gates can be
+  removed; the recipes above already use the native flags. The
   current `python -c` workaround is intentionally explicit so the
   semantics survive the migration.
 - **Lane G2** — `atomadictech/forge-action` GitHub Action. Once

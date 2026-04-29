@@ -29,6 +29,52 @@ def test_recon_runs(sample_repo):
     assert data["python_file_count"] == 2
 
 
+def test_wire_fail_on_violations_clean_tree(tmp_path, sample_repo):
+    """G1: wire exits 0 on a clean tree even with --fail-on-violations."""
+    output = tmp_path / "out"
+    output.mkdir()
+    runner.invoke(
+        app, ["auto", str(sample_repo), str(output), "--apply",
+              "--package", "demo"]
+    )
+    pkg = output / "src" / "demo"
+    if not pkg.exists():
+        # auto layout may differ — fall back to whatever was created
+        candidates = list((output / "src").iterdir()) if (output / "src").exists() else []
+        assert candidates, "auto --apply produced no package"
+        pkg = candidates[0]
+    result = runner.invoke(app, ["wire", str(pkg), "--fail-on-violations"])
+    assert result.exit_code == 0
+
+
+def test_wire_fail_on_violations_triggers_exit(tmp_path):
+    """G1: wire exits 1 when violations exist and --fail-on-violations is set."""
+    pkg = tmp_path / "pkg"
+    a1 = pkg / "a1_at_functions"
+    a2 = pkg / "a2_mo_composites"
+    a1.mkdir(parents=True)
+    a2.mkdir(parents=True)
+    (a2 / "store.py").write_text(
+        '"""a2 store."""\nclass Store:\n    pass\n', encoding="utf-8")
+    # Upward import: a1 -> a2 (illegal)
+    (a1 / "helper.py").write_text(
+        '"""a1 helper with illegal upward import."""\n'
+        "from ..a2_mo_composites.store import Store\n\n"
+        "def use(s: Store):\n    return s\n",
+        encoding="utf-8",
+    )
+    # No --fail-on-violations → exit 0 even though FAIL is reported
+    soft = runner.invoke(app, ["wire", str(pkg), "--json"])
+    assert soft.exit_code == 0
+    soft_data = json.loads(soft.stdout)
+    assert soft_data["verdict"] == "FAIL"
+    assert soft_data["violation_count"] >= 1
+    # With --fail-on-violations → exit 1
+    hard = runner.invoke(
+        app, ["wire", str(pkg), "--json", "--fail-on-violations"])
+    assert hard.exit_code == 1
+
+
 def test_auto_dry_run(tmp_path, sample_repo):
     output = tmp_path / "out"
     output.mkdir()

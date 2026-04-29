@@ -178,17 +178,27 @@ def wire_cmd(
         exists=True, file_okay=False, dir_okay=True, resolve_path=True,
         help="Tier-organized package root.")],
     json_out: Annotated[bool, typer.Option("--json")] = False,
+    fail_on_violations: Annotated[bool, typer.Option(
+        "--fail-on-violations",
+        help="Exit 1 when any upward-import violations are found "
+             "(for use in CI gates).")] = False,
 ) -> None:
     """Scan a tier tree for upward-import violations."""
     report = scan_violations(source)
+    has_violations = report["violation_count"] > 0
     if json_out:
         typer.echo(json.dumps(report, indent=2, default=str))
+        if fail_on_violations and has_violations:
+            raise typer.Exit(code=1)
         return
     typer.echo(f"\nWire scan: {source}")
     typer.echo(f"  verdict:    {report['verdict']}")
     typer.echo(f"  violations: {report['violation_count']}")
     for v in report["violations"][:10]:
         typer.echo(f"    - {v['file']}: {v['from_tier']} ⟵ {v['to_tier']}.{v['imported']}")
+    if fail_on_violations and has_violations:
+        typer.echo(f"  gate:       FAIL (--fail-on-violations set)")
+        raise typer.Exit(code=1)
 
 
 @app.command("certify")
