@@ -63,7 +63,7 @@ jobs:
 
       - name: Upload self-certify report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: forge-certify-self-${{ matrix.python-version }}
           path: certify_self.json
@@ -90,7 +90,7 @@ jobs:
           python -m twine check dist/*
 
       - name: Upload distributions
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: atomadic-forge-dist
           path: dist/*
