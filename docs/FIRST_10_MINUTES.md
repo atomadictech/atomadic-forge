@@ -184,10 +184,10 @@ You now know enough to use Forge productively. For specific topics:
 - [05-faq.md](05-faq.md) — troubleshooting, common gotchas.
 - [tutorials/](tutorials/) — quickstart tutorials and the JS / TS path.
 - **[AGENTS_GUIDE.md](AGENTS_GUIDE.md)** — using Forge from a coding
-  agent (Cursor / Claude Code / Aider / Devin) via the built-in MCP
-  server. One config snippet, **ten tools**, four resources. The
-  fastest way to put Forge in front of every PR your team's agents
-  touch.
+  agent (Cursor / Claude Code / Aider / Devin / Copilot / Codex) via
+  the built-in MCP server. One config snippet, **21 tools**, 5
+  resources. The fastest way to put Forge in front of every PR your
+  team's agents touch.
 - [MULTI_REPO.md](MULTI_REPO.md) — absorbing more than one repo at once.
 - [CI_CD.md](CI_CD.md) — GitHub Actions, GitLab CI, pre-commit.
 - [AIR_GAPPED.md](AIR_GAPPED.md) — offline / on-prem install.

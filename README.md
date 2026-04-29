@@ -310,7 +310,7 @@ Forge ships with named limits. No overpromise.
 | Product | What it is | Status |
 |---------|------------|--------|
 | **AAAA-Nexus** | Trust/safety/payments substrate for autonomous agents | Live at [atomadic.tech](https://atomadic.tech) |
-| **Atomadic Forge** | Absorb-and-emerge engine for developers (this repo) | 0.2.2 (100/100 certify + GitHub-ready) |
+| **Atomadic Forge** | Absorb-and-emerge engine for developers (this repo) | v0.3.0 (21 MCP tools · `.forge` sidecar v1.0 · 682 tests) |
 | **Atomadic Assistant** | Sovereign AI assistant with cognitive loop on Cloudflare | In development |
 
 ## License

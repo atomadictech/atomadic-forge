@@ -1,28 +1,181 @@
 # Changelog
 
-## Unreleased — _Pre-audit + GP-A W0–W6 + GP-C W1/W2/W4 + Codex-1/2/3/4_
+## Unreleased — _Codex-6 + Lane D W8 sidecar + Lane D W11 sidecar-validate_
 
-25+ commits accumulated since `0.2.2` ship, mapped onto the lanes in
-`launch/forge/GOLDEN_PATH-20260428.md` plus four Codex-direction
-follow-up rounds. Test trajectory: **301 → 611 passing, 2 skipped**.
-`forge wire src/atomadic_forge` PASS at every commit. `forge certify
-.` = **100/100** held.
+Three commits since `v0.3.0`. Trajectory: 643 → **682 passing**, 2
+skipped (+39). `forge wire src/atomadic_forge` PASS. `forge certify .`
+= 100/100 held.
 
-**Lane A is 6-of-7 named-deliverables shipped** (W2 RefAgent framework
-remains; recommended for a delegated agent). **Lane C is 3-of-6
-shipped** (W1 forge-action, W2 pre-commit-hooks, W4 mcp serve).
+### Added — Lane D W11 sidecar cross-validator (`60c174e`)
 
-**Codex direction is 4-of-4 shipped**: agent_summary (Codex-1),
-agent_plan (Codex-2), plan-apply chain (Codex-3), copilot's copilot
-(Codex-4 — context_pack / preflight / score_patch). Forge is now the
-**architectural control plane** any coding agent (Cursor, Claude
-Code, Aider, Devin, Copilot, Sweep) can wrap around.
+Closes Lane D W11. The W8 spec ships the *grammar*; W11 ships the
+**verifier** that catches sidecar drift by cross-checking declared
+effects against the source AST.
+
+- **`a1_at_functions/sidecar_validator.py`** — pure (~120 LOC).
+  `validate_sidecar(sidecar, *, source_text, source_path) ->
+  ValidationReport` (`atomadic-forge.sidecar.validate/v1`). Pure AST
+  walk + sidecar dict walk; no exec, no LLM, no network. Soft on
+  parse failures (returns `verdict='unparseable'` instead of
+  raising).
+- **5-of-7 named drift classes detected today**:
+  | Code | Class | Severity |
+  |---|---|---|
+  | `S0000` | source did not parse | `unparseable` |
+  | `S0001` | sidecar declares a symbol the source doesn't have | error |
+  | `S0002` | source has an undeclared public symbol | warn (gradual coverage is OK) |
+  | `S0003` | `Pure`-declared symbol violates purity (IO, network, non-determinism in source) | error |
+  | `S0006` | declared `tier` mismatches detected path tier | warn |
+  | `S0005` | `compose_with` name resolution | reserved (W20) |
+  | `S0007` | `proves:` clauses against Lean4 corpus | reserved (W20) |
+- **CLI verbs**: `forge sidecar parse <file.forge>` and
+  `forge sidecar validate <source.py>` — both `--json`-friendly,
+  exit 1 on FAIL. The validator auto-resolves the sibling
+  `<source>.forge` via `find_sidecar_for`.
+
+**Reserved for later in Lane D**:
+- **W12** — `forge-lsp` server (in-editor sidecar diagnostics).
+- **W14** — VS Code extension (hover + diagnostics surface).
+- **W18** — JetBrains plugin.
+- **W20** — Bao-Rompf compose-by-law checker (`S0005`) + Lean4
+  `proves:` discharger (`S0007`).
+
+**Tests** (+11 in `tests/test_sidecar_validate.py`): happy path,
+S0000-S0006 unit tests, CLI parse / validate FAIL / PASS.
+
+### Added — Lane D W8 `.forge` sidecar v1.0 (`b4ad686`)
+
+### Added — Lane D W8 `.forge` sidecar v1.0 (`b4ad686`)
+
+The "**TypeScript for architecture**" paradigm from BEP-1, now real.
+A `.forge` sidecar is a YAML file beside any source file
+(`users/auth.py.forge`) that declares the per-symbol contract Forge
+would otherwise infer heuristically. **Opt-in, gradual, never
+required** — adoption-curve modeled on TypeScript itself.
+
+- **Schema** `atomadic-forge.sidecar/v1` at
+  `a0_qk_constants/sidecar_schema.py` — pinned by tests, pure a0
+  (imports only `__future__` + `typing`).
+  - **`EffectKind`** enum (the seven-effect categorical lattice from
+    Bao-Rompf 2025): `Pure`, `IO`, `NetIO`, `KeyedCache`, `Logging`,
+    `Random`, `Mutation`.
+  - **`SidecarSymbol`** TypedDict: `name`, `effect`, `compose_with`,
+    `proves`, `tier`, `notes`.
+  - **`SidecarFile`** TypedDict: `schema_version`, `target`,
+    `symbols`, `extra`.
+- **Parser** at `a1_at_functions/sidecar_parser.py` — pure (~140 LOC):
+  - `parse_sidecar_text(text, *, source) -> ParseResult`
+  - `parse_sidecar_file(path) -> ParseResult`
+  - `find_sidecar_for(source_file) -> Path` — convention:
+    `users/auth.py` → `users/auth.py.forge`
+  - YAML errors / missing files / non-mapping top-levels become
+    structured `errors` lists; **never raise**. Unknown effects
+    preserved with a warning (forward-compat). Unknown top-level
+    fields preserved in `extra`.
+- **Spec doc** at `docs/SIDECAR.md` — v1.0 grammar + worked example
+  covering `NetIO` + `Pure` + `Logging` + `compose_with` + `proves`.
+- `pyyaml >= 6, < 7` added as runtime dep (parser hard-requires).
+
+**Reserved for later in Lane D:**
+- **W11** — `sidecar_validate` (cross-check declared effects against
+  source AST).
+- **W12** — `forge-lsp` + VS Code extension (hover + diagnostics).
+- **W20** — Bao-Rompf `compose_with` checker + Lean4 `proves:`
+  discharger.
+
+This shipment lands the **"five surfaces, one Receipt"** convergence
+predicted by BEP-1: terminal Card, PR comment, README badge, MCP
+resource, signed CS-1 PDF — and now the per-source-file effect
+signature that makes the polyglot Receipt rendering precise rather
+than heuristic.
+
+**Tests** (+16 in `tests/test_sidecar.py`): schema (3), happy path
+(4), error paths (5), forward-compat (3), tier discipline (1). 671
+passing / 2 skipped (was 655). Wire scan PASS.
+
+### Added — Codex-6 policy-as-code + recipes CLI + Receipt v1.1 (`c74670b`)
+
+### Added — Codex-6 policy-as-code + recipes CLI + Receipt v1.1 (`c74670b`)
+
+Three small but high-leverage additions on top of `v0.3.0`:
+
+**(1) Policy-as-code is now ENFORCED, not just queryable.**
+
+- `preflight_change` reads `[tool.forge.agent].max_files_per_patch`
+  from `pyproject.toml` and uses it as the scope threshold (default
+  remains 8 when no policy declared). An explicit caller-supplied
+  `--scope-threshold` still wins.
+- `preflight_change` tags any `proposed_file` matching
+  `protected_files` with a per-file note **and** emits an overall
+  "request human review" note listing the matches.
+- `score_patch` grows an optional `project_root` kwarg. When provided
+  AND `[tool.forge.agent]` declares `protected_files`, any diff
+  touching a protected file forces `needs_human_review = True`
+  regardless of diff size. Closes Codex's framing — *"Forge enforces
+  the local social contract, not just the tier law."*
+
+**(2) New CLI verb: `forge recipes [name]`** — same data the MCP
+`list_recipes` / `get_recipe` tools return, but exposed for direct
+human / shell-script use.
+
+```bash
+forge recipes                    # list every golden-path recipe
+forge recipes release_hardening  # show one recipe (checklist +
+                                 # file_scope_hints + validation_gate)
+forge recipes --json | jq        # machine-readable
+```
+
+**(3) Receipt v1.1 — `polyglot_breakdown` field shipped (Lane A W8 seed).**
+
+`ForgeReceiptV1` gains an optional `polyglot_breakdown` block
+populated automatically by `build_receipt` from the scout report:
+
+- per-language file counts
+- per-language symbol counts
+- `primary_language` verdict
+
+Per-language certify scores stay for `v0.4` once the JS/TS
+behavioural pytest gate lands (Golden Path Lane A W8 acceptance);
+today's seed gives downstream consumers (Lane B Studio, Lane F CS-1
+Conformity Statement, README badges) enough to render *"this repo is
+80% Python, 15% TS"* directly from the Receipt.
+
+This is the v1.0 → v1.1 bump promised in
+`a0_qk_constants/receipt_schema.py`'s versioning roadmap (W8) — now
+shipped one major lane ahead of W8 schedule.
+
+**Tests** (+12 in `tests/test_codex_6_enforce_polyglot.py`): 655
+passing / 2 skipped (was 643). Wire scan PASS.
+
+## 0.3.0 — _Copilot's Copilot complete · 21 MCP tools · `forge --version` (`009d6d7`, tag `v0.3.0`)_
+
+**The architectural control plane for AI coding agents.** Codex's
+framing landed: Forge is not the agent — it's the always-on senior
+engineer beside the agent. Cumulative trajectory since `0.2.2`
+(reference `ee8b8cb`):
+
+- **31 commits**, **+342 tests** (301 → **643 passing**, 2 skipped).
+- `forge wire src/atomadic_forge` **PASS at every commit** —
+  tier discipline held across the entire release.
+- `forge certify .` = **100/100** held (pre-bump verification).
+- `python -m build --no-isolation` produces a clean
+  `atomadic_forge-0.3.0.tar.gz` + `atomadic_forge-0.3.0-py3-none-any.whl`.
+- `forge mcp serve | tools/list` returns **21 tools** + 5 resources
+  (pinned by tests).
+
+**Lane status at v0.3.0**:
+- **Lane A: 6-of-7 named deliverables shipped** (W2 RefAgent
+  framework remains; recommended for a delegated agent).
+- **Lane C: 3-of-6 shipped** (W1 forge-action, W2 pre-commit-hooks,
+  W4 mcp serve).
+- **Codex direction: 5-of-5 shipped** — Codex-1 (agent_summary),
+  Codex-2 (agent_plan), Codex-3 (plan-apply chain), Codex-4
+  (3 hero copilot's-copilot primitives), Codex-5 (full 12-item
+  enumeration closed in one sweep).
 
 Lane A is **6 weeks ahead of W0 baseline** — the entire critical-path
 stack from schema → emitter → renderer → signer → F-codes → enforce
-shipped on master. Lane C delivered W1 (composite GitHub Action +
-self-certify dogfood), W2 (`.pre-commit-hooks.yaml`), and W4 (`forge
-mcp serve` — 10 MCP tools after Codex-1..4).
+shipped on master.
 
 ### Added — pre-audit operational scaffolding
 
@@ -231,6 +384,73 @@ beside any coding agent:
 
 Companion to Codex-1 (`69d4ea9`, agent_summary), Codex-2 (`c7ad6d8`,
 agent_plan), and Codex-3 (`2cafbcc`, plan-apply chain).
+
+### Added — Codex-5 Copilot's Copilot complete + `forge --version` (`276a092`)
+
+Closed Codex's full 12-item "Copilot's Copilot" enumeration in one
+sweep on top of the 3 hero primitives shipped in Codex-4. **Eight new
+pure modules + 11 new MCP tools + one production-hardening flag.**
+Total live MCP surface jumped from **10 → 21 tools**.
+
+**8 new modules** (a0 + a1 only — pure, tier-clean):
+
+| File | Codex # | Purpose |
+|---|---|---|
+| `a0_qk_constants/policy_schema.py` | #10 | `atomadic-forge.policy/v1` TypedDict + sane defaults (max_files_per_patch, protected_files, release_gate, require_human_review_for) |
+| `a1_at_functions/policy_loader.py` | #10 | pure `pyproject.toml [tool.forge.agent]` reader + `file_is_protected` matcher (exact + suffix) |
+| `a1_at_functions/test_selector.py` | #7 | `select_tests({changed_files, intent})` → `minimum` (mirror match) + `full` (tier-mate) test sets |
+| `a1_at_functions/rollback_planner.py` | #11 | `rollback_plan({changed_files})` → files-to-remove, caches, tests-to-rerun, risk_level (low/medium/high — high if a release file like pyproject / version / CHANGELOG / LICENSE is touched) |
+| `a1_at_functions/agent_memory.py` | #5 | `why_did_this_change({file})` + `what_failed_last_time({area})` → queries `.atomadic-forge/lineage.jsonl` and plan-state files |
+| `a1_at_functions/repo_explainer.py` | #6 | humane operational orientation card — purpose, entry-points, do-not-break list, release_state derived from wire/certify |
+| `a1_at_functions/plan_adapter.py` | #8 | capability-aware card filtering — `apply` / `delegate` / `ask_human` / `report_only` based on agent capabilities (`edit_files`, `run_commands`, `network`, `review`, `delegate`) |
+| `a1_at_functions/tool_composer.py` | #9 | goal-keyword → ordered tool sequence; recipe library (`orient`, `release_check`, `fix_violation`, `before_edit`, `verify_patch`) |
+| `a1_at_functions/recipes.py` | #12 | golden-path recipes — `release_hardening`, `add_cli_command`, `fix_wire_violation`, `add_feature`, `publish_mcp` (each a step-by-step playbook agents can `list` / `get`) |
+
+**11 new MCP tools** registered alongside the W4 / Codex-1..4 surface:
+
+`select_tests`, `rollback_plan`, `explain_repo`, `adapt_plan`,
+`compose_tools`, `load_policy`, `why_did_this_change`,
+`what_failed_last_time`, `list_recipes`, `get_recipe`. (`score_patch`
+shipped in Codex-4 was the 11th; this commit takes the running total
+from 10 → 21.)
+
+**Production hardening:**
+
+- **`forge --version` / `forge -V`** was throwing "Try forge --help".
+  Added a root callback with an `is_eager` `--version` option that
+  prints `atomadic-forge X.Y.Z` and exits 0. Test pins this.
+- **`forge mcp serve --help`** docstring updated to enumerate the 21
+  tools + 5 resources (was 8 / 5). MCP test pins the full set.
+
+**Tests** (+32 in `tests/test_codex_5_complete.py` + 1 update in
+`tests/test_mcp_protocol.py`): 643 passing / 2 skipped (was 611).
+Each new module has v1-schema, dispatch, and edge-case coverage.
+
+**Codex's 12-item enumeration is now FULLY shipped:**
+
+| # | Item | Where |
+|---|---|---|
+| 1 | First-call context pack | `context_pack` (Codex-4 / `fa50644`) |
+| 2 | Preflight before edit | `preflight_change` (Codex-4 / `fa50644`) |
+| 3 | Patch risk scoring | `score_patch` (Codex-4 / `fa50644`) |
+| 4 | Active guardrail | composed via `preflight_change` + `score_patch` + `auto_step` (no separate verb needed) |
+| 5 | Agent memory / lineage | `why_did_this_change`, `what_failed_last_time` (Codex-5) |
+| 6 | Explain this repo | `explain_repo` (Codex-5) |
+| 7 | Test selection | `select_tests` (Codex-5) |
+| 8 | Capability-aware planning | `adapt_plan` (Codex-5) |
+| 9 | MCP tool composer | `compose_tools` (Codex-5) |
+| 10 | Policy as code | `load_policy` (`[tool.forge.agent]`) (Codex-5) |
+| 11 | Undo plan | `rollback_plan` (Codex-5) |
+| 12 | Golden-path recipes | `list_recipes` / `get_recipe` (Codex-5) |
+
+### Added — release-bump cosmetics (`009d6d7`)
+
+- `pyproject.toml` `version = "0.3.0"`
+- Tag `v0.3.0` pushed to `origin`
+- Wheel + sdist confirmed via `python -m build --no-isolation`
+- README badge bumped from `0.2.2 (100/100 certify + GitHub-ready)`
+  to reflect the v0.3.0 21-tool architectural-control-plane surface
+  (cleanup-crew rolling).
 
 ### Added — Codex docs walkthrough (`178d020`)
 

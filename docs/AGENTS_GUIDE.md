@@ -42,8 +42,9 @@ Claude Code / Aider / your own):
 }
 ```
 
-Once registered, the agent gets **10 tools** + **4 resources** in its
-tool list (after Codex-1..4 shipped). No additional setup.
+Once registered, the agent gets **21 tools** + **5 resources** in its
+tool list (the full Codex-1..5 surface, shipped at v0.3.0). No
+additional setup.
 
 Smoke test that the server is reachable:
 
@@ -55,25 +56,76 @@ printf '%s\n%s\n%s\n' \
   | forge mcp serve --project .
 ```
 
-→ returns `serverInfo`, the 10 tool schemas (plus 4 `plan_*` verbs
-when Codex-3 surface is queried), and `{}` for shutdown.
+→ returns `serverInfo`, the 21 tool schemas, and `{}` for shutdown.
+Or against the installed CLI:
+
+```bash
+$ forge --version
+atomadic-forge 0.3.0
+```
+
+The `--version` flag (and `-V`) is the canonical "Forge is wired in
+correctly" smoke check — pin it in your setup scripts.
 
 ---
 
-## The 10 MCP tools
+## The 21 MCP tools — by phase of an agent's lifecycle
 
-| Tool | Returns | When the agent should call it |
+| Inventory (read-only) | Action loop | Copilot's Copilot |
 |---|---|---|
-| **`recon`** | tier + symbol distribution + per-language counts | First step of any agent action on an unfamiliar repo. Cheap, cached. |
-| **`wire`** | upward-import violations with F-codes | Before *every* `WriteFile` / `Edit` that crosses tier boundaries. |
-| **`certify`** | 0–100 score with structural / runtime / behavioral / operational breakdown | After a multi-file change, before deciding to commit. |
-| **`enforce`** | F-code-routed mechanical fixes (with rollback) | When `wire` returns auto-fixable violations and the agent wants Forge to apply them. |
-| **`audit_list`** | recent lineage entries with cycle-id + verdict + score | When the agent needs to see what changed historically (replay context). |
-| **`agent_summary`** ← *Codex-1* | compact blocker summary (top issues, applyable fixes, validation commands) | At the start of any "improve this repo" loop. Returns a small JSON the agent can act on directly. |
-| **`auto_plan`** ← *Codex-2* | a full `agent_plan/v1` card: ranked `top_actions[]` with `write_scope`, `risk`, `commands`, `applyable`, plus a `next_command` | When the agent wants Forge in **proposal-engine mode** — Forge ranks what to fix, the agent picks one, applies via `forge plan-apply`, re-plans. |
-| **`context_pack`** ← *Codex-4* | `context_pack/v1` — repo purpose, pinned 5-tier law, tier_map, blockers digest, best-next-action, detected test commands, release gate, risky files, recent lineage, pinned `forge://` resources | **First call after `initialize`** — the agent's orientation bundle. Replaces 6+ separate calls with one round-trip. |
-| **`preflight_change`** ← *Codex-4* | `preflight/v1` — per file: detected_tier, forbidden_imports, likely_tests, siblings_to_read; overall write_scope_too_broad flag | **Before** the agent emits any `WriteFile` / `Edit` — pre-edit guardrail. Verdict `REFINE` when scope > threshold. |
-| **`score_patch`** ← *Codex-4* | `patch_score/v1` — architectural_risk (new upward imports), public_api_risk (`__init__.py`), release_risk (pyproject / version / CHANGELOG), test_risk, `needs_human_review` boolean, suggested validation commands | **After** the agent drafts a unified-diff but **before** applying it — diff-level risk preview. |
+| `recon` | `auto_plan` | `context_pack` |
+| `wire` | `auto_step` | `preflight_change` |
+| `certify` | `auto_apply` | `score_patch` |
+| `enforce` |  | `select_tests` |
+| `audit_list` |  | `rollback_plan` |
+| `agent_summary` |  | `explain_repo` |
+|  |  | `adapt_plan` |
+|  |  | `compose_tools` |
+|  |  | `load_policy` |
+|  |  | `why_did_this_change` |
+|  |  | `what_failed_last_time` |
+|  |  | `list_recipes` |
+|  |  | `get_recipe` |
+
+**Inventory tools — read-only state queries.** Cheap; safe to call
+in a loop:
+
+| Tool | Returns | Call when |
+|---|---|---|
+| **`recon`** | tier + symbol distribution + per-language counts | First step on any unfamiliar repo. |
+| **`wire`** | upward-import violations with F-codes | Before *every* edit that crosses tier boundaries. |
+| **`certify`** | 0–100 score with structural / runtime / behavioral / operational breakdown | After a multi-file change, before commit. |
+| **`enforce`** | F-code-routed mechanical fixes (with rollback) | When `wire` returns auto-fixable violations. |
+| **`audit_list`** | recent lineage entries with cycle-id + verdict + score | When you need historical replay context. |
+| **`agent_summary`** ← *Codex-1* | compact blocker summary | Start of an "improve this repo" loop. |
+
+**Action-loop tools — propose / inspect / apply.** Implements the
+proposal-engine pattern; agent stays in the loop:
+
+| Tool | Returns | Call when |
+|---|---|---|
+| **`auto_plan`** ← *Codex-2* | full `agent_plan/v1` card with ranked `top_actions[]` (`write_scope`, `risk`, `commands`, `applyable`, `next_command`) | You want Forge to rank what to fix. |
+| **`auto_step`** ← *Codex-3* | accept / reject / skip a single card; returns updated plan-state | You're walking a saved plan one card at a time. |
+| **`auto_apply`** ← *Codex-3* | applies every `applyable` accepted card with rollback safety | You've vetted the plan and want one-shot execution. |
+
+**Copilot's-Copilot tools — Codex-4 + Codex-5.** Forge becomes the
+always-on senior engineer beside the coding agent:
+
+| Tool | Schema | Call when |
+|---|---|---|
+| **`context_pack`** ← *Codex-4* | `context_pack/v1` — repo purpose, pinned 5-tier law, tier_map, blockers digest, best-next-action, detected test commands, release gate, risky files, recent lineage, pinned `forge://` resources | **First call after `initialize`** — orientation bundle. One round-trip replaces 6+ separate calls. |
+| **`preflight_change`** ← *Codex-4* | `preflight/v1` — per file: detected_tier, forbidden_imports, likely_tests, siblings_to_read; overall write_scope_too_broad flag | **Before** every `WriteFile` / `Edit`. Verdict `REFINE` when scope > 8 files. |
+| **`score_patch`** ← *Codex-4* | `patch_score/v1` — architectural_risk, public_api_risk, release_risk, test_risk, `needs_human_review`, suggested validation commands | **After** drafting a unified-diff but **before** applying. |
+| **`select_tests`** ← *Codex-5* | `test_select/v1` — `minimum_set` (mirror match) + `full_set` (tier-mate) | "Which tests must I run for this change?" — feeds into the agent's iteration loop. |
+| **`rollback_plan`** ← *Codex-5* | `rollback/v1` — files-to-remove, caches, tests-to-rerun, `risk_level` | "If I have to undo this patch, how?" `risk_level=high` when release files (`pyproject` / `CHANGELOG` / `LICENSE`) were touched. |
+| **`explain_repo`** ← *Codex-5* | `explain/v1` — purpose, entry-points, do-not-break list, `release_state` (READY / BLOCKED) | Humane orientation card — same data as `context_pack` but human-readable summary. |
+| **`adapt_plan`** ← *Codex-5* | `agent_plan_adapted/v1` — each card decorated with `recommended_handling`: `apply` / `delegate` / `ask_human` / `report_only` | "Filter this plan for *my* capabilities." Pass `agent_capabilities` in (`edit_files` / `run_commands` / `network` / `review` / `delegate`). |
+| **`compose_tools`** ← *Codex-5* | ordered tool sequence | Goal-keyword → tool list. Recipes: `orient`, `release_check`, `fix_violation`, `before_edit`, `verify_patch`. |
+| **`load_policy`** ← *Codex-5* | `policy/v1` from `pyproject.toml [tool.forge.agent]` | First-orientation. Tells you the repo's `protected_files`, `release_gate`, `max_files_per_patch`, `require_human_review_for`. Defaults are lenient when no policy declared. |
+| **`why_did_this_change`** ← *Codex-5* | `why/v1` — lineage + plan-event entries referencing a file | "Why did this file get touched, historically?" |
+| **`what_failed_last_time`** ← *Codex-5* | `what_failed/v1` — historical failures scoped to an area | "What went wrong here before — so I don't repeat it?" |
+| **`list_recipes`** ← *Codex-5* | catalogue of golden-path recipes | First-orientation. Pre-baked: `release_hardening`, `add_cli_command`, `fix_wire_violation`, `add_feature`, `publish_mcp`. |
+| **`get_recipe`** ← *Codex-5* | `recipe/v1` — step-by-step plan | "Walk me through `release_hardening` step by step." |
 
 (Plus four `plan_list` / `plan_show` / `plan_step` / `plan_apply`
 verbs from Codex-3 — same 1:1 mapping to the CLI verbs of the same
@@ -81,27 +133,30 @@ name.)
 
 **Three integration tiers, by depth of coupling:**
 
-1. **Lightweight**: agent calls `context_pack` once for orientation,
+1. **Lightweight (3 tools)**: `context_pack` once for orientation,
    then `wire` + `certify` before commit. Drop-in for any platform.
-2. **Predictive**: agent adds `preflight_change` *before* every
-   write and `score_patch` *after* drafting the diff *before*
-   applying. Forge becomes the always-on senior engineer reviewing
-   each step.
-3. **Proposal-engine**: agent calls `auto_plan` for direction,
-   `plan_apply` to execute, `enforce` for mechanical fixes. Forge
-   drives; the agent supplies LLM context where Forge can't
-   mechanize.
+2. **Predictive (8 tools)**: add `load_policy` + `select_tests` on
+   orientation; `preflight_change` *before* every write;
+   `score_patch` *after* drafting the diff. Forge is the always-on
+   senior engineer reviewing each step.
+3. **Proposal-engine (full 21 tools)**: `auto_plan` for direction,
+   `adapt_plan` for capability-aware filtering, `auto_apply` to
+   execute, `enforce` for mechanical fixes, `rollback_plan` if
+   anything regresses, `why_did_this_change` /
+   `what_failed_last_time` for historical context. Forge drives;
+   the agent supplies LLM context where Forge can't mechanize.
 
 ---
 
-## The 4 MCP resources
+## The 5 MCP resources
 
 | Resource URI | What it is | Use case |
 |---|---|---|
-| `forge://arch/tier-map` | Canonical normative tier graph (a0..a4 + allowed imports) | Agent's "what does this codebase claim to be?" reference |
-| `forge://arch/law` | Declarative L3 rules (forbidden imports, naming conventions, effect lattice) | Pre-flight before the agent generates code |
-| `forge://arch/lineage.jsonl` | Episodic L1 trace of every Forge run | Replay / debugging / audit |
-| `forge://arch/attestation/{verdict_id}` | Signed Forge Receipt for a specific run | Provenance for a regulator or downstream consumer |
+| `forge://docs/receipt` | The Receipt schema spec | Agent reads this to know what the Receipt JSON contract is. |
+| `forge://docs/formalization` | Citations to `aethel-nexus-proofs` (29 theorems / 0 sorry) and `mhed-toe-codex-v22` (538 theorems / 0 sorry) | Agent presenting Forge to a regulator: cite the proof corpus. |
+| `forge://lineage/chain` | Episodic L1 trace of every Forge run | Replay / debugging / audit. |
+| `forge://schema/receipt` | Machine-readable JSON Schema for the Receipt | Agent doing type-checked Receipt parsing. |
+| `forge://summary/blockers` | Same payload as `agent_summary` MCP tool | One-shot `resources/read` for clients that prefer resources over tools. |
 
 The `attestation/{id}` resource is the **convergence point** of the
 BEP-1 architecture: same Receipt JSON the agent gets here is what
@@ -265,13 +320,14 @@ Forge's normative answer; only the *attestation chain* is missing.
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | Tools list returns 0 tools | MCP client didn't pass `--project .` | Check args in MCP config |
-| Tools list returns 6 not 10 | Old `forge` install (pre-Codex-4) | `pip install -U atomadic-forge` (or `pip install -e .` from the repo) |
+| Tools list returns < 21 (e.g. 6 or 10) | Old `forge` install (pre-v0.3.0) | `pip install -U atomadic-forge` (or `pip install -e .` from the repo). Pin `forge --version >= 0.3.0`. |
 | `wire` says PASS but agent still hits import errors | Agent is running tests in a different working directory | `--project` should match the test cwd |
 | `certify` returns score 90 instead of 100 | Project has no `.github/workflows/` and no `CHANGELOG.md` (operational axis is 0) | Add either; both are 5pts |
 | Receipt's `signatures` is null | `AAAA_NEXUS_API_KEY` not set, or AAAA-Nexus endpoint not yet shipped | Soft-fail behavior — Receipt is still valid for local use |
 | F0042 keeps re-firing after `enforce` | The agent is generating new upward imports faster than enforce can fix | The agent's prompt template needs the tier-map context (read `forge://arch/law` first) — or call `preflight_change` *before* every write |
-| `preflight` returns `write_scope_too_broad: true` constantly | Agent intent is too coarse-grained | Split the intent into smaller atomic intents, or raise `--scope-threshold` if the work genuinely is wide |
-| `score_patch` returns `needs_human_review` on every diff | Diffs touch `__init__.py` or pyproject reflexively | Strip those edits into a dedicated commit; the rest of the diff will score clean |
+| `preflight` returns `write_scope_too_broad: true` constantly | Agent intent is too coarse-grained, OR the repo declares `[tool.forge.agent].max_files_per_patch < 8` (Codex-6) | Split the intent into smaller atomic intents, or raise `--scope-threshold`. Read `load_policy` first to see what the repo allows. |
+| `score_patch` returns `needs_human_review` on every diff | Diffs touch `__init__.py` or pyproject reflexively, OR a path matched `[tool.forge.agent].protected_files` (Codex-6) | Strip those edits into a dedicated commit. Or call `load_policy` first to know what's protected. |
+| `preflight` flags every file in a perfectly-sized patch as "request human review" | One of the proposed files matched `protected_files` in the repo's policy | This is intentional — `protected_files` are the social contract. Surface to the human reviewer instead of auto-applying. |
 
 ---
 

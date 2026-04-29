@@ -186,13 +186,33 @@ printf '%s\n%s\n%s\n' \
 | forge mcp serve --project .
 ```
 
-Returns server info, **10 tool schemas** (`recon`, `wire`, `certify`,
-`enforce`, `audit_list`, `agent_summary`, `auto_plan`, `context_pack`,
-`preflight_change`, `score_patch` — plus the four `plan_list` /
-`plan_show` / `plan_step` / `plan_apply` verbs from Codex-3), and a
+Returns server info, **21 tool schemas** (the full Codex-1..5
+surface, see the 3-column inventory below) + 5 resources, and a
 clean shutdown. The soft-fail contract from `receipt_signer.py`
 applies — every tool gracefully degrades when an upstream (e.g.,
 AAAA-Nexus signing) is unreachable.
+
+**The 21 MCP tools, grouped by phase of an agent's lifecycle:**
+
+| Inventory (read-only) | Action loop | Copilot's Copilot |
+|---|---|---|
+| `recon` | `auto_plan` | `context_pack` |
+| `wire` | `auto_step` | `preflight_change` |
+| `certify` | `auto_apply` | `score_patch` |
+| `enforce` |  | `select_tests` |
+| `audit_list` |  | `rollback_plan` |
+| `agent_summary` |  | `explain_repo` |
+|  |  | `adapt_plan` |
+|  |  | `compose_tools` |
+|  |  | `load_policy` |
+|  |  | `why_did_this_change` |
+|  |  | `what_failed_last_time` |
+|  |  | `list_recipes` |
+|  |  | `get_recipe` |
+
+**5 MCP resources:** `forge://docs/receipt`, `forge://docs/formalization`,
+`forge://lineage/chain`, `forge://schema/receipt`,
+`forge://summary/blockers`.
 
 What this unlocks per Golden Path Lane C: the Forge Receipt JSON
 becomes consumable by every major coding-agent platform via the same
@@ -323,6 +343,152 @@ called from a pre-commit hook or an agent's tool-use loop. Add
 intentionally MCP-only. Diff strings are awkward as positional CLI
 args; agents pipe the diff through the `score_patch` MCP tool
 instead.)
+
+### Copilot's Copilot — the rest of Codex-5 (MCP-only)
+
+The 8 modules added in `276a092` (Codex's items #5–#12) ship as MCP
+tools rather than CLI verbs. Agents consume them through the running
+`forge mcp serve` over stdio JSON-RPC. Each returns a versioned JSON
+schema agents should treat as a contract:
+
+| MCP tool | Schema | What it answers |
+|---|---|---|
+| `select_tests` | `atomadic-forge.test_select/v1` | "Given these changed files + intent, which tests must I run, and which give me full confidence?" Returns `minimum_set` (mirror match) + `full_set` (tier-mate). |
+| `rollback_plan` | `atomadic-forge.rollback/v1` | "If I have to undo this patch, what do I revert / clean / restore?" Returns files-to-remove, caches, tests-to-rerun, `risk_level` (low / medium / high — high if release files like `pyproject.toml` / `CHANGELOG.md` / `LICENSE` were touched). |
+| `load_policy` | `atomadic-forge.policy/v1` | "What are this repo's agent rules?" Reads `pyproject.toml [tool.forge.agent]`. Lenient default when no policy declared. Carries `protected_files`, `release_gate`, `max_files_per_patch`, `require_human_review_for`. |
+| `why_did_this_change` | `atomadic-forge.why/v1` | "Why was this file modified, historically?" Queries `.atomadic-forge/lineage.jsonl` + plan-state files. |
+| `what_failed_last_time` | `atomadic-forge.what_failed/v1` | "What failures has this area seen?" Same lineage walk, scoped to a path / area. |
+| `explain_repo` | `atomadic-forge.explain/v1` | Humane orientation card — purpose, entry-points, do-not-break list, `release_state` (READY / BLOCKED). |
+| `adapt_plan` | `atomadic-forge.agent_plan_adapted/v1` | Filter an `agent_plan/v1` for a specific agent's capability set (`edit_files`, `run_commands`, `network`, `review`, `delegate`). Each card gets `recommended_handling`: `apply` / `delegate` / `ask_human` / `report_only`. |
+| `compose_tools` | n/a (returns ordered tool list) | Goal-keyword → ordered tool sequence. Pre-baked recipes: `orient`, `release_check`, `fix_violation`, `before_edit`, `verify_patch`. |
+| `list_recipes` / `get_recipe` | `atomadic-forge.recipe/v1` | Golden-path playbooks: `release_hardening`, `add_cli_command`, `fix_wire_violation`, `add_feature`, `publish_mcp`. Each recipe is a step-by-step plan agents can `get_recipe` and execute. |
+
+These complete Codex's 12-item Copilot's Copilot enumeration — items
+#5–#12. Items #1–#3 are the Codex-4 hero primitives
+(`context_pack` / `preflight_change` / `score_patch`); item #4
+("active guardrail") is composed via `preflight_change` +
+`score_patch` + `auto_step`.
+
+### `forge --version` / `forge -V`
+
+Prints the installed Forge version and exits 0. Hardened in v0.3.0
+(was throwing "Try forge --help" prior). Use it as the canonical
+"is Forge installed correctly?" smoke check in setup scripts and CI.
+
+```bash
+$ forge --version
+atomadic-forge 0.3.0
+```
+
+### `.forge` sidecars — Lane D W8
+
+The **TypeScript-for-architecture** paradigm. A `.forge` sidecar is
+an opt-in YAML file beside any source file
+(`users/auth.py` → `users/auth.py.forge`) that declares per-symbol
+effect signatures, tier, `compose_with`, and `proves:` clauses
+keyed to the Lean4 corpora.
+
+```yaml
+# users/auth.py.forge
+schema_version: atomadic-forge.sidecar/v1
+target: users/auth.py
+symbols:
+  - name: login
+    tier: a3_og_features
+    effect: NetIO
+    compose_with: [hash_password, fetch_user]
+    proves: [aethel-nexus-proofs.netio_safety]
+    notes: "Calls auth provider; cached with KeyedCache for 60s"
+```
+
+The seven `EffectKind`s (Bao-Rompf 2025): `Pure`, `IO`, `NetIO`,
+`KeyedCache`, `Logging`, `Random`, `Mutation`. Forward-compat:
+unknown effects are preserved with a warning, never error.
+
+Parser at `a1_at_functions/sidecar_parser.py` is pure and never
+raises — YAML errors / missing files / non-mapping top-levels all
+become structured `errors` lists. See [`docs/SIDECAR.md`](SIDECAR.md)
+for the v1.0 spec + worked example.
+
+**`forge sidecar parse <file.forge>`** (Lane D W11) — parse a
+sidecar and print its structure (or JSON). Use as a config-lint step.
+
+**`forge sidecar validate <source.py>`** (Lane D W11) — auto-resolves
+the sibling `<source.py>.forge` via `find_sidecar_for`, then
+cross-checks the declared effects against the source AST. Catches
+**5 of 7 named drift classes** today (the remaining 2 are reserved
+for Lane D W20):
+
+| Code | Class | Severity |
+|---|---|---|
+| `S0000` | source did not parse | `unparseable` |
+| `S0001` | sidecar declares a symbol the source doesn't have | error |
+| `S0002` | source has an undeclared public symbol | warn (gradual coverage is OK) |
+| `S0003` | `Pure`-declared symbol violates purity (IO, network, non-determinism) | error |
+| `S0006` | declared `tier` mismatches detected path tier | warn |
+
+```bash
+forge sidecar parse users/auth.py.forge
+forge sidecar validate users/auth.py             # exits 1 on FAIL
+forge sidecar validate users/auth.py --json | jq
+```
+
+Pure AST walk + sidecar dict walk; no exec, no LLM, no network.
+
+Reserved for **W12** (`forge-lsp` server / VS Code extension /
+JetBrains plugin) and **W20** (Bao-Rompf `compose_with` checker
+[`S0005`] + Lean4 `proves:` discharger [`S0007`]).
+
+### `forge recipes [NAME]` (Codex-6)
+
+Lists or shows one of the golden-path recipes — pre-baked, step-by-
+step playbooks an agent or human contributor can follow end-to-end.
+Same data the `list_recipes` / `get_recipe` MCP tools return, exposed
+for direct CLI use.
+
+```bash
+forge recipes                          # list all recipes
+forge recipes release_hardening        # show one recipe (checklist +
+                                       # file_scope_hints +
+                                       # validation_gate)
+forge recipes --json | jq              # machine-readable
+forge recipes release_hardening --json # one recipe in JSON
+```
+
+Available recipes (`atomadic-forge.recipe/v1`):
+- **`release_hardening`** — version bump → CHANGELOG → tag → wheel build
+- **`add_cli_command`** — register a new `forge` verb tier-cleanly
+- **`fix_wire_violation`** — F0042-style repair walkthrough
+- **`add_feature`** — pure a1 + composite a2 + feature a3 pattern
+- **`publish_mcp`** — expose a new helper as both CLI + MCP tool
+
+### Policy-as-code: `[tool.forge.agent]` (Codex-6)
+
+`pyproject.toml` can declare a project-local agent policy that Forge
+**enforces** (not just records). Goes in `[tool.forge.agent]`:
+
+```toml
+[tool.forge.agent]
+protected_files       = ["pyproject.toml", "docs/PAPER_v2.md"]
+release_gate          = ["ruff", "pytest", "build", "forge certify"]
+max_files_per_patch   = 8
+require_human_review_for = ["license", "security", "public_api"]
+```
+
+Behavior changes when a policy is present:
+
+- **`forge preflight`** uses `max_files_per_patch` as its scope
+  threshold (default 8). An explicit `--scope-threshold` still wins.
+- **`forge preflight`** tags any proposed file matching
+  `protected_files` with a per-file note and adds an overall
+  "request human review" note listing them.
+- **MCP `score_patch`** (when called with `project_root` set) flips
+  `needs_human_review = true` for any diff touching a
+  `protected_files` entry, regardless of size.
+
+Lenient by default — Forge never errors on policy *absence*. The
+defaults match the prior pre-Codex-6 behavior so existing repos see
+no behavior change until they opt in.
 
 ## Code generation (LLM-driven)
 
