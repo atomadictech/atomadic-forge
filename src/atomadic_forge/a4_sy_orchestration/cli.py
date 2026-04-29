@@ -37,6 +37,7 @@ from ..a1_at_functions.progress_reporter import make_stderr_reporter
 from ..a1_at_functions.receipt_emitter import build_receipt, receipt_to_json
 from ..a1_at_functions.scout_walk import harvest_repo
 from ..a1_at_functions.wire_check import scan_violations
+from ..a2_mo_composites.lineage_chain_store import LineageChainStore
 from ..a2_mo_composites.receipt_signer import sign_receipt
 from ..a3_og_features.forge_enforce import run_enforce
 from ..a3_og_features.forge_pipeline import (
@@ -374,6 +375,10 @@ def certify_cmd(
             package=package,
             certify_threshold=fail_under or 100.0,
         )
+        # Lane A W4: append a local lineage-chain link before signing
+        # so signatures.aaaa_nexus can carry the lineage_path the
+        # Vanguard endpoint sees. Skip on --no-lineage (future flag).
+        receipt = LineageChainStore(project_root).link_and_append(receipt)
         if sign:
             receipt = sign_receipt(receipt)
         if emit_receipt is not None:
