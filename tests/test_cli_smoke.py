@@ -50,6 +50,25 @@ def test_certify_emit_receipt_writes_v1_json(tmp_path, sample_repo):
         assert f in data
 
 
+def test_certify_sign_soft_fails_without_api_key(tmp_path, sample_repo, monkeypatch):
+    """GP-A W2: --sign with no AAAA_NEXUS_API_KEY → unsigned + note, exit 0."""
+    monkeypatch.delenv("AAAA_NEXUS_API_KEY", raising=False)
+    out = tmp_path / "receipt.json"
+    runner.invoke(
+        app, ["auto", str(sample_repo), str(tmp_path / "tree"),
+              "--apply", "--package", "demo"]
+    )
+    result = runner.invoke(
+        app, ["certify", str(tmp_path / "tree"), "--package", "demo",
+              "--sign", "--emit-receipt", str(out)]
+    )
+    assert result.exit_code == 0
+    data = json.loads(out.read_text(encoding="utf-8"))
+    assert data["signatures"]["sigstore"] is None
+    assert data["signatures"]["aaaa_nexus"] is None
+    assert any("AAAA_NEXUS_API_KEY not set" in n for n in data["notes"])
+
+
 def test_certify_print_card_renders_box(tmp_path, sample_repo):
     """GP-A W1: --print-card emits a 60-wide box-drawing card."""
     runner.invoke(

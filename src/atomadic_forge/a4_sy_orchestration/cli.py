@@ -37,6 +37,7 @@ from ..a1_at_functions.progress_reporter import make_stderr_reporter
 from ..a1_at_functions.receipt_emitter import build_receipt, receipt_to_json
 from ..a1_at_functions.scout_walk import harvest_repo
 from ..a1_at_functions.wire_check import scan_violations
+from ..a2_mo_composites.receipt_signer import sign_receipt
 from ..a3_og_features.forge_pipeline import (
     run_auto,
     run_cherry,
@@ -263,6 +264,12 @@ def certify_cmd(
         "--print-card",
         help="Print the receipt as a 60-wide box-drawing card to stdout. "
              "Powers the '62 -> 5' viral demo.")] = False,
+    sign: Annotated[bool, typer.Option(
+        "--sign",
+        help="Send the receipt to AAAA-Nexus /v1/verify/forge-receipt "
+             "for Sigstore + AAAA-Nexus signing before emitting / "
+             "rendering. Soft-fails if the endpoint is unavailable; the "
+             "unsigned receipt is still emitted with a notes entry.")] = False,
 ) -> None:
     """Score documentation, tests, tier layout, import discipline."""
     if fail_under is not None and not 0 <= fail_under <= 100:
@@ -285,7 +292,7 @@ def certify_cmd(
     typer.echo(f"  wire:  {'PASS' if report['no_upward_imports'] else 'FAIL'}")
     for issue in report["issues"]:
         typer.echo(f"    - {issue}")
-    if emit_receipt is not None or print_card:
+    if emit_receipt is not None or print_card or sign:
         # The Receipt needs a scout summary; if scout didn't already
         # run via forge auto, harvest a cheap one now (no symbol dump
         # written; we only need counts + tier_distribution).
@@ -301,6 +308,8 @@ def certify_cmd(
             package=package,
             certify_threshold=fail_under or 100.0,
         )
+        if sign:
+            receipt = sign_receipt(receipt)
         if emit_receipt is not None:
             emit_receipt.parent.mkdir(parents=True, exist_ok=True)
             emit_receipt.write_text(receipt_to_json(receipt), encoding="utf-8")
