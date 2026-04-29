@@ -385,6 +385,8 @@ def _register_specialty_apps() -> None:
          "Run any feature → fan its output into emergent scan."),
         ("atomadic_forge.commands.config_cmd", "config",
          "Configure Atomadic Forge — show / set / test config + wizard."),
+        ("atomadic_forge.commands.audit", "audit",
+         "Surface .atomadic-forge lineage: list / show / log."),
         ("atomadic_forge.commands.emergent_then_synergy", "emergent-then-synergy",
          "Run emergent → pipe JSON artifact to synergy."),
         ("atomadic_forge.commands.synergy_then_emergent", "synergy-then-emergent",
