@@ -54,6 +54,7 @@ from ..a2_mo_composites.plan_store import PlanStore
 from ..a2_mo_composites.receipt_signer import sign_receipt
 from ..a3_og_features.forge_enforce import run_enforce
 from ..a3_og_features.forge_plan_apply import apply_all_applyable, apply_card
+from ..a3_og_features.lsp_server import serve_stdio as lsp_serve_stdio
 from ..a3_og_features.mcp_server import serve_stdio as mcp_serve_stdio
 from ..a3_og_features.forge_pipeline import (
     run_auto,
@@ -1050,6 +1051,47 @@ def mcp_serve_cmd(
 
 app.add_typer(mcp_app, name="mcp",
                help="MCP server surface — speak Forge to coding agents.")
+
+
+lsp_app = typer.Typer(
+    no_args_is_help=True,
+    help="Forge LSP — diagnostics + hover for .forge sidecar files "
+         "(VS Code / Neovim / Helix / IntelliJ).",
+)
+
+
+@lsp_app.command("serve")
+def lsp_serve_cmd() -> None:
+    """Run the forge-lsp stdio JSON-RPC server.
+
+    Add to your editor's LSP config:
+
+      VS Code (settings.json or extension):
+        "files.associations": { "*.forge": "yaml" },
+        // launch forge-lsp with: command='forge', args=['lsp', 'serve']
+
+      Neovim (lspconfig):
+        require'lspconfig'.forge_lsp.setup{
+          cmd = {'forge', 'lsp', 'serve'},
+          filetypes = {'forge'},
+          root_dir = require'lspconfig'.util.find_git_ancestor,
+        }
+
+    Provides:
+      * publishDiagnostics (S0001 / S0003 / etc., F0100-coded) on
+        every didOpen / didChange / didSave
+      * textDocument/hover — markdown summary of the symbol's
+        effect, tier, compose_with, proves clauses
+      * textDocument/definition — goto-source from
+        `name: login` line in foo.py.forge → foo.py:login
+    """
+    rc = lsp_serve_stdio()
+    if rc != 0:
+        raise typer.Exit(code=rc)
+
+
+app.add_typer(lsp_app, name="lsp",
+               help="Forge LSP — diagnostics + hover for .forge sidecar files.")
 
 
 @app.command("doctor")
