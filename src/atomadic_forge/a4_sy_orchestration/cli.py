@@ -29,6 +29,10 @@ from typing import Annotated
 import typer
 
 from .. import __version__
+from ..a1_at_functions.agent_summary import (
+    render_summary_text,
+    summarize_blockers,
+)
 from ..a1_at_functions.card_renderer import render_receipt_card
 from ..a1_at_functions.certify_checks import certify as certify_checks
 from ..a1_at_functions.error_hints import format_hint
@@ -211,10 +215,24 @@ def wire_cmd(
         help="For every violation, propose a concrete mechanical fix "
              "(target tier, sketch shell command). Heuristic, for review "
              "before applying.")] = False,
+    summary: Annotated[bool, typer.Option(
+        "--summary",
+        help="Emit ONLY the compact agent-native blocker summary (top "
+             "5 actionable items + next-command) instead of the full "
+             "violation list. Pairs with --json for machine consumers.")] = False,
 ) -> None:
     """Scan a tier tree for upward-import violations."""
     report = scan_violations(source, suggest_repairs=suggest_repairs)
     has_violations = report["violation_count"] > 0
+    if summary:
+        s = summarize_blockers(wire_report=report, package_root=str(source))
+        if json_out:
+            typer.echo(json.dumps(s, indent=2, default=str))
+        else:
+            typer.echo(render_summary_text(s))
+        if fail_on_violations and has_violations:
+            raise typer.Exit(code=1)
+        return
     if json_out:
         typer.echo(json.dumps(report, indent=2, default=str))
         if fail_on_violations and has_violations:
@@ -338,6 +356,11 @@ def certify_cmd(
              "for Sigstore + AAAA-Nexus signing before emitting / "
              "rendering. Soft-fails if the endpoint is unavailable; the "
              "unsigned receipt is still emitted with a notes entry.")] = False,
+    summary: Annotated[bool, typer.Option(
+        "--summary",
+        help="Emit ONLY the compact agent-native blocker summary (top "
+             "5 actionable items + next-command) instead of the full "
+             "certify report. Pairs with --json for machine consumers.")] = False,
 ) -> None:
     """Score documentation, tests, tier layout, import discipline."""
     if fail_under is not None and not 0 <= fail_under <= 100:
@@ -347,6 +370,22 @@ def certify_cmd(
     report = certify_checks(project_root, project=project_root.name,
                              package=package)
     failed_gate = fail_under is not None and float(report["score"]) < fail_under
+    if summary:
+        # Pair certify with a fresh wire scan so the summary covers
+        # both axes (Codex feedback: agents want one compact answer).
+        wire_for_summary = scan_violations(project_root)
+        s = summarize_blockers(
+            wire_report=wire_for_summary,
+            certify_report=report,
+            package_root=package or project_root.name,
+        )
+        if json_out:
+            typer.echo(json.dumps(s, indent=2, default=str))
+        else:
+            typer.echo(render_summary_text(s))
+        if failed_gate:
+            raise typer.Exit(code=1)
+        return
     if json_out:
         typer.echo(json.dumps(report, indent=2, default=str))
         if failed_gate:

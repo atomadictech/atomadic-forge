@@ -97,6 +97,7 @@ def test_resources_list_pinned(tmp_path):
         "forge://docs/formalization",
         "forge://lineage/chain",
         "forge://schema/receipt",
+        "forge://summary/blockers",
     }
     assert uris == pinned == set(RESOURCES.keys())
 

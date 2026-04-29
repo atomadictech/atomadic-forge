@@ -40,6 +40,7 @@ from typing import Any, Callable
 
 from .. import __version__
 from ..a0_qk_constants.receipt_schema import SCHEMA_VERSION_V1
+from .agent_summary import summarize_blockers
 from .certify_checks import certify
 from .lineage_chain import canonical_receipt_hash, verify_chain_link
 from .lineage_reader import list_artifacts, read_lineage
@@ -254,6 +255,25 @@ def _resource_schema(project_root: Path) -> str:
     }, indent=2)
 
 
+def _resource_summary_blockers(project_root: Path) -> str:
+    """Single-call 'what's blocking release?' — runs wire + certify
+    and returns the compact summary. Codex feedback: this is the
+    resource agents should hit FIRST on every connect."""
+    try:
+        wire = scan_violations(project_root)
+    except (OSError, ValueError):
+        wire = None
+    try:
+        cert = certify(project_root, project=project_root.name)
+    except (OSError, ValueError, RuntimeError):
+        cert = None
+    s = summarize_blockers(
+        wire_report=wire, certify_report=cert,
+        package_root=project_root.name,
+    )
+    return json.dumps(s, indent=2, default=str)
+
+
 def _read_repo_doc(project_root: Path, rel: str) -> str:
     """Read a doc that lives in this Forge install's repo, not the
     consuming project. Falls back to '(not available)' when missing."""
@@ -291,6 +311,12 @@ RESOURCES: dict[str, dict[str, Any]] = {
         "mimeType": "application/json",
         "loader": _resource_schema,
     },
+    "forge://summary/blockers": {
+        "uri": "forge://summary/blockers",
+        "name": "Top-5 blockers (Codex feedback): wire + certify in one call",
+        "mimeType": "application/json",
+        "loader": _resource_summary_blockers,
+    },
 }
 
 
@@ -308,11 +334,45 @@ def _err(msg_id: Any, code: int, message: str,
     return {"jsonrpc": _JSON_RPC_VERSION, "id": msg_id, "error": error}
 
 
-def _serialize_result(value: Any) -> dict[str, Any]:
+def _summary_for_tool(name: str, result: Any) -> dict[str, Any] | None:
+    """Compute the agent-native summary for a tool result, when applicable.
+
+    Codex feedback: agents thrive on 'here are the 2 things blocking
+    release' more than huge manifests. We compute a top-5 summary
+    inline so MCP clients can branch on a 4-line response instead of
+    parsing kilobytes of JSON.
+    """
+    if not isinstance(result, dict):
+        return None
+    schema = result.get("schema_version", "")
+    if schema == "atomadic-forge.wire/v1":
+        return summarize_blockers(wire_report=result)
+    if schema == "atomadic-forge.certify/v1":
+        return summarize_blockers(certify_report=result)
+    if name == "certify" and isinstance(result.get("receipt"), dict):
+        # The certify-with-emit_receipt path returns a wrapped dict.
+        return summarize_blockers(certify_report=result.get("certify"))
+    return None
+
+
+def _serialize_result(value: Any, *, name: str = "") -> dict[str, Any]:
     """Wrap a tool result in MCP's ``content`` envelope so coding-agent
-    clients see a uniform shape (text + parsed JSON)."""
-    text = json.dumps(value, indent=2, default=str)
-    return {"content": [{"type": "text", "text": text}]}
+    clients see a uniform shape (text + parsed JSON).
+
+    When we can derive an agent-native summary, prepend it as a SECOND
+    text block so a sloppy client reading only ``content[0]`` still
+    gets the full payload (back-compat) while a smart client can read
+    ``content[1]`` for the compact form. Both are valid MCP shapes.
+    """
+    full = json.dumps(value, indent=2, default=str)
+    blocks: list[dict[str, Any]] = [{"type": "text", "text": full}]
+    summary = _summary_for_tool(name, value) if name else None
+    if summary is not None:
+        blocks.append({
+            "type": "text",
+            "text": "_summary:\n" + json.dumps(summary, indent=2, default=str),
+        })
+    return {"content": blocks, "_summary": summary}
 
 
 def _list_tools() -> dict[str, Any]:
@@ -392,7 +452,7 @@ def dispatch_request(
         except (ValueError, OSError, RuntimeError) as exc:
             return _err(msg_id, _ERR_SERVER,
                          f"{type(exc).__name__}: {exc}")
-        return _ok(msg_id, _serialize_result(result))
+        return _ok(msg_id, _serialize_result(result, name=name))
     if method == "resources/read":
         if is_notification:
             return None
