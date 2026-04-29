@@ -121,25 +121,42 @@ def test_signature_extraction_duplication_still_present() -> None:
     )
 
 
-# --- Lane D2: wire_check.auto_fixable hardcoded to 0 ---------------------
+# --- Lane D2: wire_check.auto_fixable is now a real counter --------------
+# (Originally a sentinel that auto_fixable was hardcoded to 0; flipped
+# in Lane D2 — the assertion now confirms repair-suggestion plumbing
+# is wired and that scan_violations exposes a suggest_repairs kwarg.)
 
-def test_wire_check_auto_fixable_still_zero() -> None:
-    """Lane D2 will turn this into a real counter wired to import_repair.
-
-    Until then, the audit claim is that `wire_check.py` initializes
-    `auto_fixable = 0` and never increments it. This test pins that so
-    Lane D2's PR is the one that flips the assertion.
+def test_wire_check_suggest_repairs_is_wired() -> None:
+    """Lane D2 landed: scan_violations(... suggest_repairs=True) returns
+    a non-zero auto_fixable count on a synthesized illegal a1->a2 import.
     """
-    src = _read("a1_at_functions/wire_check.py")
-    assert re.search(r"\bauto_fixable\s*=\s*0\b", src), (
-        "wire_check.py no longer initializes auto_fixable=0 — "
-        "either Lane D2 landed (update this test) or the symbol moved."
-    )
-    incs = re.findall(r"auto_fixable\s*\+?=\s*1", src)
-    assert not incs, (
-        "Found auto_fixable increment(s) — Lane D2 likely landed; "
-        "flip this test to assert the count actually reflects fixes."
-    )
+    from atomadic_forge.a1_at_functions.wire_check import scan_violations
+
+    import tempfile, pathlib
+    with tempfile.TemporaryDirectory() as tmp:
+        pkg = pathlib.Path(tmp) / "pkg"
+        a1 = pkg / "a1_at_functions"
+        a2 = pkg / "a2_mo_composites"
+        a1.mkdir(parents=True)
+        a2.mkdir(parents=True)
+        (a2 / "store.py").write_text(
+            '"""a2 store."""\nclass Store:\n    pass\n', encoding="utf-8")
+        (a1 / "helper.py").write_text(
+            '"""a1 with illegal upward import."""\n'
+            "from ..a2_mo_composites.store import Store\n",
+            encoding="utf-8",
+        )
+        soft = scan_violations(pkg)
+        hard = scan_violations(pkg, suggest_repairs=True)
+        assert soft["violation_count"] >= 1
+        assert soft["auto_fixable"] == 0
+        assert "repair_suggestions" not in soft
+        assert hard["auto_fixable"] >= 1
+        assert "repair_suggestions" in hard
+        assert any(
+            v.get("proposed_destination") == "a2_mo_composites"
+            for v in hard["violations"]
+        )
 
 
 # --- Lane A6/A7: chained `*_then_*` commands are auto-synthesized --------

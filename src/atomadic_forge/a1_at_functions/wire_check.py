@@ -4,6 +4,14 @@ Walks a tier-organized package and reports every import statement that
 violates the upward-only law (lower tier importing from a higher tier).
 Handles both Python (``from <pkg>.aN_… import …``) AND JavaScript / TypeScript
 (``import "../aN_…/foo"`` or ``require("../aN_…/foo")``).
+
+Lane D2 of the post-audit plan added the optional ``suggest_repairs``
+mode: when enabled, every violation gets a concrete ``proposed_fix``
+string and ``auto_fixable`` counts the suggestions whose minimum-edit
+fix is mechanically obvious (move the violating file UP to the tier of
+the symbol it imports). Heuristic, not a guarantee — the user still
+decides whether the file should move or whether the import should
+instead be inverted. Pure: no file writes, no exec.
 """
 
 from __future__ import annotations
@@ -106,11 +114,89 @@ def _scan_js_file(js: Path, package_root: Path,
         })
 
 
-def scan_violations(package_root: Path) -> dict:
+def suggest_fix_for_violation(violation: dict) -> dict:
+    """Return the violation augmented with a concrete repair proposal.
+
+    Heuristic: when tier T imports tier U upward (T < U), the safest
+    *mechanical* fix is to move the importing file from T to U — the
+    file is doing higher-tier work (consuming state / orchestrating)
+    and was misclassified. The alternative (push the imported symbol
+    down to T) requires semantic judgement we don't have here.
+
+    The returned dict has the original violation fields plus:
+        proposed_action      — one of "move_file_up" | "review_manually"
+        proposed_destination — target tier directory (e.g. "a2_mo_composites")
+        fix_command          — single shell command sketch the user can adapt
+        auto_fixable         — bool: is this a clean mechanical move?
+
+    Pure: no I/O. Heuristic — for review, not auto-apply.
+    """
+    file = violation["file"]
+    from_tier = violation["from_tier"]
+    to_tier = violation["to_tier"]
+    language = violation.get("language", "python")
+    imported = violation.get("imported", "")
+
+    auto_fixable = (
+        from_tier in TIER_NAMES
+        and to_tier in TIER_NAMES
+        and from_tier != to_tier
+        and language in ("python", "javascript", "typescript")
+    )
+
+    if auto_fixable:
+        proposed_action = "move_file_up"
+        proposed_destination = to_tier
+        # File path under the package: the user's package root prefix
+        # is unknown to this pure function, so the command is a sketch.
+        fix_command = (
+            f"mv <package_root>/{file} <package_root>/{to_tier}/"
+            f"{Path(file).name}  "
+            f"# then update imports referencing the old path"
+        )
+        reasoning = (
+            f"{file} is at tier {from_tier} but imports from "
+            f"tier {to_tier} (symbol: {imported!r}). The safest "
+            f"mechanical fix is to relocate the file up to {to_tier}; "
+            f"if the file is genuinely a {from_tier} citizen, the "
+            f"imported symbol probably belongs at {from_tier} or "
+            f"lower instead."
+        )
+    else:
+        proposed_action = "review_manually"
+        proposed_destination = ""
+        fix_command = ""
+        reasoning = (
+            f"Could not auto-classify a destination for {file} "
+            f"(from_tier={from_tier!r}, to_tier={to_tier!r}, "
+            f"language={language!r}). Review manually."
+        )
+
+    return {
+        **violation,
+        "proposed_action": proposed_action,
+        "proposed_destination": proposed_destination,
+        "fix_command": fix_command,
+        "reasoning": reasoning,
+        "auto_fixable": auto_fixable,
+    }
+
+
+def scan_violations(
+    package_root: Path,
+    *,
+    suggest_repairs: bool = False,
+) -> dict:
     """Return a wire report dict keyed by ``schema_version``.
 
     Polyglot: scans Python ``.py`` AND JavaScript / TypeScript files. Each
     violation includes a ``language`` field so reports can group by source.
+
+    ``suggest_repairs`` (Lane D2): when True, every violation is enriched
+    with a ``proposed_fix`` string, the top-level ``auto_fixable`` count
+    is the number of violations with a clean mechanical move, and the
+    response includes a ``repair_suggestions`` summary (one entry per
+    file, deduplicated). Default False keeps the v1 schema unchanged.
     """
     package_root = Path(package_root).resolve()
     violations: list[dict] = []
@@ -132,7 +218,31 @@ def scan_violations(package_root: Path) -> dict:
         elif suffix in TYPESCRIPT_EXTS:
             _scan_js_file(f, package_root, from_tier, "typescript", violations)
 
-    return {
+    repair_suggestions: list[dict] = []
+    if suggest_repairs:
+        for v in violations:
+            enriched = suggest_fix_for_violation(v)
+            v["proposed_fix"] = enriched["fix_command"] or enriched["reasoning"]
+            v["proposed_action"] = enriched["proposed_action"]
+            v["proposed_destination"] = enriched["proposed_destination"]
+            if enriched["auto_fixable"]:
+                auto_fixable += 1
+        # One summary entry per (file, proposed_destination) pair.
+        seen: set[tuple[str, str]] = set()
+        for v in violations:
+            key = (v["file"], v.get("proposed_destination", ""))
+            if key in seen:
+                continue
+            seen.add(key)
+            repair_suggestions.append({
+                "file": v["file"],
+                "from_tier": v["from_tier"],
+                "proposed_action": v.get("proposed_action", "review_manually"),
+                "proposed_destination": v.get("proposed_destination", ""),
+                "violation_count": sum(1 for w in violations if w["file"] == v["file"]),
+            })
+
+    report: dict = {
         "schema_version": "atomadic-forge.wire/v1",
         "source_dir": str(package_root),
         "violation_count": len(violations),
@@ -140,3 +250,6 @@ def scan_violations(package_root: Path) -> dict:
         "violations": violations,
         "verdict": "PASS" if not violations else "FAIL",
     }
+    if suggest_repairs:
+        report["repair_suggestions"] = repair_suggestions
+    return report

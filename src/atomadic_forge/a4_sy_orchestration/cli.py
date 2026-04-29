@@ -198,9 +198,14 @@ def wire_cmd(
         "--fail-on-violations",
         help="Exit 1 when any upward-import violations are found "
              "(for use in CI gates).")] = False,
+    suggest_repairs: Annotated[bool, typer.Option(
+        "--suggest-repairs",
+        help="For every violation, propose a concrete mechanical fix "
+             "(target tier, sketch shell command). Heuristic, for review "
+             "before applying.")] = False,
 ) -> None:
     """Scan a tier tree for upward-import violations."""
-    report = scan_violations(source)
+    report = scan_violations(source, suggest_repairs=suggest_repairs)
     has_violations = report["violation_count"] > 0
     if json_out:
         typer.echo(json.dumps(report, indent=2, default=str))
@@ -210,8 +215,22 @@ def wire_cmd(
     typer.echo(f"\nWire scan: {source}")
     typer.echo(f"  verdict:    {report['verdict']}")
     typer.echo(f"  violations: {report['violation_count']}")
+    if suggest_repairs:
+        typer.echo(f"  auto-fixable: {report['auto_fixable']}/{report['violation_count']}")
     for v in report["violations"][:10]:
-        typer.echo(f"    - {v['file']}: {v['from_tier']} ⟵ {v['to_tier']}.{v['imported']}")
+        line = f"    - {v['file']}: {v['from_tier']} ⟵ {v['to_tier']}.{v['imported']}"
+        typer.echo(line)
+        if suggest_repairs and v.get("proposed_destination"):
+            typer.echo(f"        → move to {v['proposed_destination']}/  "
+                       f"({v.get('proposed_action', 'review_manually')})")
+    if suggest_repairs and report.get("repair_suggestions"):
+        typer.echo("\n  Repair plan (one entry per file):")
+        for s in report["repair_suggestions"][:10]:
+            dest = s.get("proposed_destination") or "(review manually)"
+            typer.echo(
+                f"    - {s['file']}: {s['violation_count']} violation(s) "
+                f"→ {dest}"
+            )
     if fail_on_violations and has_violations:
         typer.echo(f"  gate:       FAIL (--fail-on-violations set)")
         raise typer.Exit(code=1)
