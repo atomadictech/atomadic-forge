@@ -28,6 +28,10 @@ from ..a0_qk_constants.gen_language import (
 )
 from ..a0_qk_constants.tier_names import TIER_NAMES
 from ..a1_at_functions.certify_checks import certify
+from ..a1_at_functions.compiler_feedback import (
+    pack_compile_feedback,
+    should_fix_round,
+)
 from ..a1_at_functions.forge_feedback import (
     compute_reuse_stats,
     pack_feedback,
@@ -35,6 +39,7 @@ from ..a1_at_functions.forge_feedback import (
     parse_files_from_response,
     system_prompt,
 )
+from ..a1_at_functions.import_smoke import import_smoke
 from ..a1_at_functions.generation_quality import (
     apply_docs_phase,
     apply_docstring_phase,
@@ -203,6 +208,81 @@ def _write_files(output: Path, files: list[dict[str, str]],
     return written
 
 
+def _run_fix_rounds(
+    *,
+    pkg_root: Path,
+    output: Path,
+    package: str,
+    language: Language,
+    llm: LLMClient,
+    sys_prompt: str,
+    max_fix_rounds: int,
+    transcript: TranscriptLog | None,
+    turn: int,
+) -> list[dict[str, Any]]:
+    """Run up to ``max_fix_rounds`` import-smoke fix rounds.
+
+    Each round:
+      1. Run import_smoke against the just-written package.
+      2. If importable → return what we did so far; the regular turn
+         continues.
+      3. Otherwise pack a fix-round prompt with the error trace and
+         re-call the LLM, write the response files, and loop.
+
+    Lane A W3 contract — the fix-round NEVER scores quality; it only
+    asks for the minimum patch to make the package import. This keeps
+    the regular --max-iterations budget for actual quality work.
+    """
+    rounds: list[dict[str, Any]] = []
+    if max_fix_rounds < 1 or language != "python":
+        # Smoke is Python-only; JS/TS skip fix rounds today.
+        return rounds
+    for attempt in range(1, max_fix_rounds + 1):
+        smoke = import_smoke(output_root=output, package=package)
+        if smoke.get("importable"):
+            return rounds
+        if not should_fix_round(smoke):
+            return rounds
+        prompt = pack_compile_feedback(
+            smoke, package=package,
+            fix_round_index=attempt,
+            max_fix_rounds=max_fix_rounds,
+        )
+        if transcript:
+            transcript.append(
+                "prompt", prompt, role="user", llm=llm.name,
+                extra={"turn": turn, "phase": "fix-round",
+                       "fix_round": attempt},
+            )
+        response = llm.call(prompt, system=sys_prompt)
+        if transcript:
+            transcript.append(
+                "response", response, role="assistant", llm=llm.name,
+                extra={"turn": turn, "phase": "fix-round",
+                       "fix_round": attempt},
+            )
+        files = parse_files_from_response(response)
+        # The contract said: emit `[]` to signal 'env error, give up'.
+        if not files and response.strip().endswith("[]"):
+            rounds.append({
+                "fix_round": attempt,
+                "files_written": [],
+                "halted_reason": "llm_signaled_environment_error",
+                "smoke_error_kind": smoke.get("error_kind"),
+            })
+            return rounds
+        written = _write_files(output, files, language=language)
+        if pkg_root.exists() and EMITS_INIT_FILES[language]:
+            rebuild_tier_inits(pkg_root)
+        rounds.append({
+            "fix_round": attempt,
+            "files_written": written,
+            "smoke_error_kind": smoke.get("error_kind"),
+            "smoke_error_message": smoke.get("error_message"),
+        })
+    return rounds
+
+
 def run_iterate(
     intent: str,
     *,
@@ -211,6 +291,7 @@ def run_iterate(
     seed_repo: Path | list[Path] | None = None,
     llm: LLMClient | None = None,
     max_iterations: int = 5,
+    max_fix_rounds: int = 0,
     target_score: float = 75.0,
     apply: bool = True,
     language: Language | str = "python",
@@ -301,6 +382,18 @@ def run_iterate(
                      "raw_response_chars": len(response),
                      "parse_retried": parse_retried})
 
+    # ── Lane A W3 — Compiler Feedback Loop, after turn 0 ────────────────
+    fix_rounds_log: list[dict[str, Any]] = []
+    if max_fix_rounds > 0 and apply:
+        rounds = _run_fix_rounds(
+            pkg_root=pkg_root, output=output, package=package,
+            language=lang, llm=llm, sys_prompt=sys_prompt,
+            max_fix_rounds=max_fix_rounds, transcript=transcript, turn=0,
+        )
+        for r in rounds:
+            history_files.extend(r.get("files_written", []))
+        fix_rounds_log.extend({**r, "turn": 0} for r in rounds)
+
     # ── Iteration turns ────────────────────────────────────────────────────
     final_wire: dict[str, Any] | None = None
     final_cert: dict[str, Any] | None = None
@@ -349,6 +442,17 @@ def run_iterate(
         turn_log.append({"turn": turn, "prompt_chars": len(feedback),
                          "files_written": written,
                          "raw_response_chars": len(response)})
+        # Lane A W3 — fix-round budget per turn.
+        if max_fix_rounds > 0:
+            rounds = _run_fix_rounds(
+                pkg_root=pkg_root, output=output, package=package,
+                language=lang, llm=llm, sys_prompt=sys_prompt,
+                max_fix_rounds=max_fix_rounds, transcript=transcript,
+                turn=turn,
+            )
+            for r in rounds:
+                history_files.extend(r.get("files_written", []))
+            fix_rounds_log.extend({**r, "turn": turn} for r in rounds)
 
     quality_phases: list[dict[str, Any]] = []
     if lang == "python":
@@ -414,6 +518,9 @@ def run_iterate(
             "issues": (final_cert or {}).get("issues", []),
         },
         "transcript": turn_log,
+        "fix_rounds": fix_rounds_log,
+        "fix_round_count": len(fix_rounds_log),
+        "max_fix_rounds": max_fix_rounds,
         "transcript_log_path": (str(transcript.path) if transcript else None),
         "generated_at_utc": _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds"),
     }

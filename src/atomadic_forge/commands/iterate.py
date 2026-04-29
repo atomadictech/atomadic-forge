@@ -64,6 +64,13 @@ def run_cmd(
     provider: Annotated[str, typer.Option("--provider",
         help=PROVIDER_HELP)] = "auto",
     max_iterations: Annotated[int, typer.Option("--max-iterations")] = 5,
+    max_fix_rounds: Annotated[int, typer.Option(
+        "--max-fix-rounds",
+        help="Per-turn budget for compiler-feedback fix rounds (Lane A W3). "
+             "When the just-emitted package fails import_smoke, the loop "
+             "sends the LLM the error trace and asks for a minimal patch, "
+             "up to N times before continuing to the next iterate turn. "
+             "Default 0 = disabled.")] = 0,
     target_score: Annotated[float, typer.Option("--target-score")] = 75.0,
     apply: Annotated[bool, typer.Option("--apply/--no-apply")] = True,
     json_out: Annotated[bool, typer.Option("--json")] = False,
@@ -79,6 +86,7 @@ def run_cmd(
             seed_repo=seed_repo,
             llm=llm,                       # type: ignore[arg-type]
             max_iterations=max_iterations,
+            max_fix_rounds=max_fix_rounds,
             target_score=target_score,
             apply=apply,
         )
