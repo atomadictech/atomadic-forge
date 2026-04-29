@@ -60,9 +60,11 @@ def test_names_are_unique():
 # ---- canonical mapping pinned -------------------------------------------
 
 def test_w5_seed_codes_pinned():
-    """The W5 seed set is fixed; adding/removing entries must update
-    this test (and the H1 sentinel below)."""
+    """The seed set is fixed; adding entries here is additive but
+    renaming or renumbering is a breaking change. Updated for Lane D
+    W11 (F0100..F0106 sidecar codes)."""
     pinned = {
+        # W5 wire / certify seed
         "F0040": "a0-cannot-import-anything",
         "F0041": "a1-imports-a2",
         "F0042": "a1-imports-a3",
@@ -75,6 +77,12 @@ def test_w5_seed_codes_pinned():
         "F0051": "tests-missing",
         "F0052": "tier-layout-incomplete",
         "F0053": "upward-imports-present",
+        # Lane D W11 sidecar drift
+        "F0100": "sidecar-source-unparseable",
+        "F0101": "sidecar-declares-missing-symbol",
+        "F0102": "sidecar-coverage-incomplete",
+        "F0103": "sidecar-pure-violates-purity",
+        "F0106": "sidecar-tier-mismatch",
     }
     for code, name in pinned.items():
         entry = F_CODE_REGISTRY.get(code)
@@ -82,6 +90,34 @@ def test_w5_seed_codes_pinned():
         assert entry["name"] == name, (
             f"{code} renamed: registry={entry['name']!r} expected={name!r}"
         )
+
+
+def test_sidecar_s_to_f_mapping():
+    from atomadic_forge.a0_qk_constants.error_codes import SIDECAR_S_TO_F
+    assert SIDECAR_S_TO_F["S0001"] == "F0101"
+    assert SIDECAR_S_TO_F["S0003"] == "F0103"
+    # Every S-code mapping points at a registered F-code.
+    for s, f in SIDECAR_S_TO_F.items():
+        assert f in F_CODE_REGISTRY, (
+            f"{s} maps to {f} but {f} is not registered"
+        )
+
+
+def test_sidecar_validator_attaches_fcode():
+    """The validator promotes S-codes to f_code on each finding."""
+    from atomadic_forge.a1_at_functions.sidecar_parser import parse_sidecar_text
+    from atomadic_forge.a1_at_functions.sidecar_validator import validate_sidecar
+    parse = parse_sidecar_text(
+        "schema_version: atomadic-forge.sidecar/v1\n"
+        "target: x.py\n"
+        "symbols:\n"
+        "  - name: ghost\n"
+        "    effect: Pure\n"
+    )
+    rep = validate_sidecar(parse["sidecar"], source_text="def real(): pass\n")
+    s001_findings = [f for f in rep["findings"] if f["code"] == "S0001"]
+    assert s001_findings
+    assert s001_findings[0]["f_code"] == "F0101"
 
 
 # ---- lookup helpers -----------------------------------------------------
