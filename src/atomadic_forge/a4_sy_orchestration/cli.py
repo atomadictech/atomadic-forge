@@ -38,6 +38,7 @@ from ..a1_at_functions.receipt_emitter import build_receipt, receipt_to_json
 from ..a1_at_functions.scout_walk import harvest_repo
 from ..a1_at_functions.wire_check import scan_violations
 from ..a2_mo_composites.receipt_signer import sign_receipt
+from ..a3_og_features.forge_enforce import run_enforce
 from ..a3_og_features.forge_pipeline import (
     run_auto,
     run_cherry,
@@ -249,6 +250,68 @@ def wire_cmd(
                           count=report["violation_count"], path=source),
             err=True,
         )
+
+
+@app.command("enforce")
+def enforce_cmd(
+    package_root: Annotated[Path, typer.Argument(
+        exists=True, file_okay=False, dir_okay=True, resolve_path=True,
+        help="Tier-organized package root.")],
+    apply: Annotated[bool, typer.Option(
+        "--apply",
+        help="Actually execute file moves. Default is dry-run.")] = False,
+    json_out: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    """Plan (and optionally apply) mechanical fixes for wire violations.
+
+    Routes by F-code (Lane A W5); rolls back any fix that increases the
+    violation count. Default mode is dry-run — pass --apply to execute.
+    """
+    report = run_enforce(package_root, apply=apply)
+    if json_out:
+        typer.echo(json.dumps(report, indent=2, default=str))
+        if apply and report["post_violations"] > report["pre_violations"]:
+            raise typer.Exit(code=1)
+        return
+    plan = report["plan"]
+    typer.echo(f"\nForge enforce ({'APPLY' if apply else 'DRY-RUN'}): "
+               f"{package_root}")
+    typer.echo("-" * 60)
+    typer.echo(f"  pre  violations: {report['pre_violations']}")
+    typer.echo(f"  post violations: {report['post_violations']}")
+    typer.echo(f"  actions:         {plan['action_count']} "
+               f"({plan['auto_apply_count']} auto, "
+               f"{plan['review_count']} review)")
+    if plan["by_fcode"]:
+        typer.echo(f"  by F-code:       {plan['by_fcode']}")
+    if not apply and plan["action_count"] > 0:
+        typer.echo("\n  Planned moves:")
+        for action in plan["actions"][:10]:
+            tag = "AUTO" if action.get("auto_apply") else "REVIEW"
+            if action.get("dest"):
+                typer.echo(
+                    f"    [{tag}] [{action['f_code']}] "
+                    f"{action['src']}  →  {action['dest']}"
+                )
+            else:
+                typer.echo(
+                    f"    [{tag}] [{action['f_code']}] "
+                    f"{action['src']}  →  (manual review)"
+                )
+            for w in action.get("warnings", [])[:2]:
+                typer.echo(f"        ! {w}")
+        typer.echo("\n  (re-run with --apply to execute the AUTO actions)")
+    if apply:
+        typer.echo("\n  Apply results:")
+        for entry in report["applied"]:
+            a = entry["action"]
+            typer.echo(f"    [{entry['status'].upper():12s}] "
+                       f"[{a['f_code']}] {a['src']}")
+        if report["rollbacks"]:
+            typer.echo(f"\n  Rolled back: {len(report['rollbacks'])} action(s) "
+                       "(violations rose; reverted)")
+        if report["post_violations"] > report["pre_violations"]:
+            raise typer.Exit(code=1)
 
 
 @app.command("certify")
