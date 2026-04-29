@@ -76,7 +76,8 @@ def test_tools_list_pinned(tmp_path):
         project_root=tmp_path,
     )
     names = {t["name"] for t in resp["result"]["tools"]}
-    pinned = {"recon", "wire", "certify", "enforce", "audit_list"}
+    pinned = {"recon", "wire", "certify", "enforce", "audit_list",
+              "auto_plan"}
     assert pinned == names == set(TOOLS.keys()), (
         f"tools/list drifted: returned {names}, expected {pinned}"
     )

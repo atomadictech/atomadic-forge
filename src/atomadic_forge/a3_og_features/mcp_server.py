@@ -24,9 +24,11 @@ from pathlib import Path as _Path
 
 from ..a1_at_functions.mcp_protocol import (
     dispatch_request,
+    register_auto_plan_handler,
     register_enforce_handler,
 )
 from .forge_enforce import run_enforce as _run_enforce
+from .forge_pipeline import run_auto_plan as _run_auto_plan
 
 
 def _bound_enforce(project_root, args):
@@ -37,7 +39,22 @@ def _bound_enforce(project_root, args):
     return _run_enforce(src, apply=apply)
 
 
+def _bound_auto_plan(project_root, args):
+    """a3-side auto_plan handler — exposes the agent_plan/v1 emitter
+    through the MCP dispatcher with the same a1↔a3 injection pattern
+    used for enforce."""
+    target = _Path(args.get("target", project_root)).resolve()
+    return _run_auto_plan(
+        target=target,
+        goal=str(args.get("goal", "improve repo conformance")),
+        mode=str(args.get("mode", "improve")),
+        package=args.get("package"),
+        top_n=int(args.get("top_n", 7)),
+    )
+
+
 register_enforce_handler(_bound_enforce)
+register_auto_plan_handler(_bound_auto_plan)
 
 
 def serve_stdio(

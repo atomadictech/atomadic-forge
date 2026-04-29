@@ -21,6 +21,7 @@ from typing import Any
 
 from .. import __version__
 from ..a0_qk_constants.tier_names import TIER_NAMES
+from ..a1_at_functions.agent_plan_emitter import emit_agent_plan
 from ..a1_at_functions.certify_checks import certify
 from ..a1_at_functions.cherry_pick import select_items
 from ..a1_at_functions.scout_walk import harvest_repo
@@ -248,3 +249,47 @@ def run_auto(*, target: Path, output: Path, package: str = "absorbed",
         "finalize": final,
         "applied": apply,
     }
+
+
+def run_auto_plan(
+    *,
+    target: Path,
+    goal: str = "improve repo conformance",
+    mode: str = "improve",
+    package: str | None = None,
+    top_n: int = 7,
+) -> dict[str, Any]:
+    """Codex-driven 'observe → propose cards' orchestrator.
+
+    Runs scout + wire + certify (and, when available, emergent +
+    synergy) and emits a single ``agent_plan/v1`` with top-N action
+    cards. Does NOT mutate the filesystem — handoff is the agent's
+    responsibility.
+
+    Mode 'improve' (default): the agent operates on the repo at
+    ``target`` in-place; certify runs against ``target`` and the
+    generated cards reference its layout.
+    Mode 'absorb': used by the legacy ``forge auto`` flow when the
+    target is a flat repo and the next action is to scaffold a new
+    tier-organized output.
+
+    The returned dict matches AgentPlan exactly (schema_version
+    'atomadic-forge.agent_plan/v1') so MCP clients can round-trip
+    it without unwrapping.
+    """
+    target = Path(target).resolve()
+    wire = scan_violations(target, suggest_repairs=True)
+    try:
+        cert = certify(target, project=target.name, package=package)
+    except (OSError, RuntimeError, ValueError):
+        cert = None
+    # emergent / synergy reports are optional; the emitter degrades
+    # gracefully when they're absent. Wiring them in here would
+    # require a3→a3 imports (allowed) but would slow the plan call.
+    plan = emit_agent_plan(
+        project_root=str(target),
+        goal=goal, mode=mode,
+        wire_report=wire, certify_report=cert,
+        package=package, top_n=top_n,
+    )
+    return plan

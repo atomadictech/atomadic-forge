@@ -147,6 +147,38 @@ def _tool_audit_list(project_root: Path, args: dict[str, Any]) -> dict[str, Any]
     }
 
 
+def _tool_auto_plan_unbound(project_root: Path,
+                             args: dict[str, Any]) -> dict[str, Any]:
+    """auto_plan stub — a3 binds the real ``run_auto_plan`` at import
+    time via ``register_auto_plan_handler``. Same a1↔a3 injection
+    pattern the enforce tool uses (see Lane C W4 commit msg).
+    """
+    return {
+        "schema_version": "atomadic-forge.agent_plan/v1",
+        "wired": False,
+        "note": (
+            "auto_plan tool not yet wired — import "
+            "atomadic_forge.a3_og_features.mcp_server (or any code "
+            "under a3) to register the real handler."
+        ),
+    }
+
+
+_auto_plan_handler: ToolHandler = _tool_auto_plan_unbound
+
+
+def _tool_auto_plan(project_root: Path,
+                     args: dict[str, Any]) -> dict[str, Any]:
+    return _auto_plan_handler(project_root, args)
+
+
+def register_auto_plan_handler(handler: ToolHandler) -> None:
+    """Bind the real auto_plan handler from a3 (mirror of
+    register_enforce_handler)."""
+    global _auto_plan_handler
+    _auto_plan_handler = handler
+
+
 TOOLS: dict[str, dict[str, Any]] = {
     "recon": {
         "name": "recon",
@@ -220,6 +252,32 @@ TOOLS: dict[str, dict[str, Any]] = {
             "additionalProperties": False,
         },
         "handler": _tool_audit_list,
+    },
+    "auto_plan": {
+        "name": "auto_plan",
+        "description": (
+            "Codex's 'next best action card' generator. Runs scout + "
+            "wire + certify and emits an agent_plan/v1 with top-N "
+            "ranked AgentActionCard entries (kind, why, write_scope, "
+            "risk, applyable, commands, next_command). The active "
+            "agent picks one card and runs its next_command; Forge "
+            "does NOT mutate the repo from this tool."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "target":   {"type": "string"},
+                "goal":     {"type": "string",
+                              "default": "improve repo conformance"},
+                "mode":     {"type": "string",
+                              "enum": ["improve", "absorb"],
+                              "default": "improve"},
+                "package":  {"type": ["string", "null"]},
+                "top_n":    {"type": "integer", "default": 7},
+            },
+            "additionalProperties": False,
+        },
+        "handler": _tool_auto_plan,
     },
 }
 
@@ -352,6 +410,18 @@ def _summary_for_tool(name: str, result: Any) -> dict[str, Any] | None:
     if name == "certify" and isinstance(result.get("receipt"), dict):
         # The certify-with-emit_receipt path returns a wrapped dict.
         return summarize_blockers(certify_report=result.get("certify"))
+    if schema == "atomadic-forge.agent_plan/v1":
+        # Plans already ARE summary-shaped — surface a tiny digest
+        # so MCP clients can branch without re-parsing the full plan.
+        return {
+            "schema_version": "atomadic-forge.summary/v1",
+            "verdict": result.get("verdict", "?"),
+            "score": 0,
+            "blocker_count": result.get("action_count", 0),
+            "auto_fixable_count": result.get("applyable_count", 0),
+            "blockers": [],
+            "next_command": result.get("next_command", ""),
+        }
     return None
 
 

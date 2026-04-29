@@ -47,6 +47,7 @@ from ..a3_og_features.forge_enforce import run_enforce
 from ..a3_og_features.mcp_server import serve_stdio as mcp_serve_stdio
 from ..a3_og_features.forge_pipeline import (
     run_auto,
+    run_auto_plan,
     run_cherry,
     run_finalize,
     run_recon,
@@ -270,6 +271,70 @@ def wire_cmd(
                           count=report["violation_count"], path=source),
             err=True,
         )
+
+
+@app.command("plan")
+def plan_cmd(
+    target: Annotated[Path, typer.Argument(
+        exists=True, file_okay=False, dir_okay=True, resolve_path=True,
+        help="Repo to inspect. The agent operates on it in-place "
+             "(mode='improve', default) — Forge does NOT mutate.")],
+    goal: Annotated[str, typer.Option("--goal",
+        help="One-line description of what the agent is trying to achieve. "
+             "Echoed back in the plan envelope.")] = "improve repo conformance",
+    mode: Annotated[str, typer.Option("--mode",
+        help="improve = operate in-place; absorb = scaffold a new "
+             "tier-organized package from a flat repo.")] = "improve",
+    package: Annotated[str | None, typer.Option("--package",
+        help="Forwarded to forge certify when relevant.")] = None,
+    top_n: Annotated[int, typer.Option("--top",
+        help="Cap the action card list at N (action_count remains "
+             "the full count).")] = 7,
+    json_out: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    """Codex-driven 'next best action card' generator (agent_plan/v1).
+
+    Runs scout + wire + certify (and the optional emergent / synergy
+    overlays when scans are present), ranks blockers and opportunities,
+    and emits one ordered ``agent_plan/v1`` document. Each action card
+    carries:
+
+      id, kind, title, why, write_scope, risk, applyable,
+      commands, related_fcodes, next_command, sample_path,
+      score_delta_estimate
+
+    The active agent inspects the cards, picks one (typically the
+    first applyable), and runs its ``next_command``. Forge does NOT
+    mutate the repo from this verb — the bounded write-step is
+    delegated to verbs the cards reference (forge enforce, forge
+    auto, forge synergy implement, forge emergent synthesize, etc.).
+    """
+    plan = run_auto_plan(target=target, goal=goal, mode=mode,
+                          package=package, top_n=top_n)
+    if json_out:
+        typer.echo(json.dumps(plan, indent=2, default=str))
+        return
+    typer.echo(f"\nForge plan ({plan['mode']}): {target}")
+    typer.echo("-" * 60)
+    typer.echo(f"  goal:          {plan['goal']}")
+    typer.echo(f"  verdict:       {plan['verdict']}")
+    typer.echo(f"  actions:       {plan['action_count']} "
+                f"({plan['applyable_count']} applyable)")
+    typer.echo("")
+    for i, card in enumerate(plan["top_actions"], 1):
+        tag = "AUTO" if card.get("applyable") else "REVIEW"
+        risk = card.get("risk", "?")
+        typer.echo(f"  {i}. [{tag}] [{risk}] [{card.get('kind', '?')}]"
+                    f"  {card.get('title', '')}")
+        typer.echo(f"     id:   {card.get('id', '')}")
+        why = card.get("why", "").strip()
+        if why:
+            typer.echo(f"     why:  {why[:120]}")
+        nc = card.get("next_command", "").strip()
+        if nc:
+            typer.echo(f"     next: {nc[:120]}")
+        typer.echo("")
+    typer.echo(f"  NEXT: {plan.get('next_command', '').strip()[:120]}")
 
 
 @app.command("enforce")
