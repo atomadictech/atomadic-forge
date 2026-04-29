@@ -168,12 +168,16 @@ def _file_score(path: str, diff_text: str) -> PatchFileScore:
     )
 
 
-def score_patch(diff: str) -> PatchScore:
+def score_patch(diff: str, *, project_root: object | None = None) -> PatchScore:
     """Score a unified-diff string. Returns the patch_score/v1 shape.
 
     Empty or unparseable diffs return a low-risk report with a note
     instead of raising — the agent should never see a traceback when
     asking 'is this safe?'.
+
+    Codex-6: when ``project_root`` is provided AND that project has a
+    [tool.forge.agent] policy with protected_files, any diff touching
+    a protected file is flagged as ``needs_human_review``.
     """
     if not diff or not diff.strip():
         return PatchScore(
@@ -213,9 +217,31 @@ def score_patch(diff: str) -> PatchScore:
             "unified-diff format expected"
         )
 
-    needs_review = arch_risk or api_risk or rel_risk or (
+    # Codex-6: respect [tool.forge.agent] protected_files when a
+    # project_root is provided. Lazy import to avoid a circular path.
+    protected_hits: list[str] = []
+    if project_root is not None:
+        try:
+            from pathlib import Path as _Path
+            from .policy_loader import file_is_protected, load_policy
+            policy = load_policy(_Path(str(project_root)))
+            for f in files:
+                if file_is_protected(f["path"], policy):
+                    protected_hits.append(f["path"])
+                    f.setdefault("notes", []).append(
+                        "policy: file listed in protected_files — needs review"
+                    )
+        except Exception:  # noqa: BLE001
+            pass
+
+    needs_review = arch_risk or api_risk or rel_risk or bool(protected_hits) or (
         sum(f["added_lines"] for f in files) > 200
     )
+    if protected_hits:
+        notes.append(
+            f"diff touches {len(protected_hits)} file(s) listed in "
+            "[tool.forge.agent] protected_files — needs_human_review=True"
+        )
     if needs_review and "review" not in " ".join(notes):
         notes.append(
             "needs_human_review=True because of architectural / "

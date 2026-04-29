@@ -40,6 +40,7 @@ from ..a1_at_functions.error_hints import format_hint
 from ..a1_at_functions.manifest_diff import diff_manifests
 from ..a1_at_functions.progress_reporter import make_stderr_reporter
 from ..a1_at_functions.preflight_change import preflight_change
+from ..a1_at_functions.recipes import all_recipes, get_recipe, list_recipes
 from ..a1_at_functions.receipt_emitter import build_receipt, receipt_to_json
 from ..a1_at_functions.scout_walk import harvest_repo
 from ..a1_at_functions.wire_check import scan_violations
@@ -480,6 +481,63 @@ def preflight_cmd(
         typer.echo(f"\n  ! {note}")
     if report["write_scope_too_broad"]:
         raise typer.Exit(code=1)
+
+
+@app.command("recipes")
+def recipes_cmd(
+    name: Annotated[str | None, typer.Argument(
+        help="Recipe name to show; omit to list all.")] = None,
+    json_out: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    """Codex #12: golden-path recipes catalogue.
+
+    With no argument, lists every recipe. With a name, shows that
+    recipe's checklist + file_scope_hints + validation_gate. Same
+    surface as the MCP tools list_recipes / get_recipe.
+    """
+    if name is None:
+        names = list_recipes()
+        catalogue = all_recipes()
+        if json_out:
+            typer.echo(json.dumps(
+                {"schema_version": "atomadic-forge.recipe.list/v1",
+                 "recipes": names,
+                 "catalogue": {n: r["description"] for n, r in catalogue.items()}},
+                indent=2, default=str))
+            return
+        typer.echo("\nForge — golden-path recipes")
+        typer.echo("-" * 60)
+        for n in names:
+            typer.echo(f"  {n:<22}  {catalogue[n]['description'][:60]}")
+        typer.echo(f"\n  forge recipes <name>  — show one recipe")
+        return
+    recipe = get_recipe(name)
+    if recipe is None:
+        raise typer.BadParameter(
+            f"unknown recipe: {name!r}. "
+            f"Available: {', '.join(list_recipes())}"
+        )
+    if json_out:
+        typer.echo(json.dumps(recipe, indent=2, default=str))
+        return
+    typer.echo(f"\nForge recipe: {recipe['name']}")
+    typer.echo("-" * 60)
+    typer.echo(f"  {recipe['description']}\n")
+    typer.echo("  Checklist:")
+    for i, step in enumerate(recipe.get("checklist", []), 1):
+        typer.echo(f"    {i}. {step}")
+    if recipe.get("file_scope_hints"):
+        typer.echo("\n  File scope:")
+        for f in recipe["file_scope_hints"]:
+            typer.echo(f"    - {f}")
+    if recipe.get("validation_gate"):
+        typer.echo("\n  Validation gate:")
+        for cmd in recipe["validation_gate"]:
+            typer.echo(f"    $ {cmd}")
+    if recipe.get("notes"):
+        typer.echo("\n  Notes:")
+        for n in recipe["notes"]:
+            typer.echo(f"    {n}")
 
 
 @app.command("plan-list")
