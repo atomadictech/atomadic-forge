@@ -29,6 +29,7 @@ from typing import Annotated
 import typer
 
 from .. import __version__
+from ..a1_at_functions.agent_context_pack import emit_context_pack
 from ..a1_at_functions.agent_summary import (
     render_summary_text,
     summarize_blockers,
@@ -38,6 +39,7 @@ from ..a1_at_functions.certify_checks import certify as certify_checks
 from ..a1_at_functions.error_hints import format_hint
 from ..a1_at_functions.manifest_diff import diff_manifests
 from ..a1_at_functions.progress_reporter import make_stderr_reporter
+from ..a1_at_functions.preflight_change import preflight_change
 from ..a1_at_functions.receipt_emitter import build_receipt, receipt_to_json
 from ..a1_at_functions.scout_walk import harvest_repo
 from ..a1_at_functions.wire_check import scan_violations
@@ -349,6 +351,115 @@ def plan_cmd(
     if plan_id:
         typer.echo(f"  saved: plan_id={plan_id}")
         typer.echo(f"        forge plan-show {plan_id} --project {target}")
+
+
+@app.command("context-pack")
+def context_pack_cmd(
+    target: Annotated[Path, typer.Argument(
+        exists=True, file_okay=False, dir_okay=True, resolve_path=True,
+        help="Project root.")] = Path("."),
+    json_out: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    """Codex 'Copilot's Copilot' #1: first-call context bundle.
+
+    Returns repo purpose + tier law + tier map + blockers + best
+    next action + test commands + release gate + risky files +
+    recent lineage in one read. The single tool every coding agent
+    should call on first connect.
+    """
+    target = Path(target).resolve()
+    try:
+        scout = harvest_repo(target)
+    except (OSError, ValueError):
+        scout = None
+    try:
+        wire = scan_violations(target)
+    except (OSError, ValueError):
+        wire = None
+    try:
+        cert = certify_checks(target, project=target.name)
+    except (OSError, RuntimeError, ValueError):
+        cert = None
+    pack = emit_context_pack(
+        project_root=target,
+        scout_report=scout, wire_report=wire, certify_report=cert,
+    )
+    if json_out:
+        typer.echo(json.dumps(pack, indent=2, default=str))
+        return
+    typer.echo(f"\nForge context-pack: {target}")
+    typer.echo("-" * 60)
+    typer.echo(f"  purpose:   {pack['repo_purpose'][:200]}")
+    typer.echo(f"  language:  {pack['primary_language']}")
+    typer.echo(f"  tiers:     {pack['tier_map']}")
+    bs = pack["blockers_summary"]
+    typer.echo(f"  verdict:   {bs.get('verdict', '?')}  "
+                f"({bs.get('blocker_count', 0)} blocker(s))")
+    if pack.get("best_next_action"):
+        n = pack["best_next_action"]
+        typer.echo(f"  best next: {n.get('title', n.get('id', '?'))}")
+        nc = n.get("next_command", "").strip()
+        if nc:
+            typer.echo(f"             {nc[:140]}")
+    typer.echo(f"  tests:     {' | '.join(pack['test_commands'][:3])}")
+    typer.echo(f"  gate:      {' && '.join(pack['release_gate'])}")
+    if pack["risky_files"]:
+        typer.echo("  risky files (most-edited):")
+        for f in pack["risky_files"][:5]:
+            typer.echo(f"    - {f['path']}  ({f['edit_count']}x)")
+
+
+@app.command("preflight")
+def preflight_cmd(
+    intent: Annotated[str, typer.Argument(
+        help="One-line description of what the agent intends to do.")],
+    files: Annotated[list[str], typer.Argument(
+        help="Proposed file paths the agent plans to write/modify.")],
+    project: Annotated[Path, typer.Option(
+        "--project",
+        exists=True, file_okay=False, dir_okay=True, resolve_path=True)] = Path("."),
+    scope_threshold: Annotated[int, typer.Option(
+        "--scope-threshold",
+        help="Warn when more than N files are in the write scope.")] = 8,
+    json_out: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    """Codex 'Copilot's Copilot' #2: pre-edit guardrail.
+
+    For each proposed file, returns the detected tier, forbidden
+    imports, likely-affected tests, and sibling files to read first.
+    Surfaces 'write_scope too broad' before the agent commits to a
+    fragile multi-file patch.
+    """
+    report = preflight_change(
+        intent=intent, proposed_files=list(files),
+        project_root=project, scope_threshold=scope_threshold,
+    )
+    if json_out:
+        typer.echo(json.dumps(report, indent=2, default=str))
+        if report["write_scope_too_broad"]:
+            raise typer.Exit(code=1)
+        return
+    typer.echo(f"\nForge preflight ({len(files)} file(s))")
+    typer.echo("-" * 60)
+    typer.echo(f"  intent: {intent[:200]}")
+    if report["write_scope_too_broad"]:
+        typer.echo(f"  ⚠ write_scope: {report['write_scope_size']} files "
+                    f"(> {report['write_scope_threshold']} threshold)")
+    for f in report["proposed_files"]:
+        tier = f.get("detected_tier") or "(none)"
+        typer.echo(f"\n  {f['path']}  [{tier}]")
+        if f.get("forbidden_imports"):
+            typer.echo(f"    forbidden: {f['forbidden_imports']}")
+        if f.get("likely_tests"):
+            typer.echo(f"    tests:     {f['likely_tests'][:3]}")
+        if f.get("siblings_to_read"):
+            typer.echo(f"    siblings:  {f['siblings_to_read'][:3]}")
+        for note in f.get("notes", []):
+            typer.echo(f"    note: {note}")
+    for note in report.get("overall_notes", []):
+        typer.echo(f"\n  ! {note}")
+    if report["write_scope_too_broad"]:
+        raise typer.Exit(code=1)
 
 
 @app.command("plan-list")

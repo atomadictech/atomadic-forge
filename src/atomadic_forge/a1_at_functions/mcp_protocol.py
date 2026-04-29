@@ -40,10 +40,13 @@ from typing import Any, Callable
 
 from .. import __version__
 from ..a0_qk_constants.receipt_schema import SCHEMA_VERSION_V1
+from .agent_context_pack import emit_context_pack
 from .agent_summary import summarize_blockers
 from .certify_checks import certify
 from .lineage_chain import canonical_receipt_hash, verify_chain_link
 from .lineage_reader import list_artifacts, read_lineage
+from .patch_scorer import score_patch as _score_patch
+from .preflight_change import preflight_change as _preflight_change
 from .receipt_emitter import build_receipt
 from .scout_walk import harvest_repo
 from .wire_check import scan_violations
@@ -145,6 +148,51 @@ def _tool_audit_list(project_root: Path, args: dict[str, Any]) -> dict[str, Any]
         "project": str(root),
         "artifacts": list_artifacts(root),
     }
+
+
+def _tool_context_pack(project_root: Path, args: dict[str, Any]) -> dict[str, Any]:
+    """Codex 'Copilot's Copilot' #1 — first-call context pack."""
+    root = Path(args.get("target", project_root)).resolve()
+    try:
+        scout = harvest_repo(root)
+    except (OSError, ValueError):
+        scout = None
+    try:
+        wire = scan_violations(root)
+    except (OSError, ValueError):
+        wire = None
+    try:
+        cert = certify(root, project=root.name)
+    except (OSError, RuntimeError, ValueError):
+        cert = None
+    return emit_context_pack(
+        project_root=root,
+        scout_report=scout, wire_report=wire, certify_report=cert,
+    )
+
+
+def _tool_preflight_change(project_root: Path, args: dict[str, Any]) -> dict[str, Any]:
+    """Codex 'Copilot's Copilot' #2 — pre-edit guardrail."""
+    root = Path(args.get("project_root", project_root)).resolve()
+    intent = str(args.get("intent", ""))
+    proposed = list(args.get("proposed_files") or [])
+    threshold = int(args.get("scope_threshold", 8))
+    if not intent:
+        return {"schema_version": "atomadic-forge.preflight/v1",
+                "error": "intent is required"}
+    if not proposed:
+        return {"schema_version": "atomadic-forge.preflight/v1",
+                "error": "proposed_files must be non-empty"}
+    return _preflight_change(
+        intent=intent, proposed_files=proposed,
+        project_root=root, scope_threshold=threshold,
+    )
+
+
+def _tool_score_patch(project_root: Path, args: dict[str, Any]) -> dict[str, Any]:
+    """Codex 'Copilot's Copilot' #3 — pre-merge patch risk scorer."""
+    diff = str(args.get("diff", ""))
+    return _score_patch(diff)
 
 
 def _tool_auto_plan_unbound(project_root: Path,
@@ -359,6 +407,70 @@ TOOLS: dict[str, dict[str, Any]] = {
         },
         "handler": _tool_auto_apply,
     },
+    "context_pack": {
+        "name": "context_pack",
+        "description": (
+            "Codex 'Copilot's Copilot' #1 — first-call context bundle. "
+            "Returns repo purpose, the architecture law, tier map, "
+            "current blockers, best next action, test commands, "
+            "release gate, risky files, and recent lineage. The single "
+            "tool every coding agent should call on connect."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "target": {"type": "string",
+                            "description": "Project path; defaults to project_root."},
+            },
+            "additionalProperties": False,
+        },
+        "handler": _tool_context_pack,
+    },
+    "preflight_change": {
+        "name": "preflight_change",
+        "description": (
+            "Codex 'Copilot's Copilot' #2 — pre-edit guardrail. Given "
+            "an intent string + a list of proposed_files, returns each "
+            "file's detected tier, forbidden imports, likely affected "
+            "tests, sibling files to read first, and whether the "
+            "write_scope is too broad. Most agent mistakes happen "
+            "BEFORE code is written; this surfaces them in advance."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "project_root":    {"type": "string"},
+                "intent":          {"type": "string"},
+                "proposed_files":  {"type": "array",
+                                     "items": {"type": "string"}},
+                "scope_threshold": {"type": "integer", "default": 8},
+            },
+            "required": ["intent", "proposed_files"],
+            "additionalProperties": False,
+        },
+        "handler": _tool_preflight_change,
+    },
+    "score_patch": {
+        "name": "score_patch",
+        "description": (
+            "Codex 'Copilot's Copilot' #3 — patch risk scorer. Submit "
+            "a unified-diff string and get back architecture risk, "
+            "test risk, public_API risk, release risk, a "
+            "needs_human_review boolean, and suggested validation "
+            "commands. Forge becomes a PR reviewer BEFORE the PR exists."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "diff": {"type": "string",
+                          "description": "Unified-diff text "
+                                          "(git diff / patch format)."},
+            },
+            "required": ["diff"],
+            "additionalProperties": False,
+        },
+        "handler": _tool_score_patch,
+    },
 }
 
 
@@ -490,6 +602,44 @@ def _summary_for_tool(name: str, result: Any) -> dict[str, Any] | None:
     if name == "certify" and isinstance(result.get("receipt"), dict):
         # The certify-with-emit_receipt path returns a wrapped dict.
         return summarize_blockers(certify_report=result.get("certify"))
+    if schema == "atomadic-forge.context_pack/v1":
+        # Re-surface the embedded blockers_summary.
+        return result.get("blockers_summary")
+    if schema == "atomadic-forge.preflight/v1":
+        too_broad = result.get("write_scope_too_broad", False)
+        n = result.get("write_scope_size", 0)
+        return {
+            "schema_version": "atomadic-forge.summary/v1",
+            "verdict": "REFINE" if too_broad else "PASS",
+            "score": None,
+            "blocker_count": len(result.get("overall_notes") or []),
+            "auto_fixable_count": 0,
+            "blockers": [],
+            "next_command": (
+                f"# write_scope size {n} > threshold; split the change"
+                if too_broad
+                else "# preflight clean; proceed with bounded edit"
+            ),
+        }
+    if schema == "atomadic-forge.patch_score/v1":
+        return {
+            "schema_version": "atomadic-forge.summary/v1",
+            "verdict": "REFINE" if result.get("needs_human_review") else "PASS",
+            "score": None,
+            "blocker_count": (
+                int(result.get("architectural_risk", False))
+                + int(result.get("test_risk", False))
+                + int(result.get("public_api_risk", False))
+                + int(result.get("release_risk", False))
+            ),
+            "auto_fixable_count": 0,
+            "blockers": [],
+            "next_command": (
+                "# needs_human_review=True — block auto-merge"
+                if result.get("needs_human_review")
+                else "# score_patch clean; proceed with merge"
+            ),
+        }
     if schema == "atomadic-forge.agent_plan/v1":
         # Plans already ARE summary-shaped — surface a tiny digest
         # so MCP clients can branch without re-parsing the full plan.
