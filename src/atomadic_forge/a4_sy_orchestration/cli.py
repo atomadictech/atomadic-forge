@@ -41,6 +41,11 @@ from ..a1_at_functions.manifest_diff import diff_manifests
 from ..a1_at_functions.progress_reporter import make_stderr_reporter
 from ..a1_at_functions.preflight_change import preflight_change
 from ..a1_at_functions.recipes import all_recipes, get_recipe, list_recipes
+from ..a1_at_functions.sidecar_parser import (
+    find_sidecar_for,
+    parse_sidecar_file,
+)
+from ..a1_at_functions.sidecar_validator import validate_sidecar
 from ..a1_at_functions.receipt_emitter import build_receipt, receipt_to_json
 from ..a1_at_functions.scout_walk import harvest_repo
 from ..a1_at_functions.wire_check import scan_violations
@@ -481,6 +486,87 @@ def preflight_cmd(
         typer.echo(f"\n  ! {note}")
     if report["write_scope_too_broad"]:
         raise typer.Exit(code=1)
+
+
+sidecar_app = typer.Typer(
+    no_args_is_help=True,
+    help=".forge sidecar tools: parse + validate the per-symbol "
+         "effect / compose_with / proves contract (Lane D W8 / W11).",
+)
+
+
+@sidecar_app.command("parse")
+def sidecar_parse_cmd(
+    sidecar_file: Annotated[Path, typer.Argument(
+        exists=True, file_okay=True, dir_okay=False, resolve_path=True)],
+    json_out: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    """Parse a .forge sidecar YAML file."""
+    rep = parse_sidecar_file(sidecar_file)
+    if json_out:
+        typer.echo(json.dumps(rep, indent=2, default=str))
+        if rep["errors"]:
+            raise typer.Exit(code=1)
+        return
+    if rep["errors"]:
+        typer.echo(f"\nSidecar parse FAILED: {sidecar_file}")
+        for e in rep["errors"]:
+            typer.echo(f"  ! {e}")
+        raise typer.Exit(code=1)
+    sc = rep["sidecar"]
+    typer.echo(f"\nSidecar OK: {sc['target']}  "
+                f"({len(sc['symbols'])} symbol(s))")
+    for w in rep.get("warnings", []):
+        typer.echo(f"  ⚠ {w}")
+    for s in sc["symbols"]:
+        typer.echo(f"  - {s.get('name')}  effect={s.get('effect')}  "
+                    f"tier={s.get('tier', '?')}")
+
+
+@sidecar_app.command("validate")
+def sidecar_validate_cmd(
+    source_file: Annotated[Path, typer.Argument(
+        exists=True, file_okay=True, dir_okay=False, resolve_path=True,
+        help="Source file to validate against (e.g. src/pkg/auth.py).")],
+    json_out: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    """Cross-check a .forge sidecar against its source AST.
+
+    Looks for ``<source>.forge`` next to the source file. Reports
+    drift across S0000–S0007 finding classes; exits 1 on FAIL.
+    """
+    sidecar_path = find_sidecar_for(source_file)
+    parse = parse_sidecar_file(sidecar_path)
+    if parse["errors"]:
+        typer.echo(f"\nCould not parse sidecar at {sidecar_path}:")
+        for e in parse["errors"]:
+            typer.echo(f"  ! {e}")
+        raise typer.Exit(code=1)
+    try:
+        source_text = source_file.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise typer.BadParameter(f"could not read {source_file}: {exc}")
+    rep = validate_sidecar(
+        parse["sidecar"], source_text=source_text, source_path=source_file,
+    )
+    if json_out:
+        typer.echo(json.dumps(rep, indent=2, default=str))
+        if rep["verdict"] == "FAIL":
+            raise typer.Exit(code=1)
+        return
+    typer.echo(f"\nSidecar validate: {source_file}")
+    typer.echo(f"  verdict:  {rep['verdict']}")
+    typer.echo(f"  findings: {rep['finding_count']}")
+    for f in rep["findings"]:
+        sev = f.get("severity", "?").upper()
+        typer.echo(f"  - [{f.get('code')}] [{sev:<5}] "
+                    f"{f.get('symbol', '?')}: {f.get('message', '')}")
+    if rep["verdict"] == "FAIL":
+        raise typer.Exit(code=1)
+
+
+app.add_typer(sidecar_app, name="sidecar",
+               help="Parse / validate .forge sidecar files.")
 
 
 @app.command("recipes")
