@@ -80,6 +80,10 @@ def test_tools_list_pinned(tmp_path):
         "recon", "wire", "certify", "enforce", "audit_list",
         "auto_plan", "auto_step", "auto_apply",
         "context_pack", "preflight_change", "score_patch",
+        "select_tests", "rollback_plan", "explain_repo",
+        "adapt_plan", "compose_tools", "load_policy",
+        "why_did_this_change", "what_failed_last_time",
+        "list_recipes", "get_recipe",
     }
     assert pinned == names == set(TOOLS.keys()), (
         f"tools/list drifted: returned {names}, expected {pinned}"

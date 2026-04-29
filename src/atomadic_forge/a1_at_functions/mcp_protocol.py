@@ -41,14 +41,21 @@ from typing import Any, Callable
 from .. import __version__
 from ..a0_qk_constants.receipt_schema import SCHEMA_VERSION_V1
 from .agent_context_pack import emit_context_pack
+from .agent_memory import what_failed_last_time, why_did_this_change
 from .agent_summary import summarize_blockers
 from .certify_checks import certify
 from .lineage_chain import canonical_receipt_hash, verify_chain_link
 from .lineage_reader import list_artifacts, read_lineage
 from .patch_scorer import score_patch as _score_patch
+from .plan_adapter import adapt_plan as _adapt_plan
+from .policy_loader import load_policy as _load_policy
 from .preflight_change import preflight_change as _preflight_change
 from .receipt_emitter import build_receipt
+from .recipes import all_recipes, get_recipe, list_recipes
+from .repo_explainer import explain_repo as _explain_repo
 from .scout_walk import harvest_repo
+from .test_selector import select_tests as _select_tests
+from .tool_composer import compose_tools as _compose_tools
 from .wire_check import scan_violations
 
 
@@ -193,6 +200,103 @@ def _tool_score_patch(project_root: Path, args: dict[str, Any]) -> dict[str, Any
     """Codex 'Copilot's Copilot' #3 — pre-merge patch risk scorer."""
     diff = str(args.get("diff", ""))
     return _score_patch(diff)
+
+
+def _tool_select_tests(project_root: Path, args: dict[str, Any]) -> dict[str, Any]:
+    """Codex #7 — minimum + full-confidence test set per intent."""
+    root = Path(args.get("project_root", project_root)).resolve()
+    return _select_tests(
+        intent=str(args.get("intent", "")),
+        changed_files=list(args.get("changed_files") or []),
+        project_root=root,
+    )
+
+
+def _tool_rollback_plan(project_root: Path, args: dict[str, Any]) -> dict[str, Any]:
+    """Codex #11 — reversible-move guidance."""
+    from .rollback_planner import rollback_plan as _rb
+    root = Path(args.get("project_root", project_root)).resolve()
+    return _rb(
+        changed_files=list(args.get("changed_files") or []),
+        project_root=root,
+    )
+
+
+def _tool_explain_repo(project_root: Path, args: dict[str, Any]) -> dict[str, Any]:
+    """Codex #6 — humane operational orientation."""
+    root = Path(args.get("project_root", project_root)).resolve()
+    try:
+        scout = harvest_repo(root)
+    except (OSError, ValueError):
+        scout = None
+    try:
+        wire = scan_violations(root)
+    except (OSError, ValueError):
+        wire = None
+    try:
+        cert = certify(root, project=root.name)
+    except (OSError, RuntimeError, ValueError):
+        cert = None
+    pack = emit_context_pack(project_root=root, scout_report=scout,
+                              wire_report=wire, certify_report=cert)
+    return _explain_repo(
+        project_root=root,
+        repo_purpose=pack.get("repo_purpose", ""),
+        scout_report=scout, wire_report=wire, certify_report=cert,
+        depth=str(args.get("depth", "agent")),
+    )
+
+
+def _tool_adapt_plan(project_root: Path, args: dict[str, Any]) -> dict[str, Any]:
+    """Codex #8 — capability-aware card filtering."""
+    plan = args.get("plan") or {}
+    if not isinstance(plan, dict):
+        return {"error": "plan must be an agent_plan/v1 object"}
+    return _adapt_plan(
+        plan,
+        agent_capabilities=list(args.get("agent_capabilities") or []),
+    )
+
+
+def _tool_compose_tools(project_root: Path, args: dict[str, Any]) -> dict[str, Any]:
+    """Codex #9 — tool-use planner."""
+    return _compose_tools(goal=str(args.get("goal", "")))
+
+
+def _tool_load_policy(project_root: Path, args: dict[str, Any]) -> dict[str, Any]:
+    """Codex #10 — read [tool.forge.agent] from pyproject.toml."""
+    root = Path(args.get("project_root", project_root)).resolve()
+    return _load_policy(root)
+
+
+def _tool_why_did_this_change(project_root: Path, args: dict[str, Any]) -> dict[str, Any]:
+    """Codex #5 — agent memory: lineage + plan-event lookup."""
+    root = Path(args.get("project_root", project_root)).resolve()
+    return why_did_this_change(file=str(args.get("file", "")), project_root=root)
+
+
+def _tool_what_failed_last_time(project_root: Path, args: dict[str, Any]) -> dict[str, Any]:
+    """Codex #5 — failed/rolled_back plan events for an area."""
+    root = Path(args.get("project_root", project_root)).resolve()
+    return what_failed_last_time(area=str(args.get("area", "")), project_root=root)
+
+
+def _tool_list_recipes(project_root: Path, args: dict[str, Any]) -> dict[str, Any]:
+    """Codex #12 — list golden-path recipes."""
+    return {
+        "schema_version": "atomadic-forge.recipe.list/v1",
+        "recipes": list_recipes(),
+        "catalogue": {n: r["description"] for n, r in all_recipes().items()},
+    }
+
+
+def _tool_get_recipe(project_root: Path, args: dict[str, Any]) -> dict[str, Any]:
+    """Codex #12 — fetch a named recipe."""
+    name = str(args.get("name", ""))
+    recipe = get_recipe(name)
+    if recipe is None:
+        return {"error": f"unknown recipe: {name!r}"}
+    return recipe
 
 
 def _tool_auto_plan_unbound(project_root: Path,
@@ -470,6 +574,176 @@ TOOLS: dict[str, dict[str, Any]] = {
             "additionalProperties": False,
         },
         "handler": _tool_score_patch,
+    },
+    "select_tests": {
+        "name": "select_tests",
+        "description": (
+            "Codex #7 — minimum + full-confidence test sets per "
+            "intent. Returns mirror-name matches plus tier-mate tests; "
+            "agents stop over-running or under-running tests."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "project_root":  {"type": "string"},
+                "intent":        {"type": "string"},
+                "changed_files": {"type": "array",
+                                    "items": {"type": "string"}},
+            },
+            "required": ["changed_files"],
+            "additionalProperties": False,
+        },
+        "handler": _tool_select_tests,
+    },
+    "rollback_plan": {
+        "name": "rollback_plan",
+        "description": (
+            "Codex #11 — structured undo plan: files to remove, caches "
+            "to clean, docs to restore, tests to rerun, risk level."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "project_root":  {"type": "string"},
+                "changed_files": {"type": "array",
+                                    "items": {"type": "string"}},
+            },
+            "required": ["changed_files"],
+            "additionalProperties": False,
+        },
+        "handler": _tool_rollback_plan,
+    },
+    "explain_repo": {
+        "name": "explain_repo",
+        "description": (
+            "Codex #6 — humane operational orientation. One-liner + "
+            "core flow + do_not_break list + important tests + "
+            "release state. Different from context_pack (which is "
+            "data-rich); this is decision-oriented."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "project_root": {"type": "string"},
+                "depth":        {"type": "string", "default": "agent"},
+            },
+            "additionalProperties": False,
+        },
+        "handler": _tool_explain_repo,
+    },
+    "adapt_plan": {
+        "name": "adapt_plan",
+        "description": (
+            "Codex #8 — capability-aware card filtering. Tag each "
+            "card with recommended_handling: apply / delegate / "
+            "ask_human / report_only based on agent_capabilities."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "plan":               {"type": "object"},
+                "agent_capabilities": {"type": "array",
+                                         "items": {"type": "string"}},
+            },
+            "required": ["plan"],
+            "additionalProperties": False,
+        },
+        "handler": _tool_adapt_plan,
+    },
+    "compose_tools": {
+        "name": "compose_tools",
+        "description": (
+            "Codex #9 — tool-use planner. Match a goal keyword to a "
+            "named recipe (orient / release_check / fix_violation / "
+            "before_edit / verify_patch) and return the ordered tool "
+            "sequence the agent should run."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {"goal": {"type": "string"}},
+            "additionalProperties": False,
+        },
+        "handler": _tool_compose_tools,
+    },
+    "load_policy": {
+        "name": "load_policy",
+        "description": (
+            "Codex #10 — read [tool.forge.agent] from the project's "
+            "pyproject.toml. Returns the v1 policy dict with "
+            "protected_files / release_gate / max_files_per_patch / "
+            "require_human_review_for fields populated (defaults "
+            "applied where the user didn't override)."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {"project_root": {"type": "string"}},
+            "additionalProperties": False,
+        },
+        "handler": _tool_load_policy,
+    },
+    "why_did_this_change": {
+        "name": "why_did_this_change",
+        "description": (
+            "Codex #5 — agent memory: every lineage entry + plan "
+            "event that references the named file. Helps the next "
+            "agent see what was tried, by whom, and when."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "project_root": {"type": "string"},
+                "file":         {"type": "string"},
+            },
+            "required": ["file"],
+            "additionalProperties": False,
+        },
+        "handler": _tool_why_did_this_change,
+    },
+    "what_failed_last_time": {
+        "name": "what_failed_last_time",
+        "description": (
+            "Codex #5 — failed / rolled_back plan events matching an "
+            "area substring. Surfaces the failures the agent should "
+            "expect to confront."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "project_root": {"type": "string"},
+                "area":         {"type": "string"},
+            },
+            "required": ["area"],
+            "additionalProperties": False,
+        },
+        "handler": _tool_what_failed_last_time,
+    },
+    "list_recipes": {
+        "name": "list_recipes",
+        "description": (
+            "Codex #12 — list named golden-path recipes "
+            "(release_hardening, add_cli_command, fix_wire_violation, "
+            "add_feature, publish_mcp). Pair with get_recipe."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False,
+        },
+        "handler": _tool_list_recipes,
+    },
+    "get_recipe": {
+        "name": "get_recipe",
+        "description": (
+            "Codex #12 — fetch one named recipe (checklist + "
+            "file_scope_hints + validation_gate)."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {"name": {"type": "string"}},
+            "required": ["name"],
+            "additionalProperties": False,
+        },
+        "handler": _tool_get_recipe,
     },
 }
 

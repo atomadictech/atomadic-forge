@@ -69,8 +69,28 @@ def _force_utf8() -> None:
             pass
 
 
+def _version_callback(value: bool) -> None:
+    if value:
+        typer.echo(f"atomadic-forge {__version__}")
+        raise typer.Exit()
+
+
 app = typer.Typer(no_args_is_help=True,
                   help="Atomadic Forge — absorb · enforce · emerge.")
+
+
+@app.callback()
+def _root_callback(
+    version: Annotated[bool | None, typer.Option(
+        "--version", "-V",
+        help="Show the Forge version and exit.",
+        callback=_version_callback, is_eager=True,
+    )] = None,
+) -> None:
+    """Root callback so --version works at the top level (Codex
+    production-hardening: agents shouldn't get a usage error when
+    asking for the version)."""
+    return None
 
 
 @app.command("init")
@@ -849,15 +869,28 @@ def mcp_serve_cmd(
           }
         }
 
-    Tools exposed (8):
-      recon        — scout the repo + classify symbols into 5 tiers
-      wire         — upward-import scan; suggest_repairs is supported
-      certify      — score documentation / tests / layout / wire
-      enforce      — apply mechanical fixes; rolls back on regression
-      audit_list   — summarize .atomadic-forge lineage entries
-      auto_plan    — agent_plan/v1 'next best action card' generator
-      auto_step    — apply ONE card from a saved plan
-      auto_apply   — apply ALL applyable cards from a saved plan
+    Tools exposed (21):
+      recon                 — scout the repo + classify symbols
+      wire                  — upward-import scan; --suggest-repairs
+      certify               — 4-axis score; --emit-receipt / --print-card
+      enforce               — F-coded mechanical fixes; rollback-safe
+      audit_list            — .atomadic-forge lineage summaries
+      auto_plan             — agent_plan/v1 ranked action cards
+      auto_step             — apply ONE card from a saved plan
+      auto_apply            — apply ALL applyable cards (halts on regression)
+      context_pack          — Codex 'first call' orientation bundle
+      preflight_change      — pre-edit guardrail (forbidden imports etc.)
+      score_patch           — patch risk scorer (architecture/api/release)
+      select_tests          — minimum + full-confidence test sets
+      rollback_plan         — files to remove + caches to clean
+      explain_repo          — humane operational orientation
+      adapt_plan            — capability-aware card filtering
+      compose_tools         — tool-use planner per goal keyword
+      load_policy           — read [tool.forge.agent] from pyproject.toml
+      why_did_this_change   — agent memory: lineage + plan-event lookup
+      what_failed_last_time — agent memory: failed/rolled_back events
+      list_recipes          — golden-path recipes catalogue
+      get_recipe            — fetch one named recipe
 
     Resources exposed (5):
       forge://docs/receipt           — Receipt v1 schema docs
