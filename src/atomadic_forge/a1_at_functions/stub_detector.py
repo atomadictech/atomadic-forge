@@ -5,18 +5,21 @@ a ``# TODO`` / ``# Implement me!`` placeholder, the file *looks* like a
 real symbol but won't run.  We must catch this so the certify score can't
 be gamed by emitting empty shells.
 
-The detector inspects function/class bodies via AST; comments are matched
-on the raw source.  Returns one record per stub-shaped symbol with the
-file path, qualname, and the specific stub kind detected.
+The detector inspects function/class bodies via AST; placeholder comments
+are matched via Python tokenization so docstrings and prompt text are not
+mistaken for code stubs.  Returns one record per stub-shaped symbol with
+the file path, qualname, and the specific stub kind detected.
 """
 
 from __future__ import annotations
 
 import ast
+import io
 import re
+import tokenize
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable, Literal, TypedDict
-
+from typing import Literal, TypedDict
 
 StubKind = Literal["pass_only", "not_implemented", "comment_only",
                    "todo_marker"]
@@ -38,7 +41,7 @@ _TODO_RE = re.compile(
 
 
 def _function_body_is_pass_only(fn: ast.AST) -> bool:
-    if not isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef)):
+    if not isinstance(fn, ast.FunctionDef | ast.AsyncFunctionDef):
         return False
     body = list(fn.body)
     # Strip docstring.
@@ -54,7 +57,7 @@ def _function_body_is_pass_only(fn: ast.AST) -> bool:
 
 
 def _function_body_raises_not_implemented(fn: ast.AST) -> bool:
-    if not isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef)):
+    if not isinstance(fn, ast.FunctionDef | ast.AsyncFunctionDef):
         return False
     for node in ast.walk(fn):
         if isinstance(node, ast.Raise) and node.exc is not None:
@@ -66,6 +69,19 @@ def _function_body_raises_not_implemented(fn: ast.AST) -> bool:
             if isinstance(target, ast.Attribute) and target.attr == "NotImplementedError":
                 return True
     return False
+
+
+def _todo_comment_lines(src: str) -> list[tuple[int, str]]:
+    """Return placeholder comments only, excluding docstrings and strings."""
+    out: list[tuple[int, str]] = []
+    try:
+        tokens = tokenize.generate_tokens(io.StringIO(src).readline)
+        for tok in tokens:
+            if tok.type == tokenize.COMMENT and _TODO_RE.search(tok.string):
+                out.append((tok.start[0], tok.line.rstrip()))
+    except tokenize.TokenError:
+        return []
+    return out
 
 
 def detect_stubs_in_file(path: Path, *, repo_root: Path | None = None
@@ -85,15 +101,14 @@ def detect_stubs_in_file(path: Path, *, repo_root: Path | None = None
     src_lines = src.splitlines()
     out: list[StubFinding] = []
 
-    todo_lines = [(i + 1, line) for i, line in enumerate(src_lines)
-                   if _TODO_RE.search(line)]
+    todo_lines = _todo_comment_lines(src)
 
     def add(qualname: str, lineno: int, kind: StubKind, excerpt: str) -> None:
         out.append(StubFinding(file=rel, qualname=qualname, lineno=lineno,
                                 kind=kind, excerpt=excerpt[:120]))
 
     def visit(node: ast.AST, prefix: str = "") -> None:
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
             if node.name.startswith("_") and node.name != "__init__":
                 return
             qual = f"{prefix}{node.name}" if prefix else node.name

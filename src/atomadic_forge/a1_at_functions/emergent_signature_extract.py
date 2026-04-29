@@ -10,11 +10,10 @@ from __future__ import annotations
 
 import ast
 import re
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
 
 from ..a0_qk_constants.emergent_types import SymbolSignatureCard
-
 
 _TIERS = (
     "a0_qk_constants", "a1_at_functions", "a2_mo_composites",
@@ -80,7 +79,7 @@ def _is_pure(fn: ast.AST) -> bool:
                     root = root.value
                 if isinstance(root, ast.Name) and root.id in _IMPURE_HINTS:
                     return False
-        if isinstance(child, (ast.Global, ast.Nonlocal)):
+        if isinstance(child, ast.Global | ast.Nonlocal):
             return False
     return True
 
@@ -92,7 +91,7 @@ def _docstring_first_line(node: ast.AST) -> str:
 
 def _harvest_function(fn: ast.AST, *, module: str, tier: str, domain: str,
                      class_qualifier: str = "") -> SymbolSignatureCard | None:
-    if not isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef)):
+    if not isinstance(fn, ast.FunctionDef | ast.AsyncFunctionDef):
         return None
     if not _PUBLIC(fn.name):
         return None
@@ -126,13 +125,13 @@ def _harvest_one_file(py_file: Path, *, module: str, tier: str,
     except (SyntaxError, OSError):
         return cards
     for node in tree.body:
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
             card = _harvest_function(node, module=module, tier=tier, domain=domain)
             if card:
                 cards.append(card)
         elif isinstance(node, ast.ClassDef) and _PUBLIC(node.name):
             for sub in node.body:
-                if isinstance(sub, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                if isinstance(sub, ast.FunctionDef | ast.AsyncFunctionDef):
                     card = _harvest_function(
                         sub, module=module, tier=tier, domain=domain,
                         class_qualifier=node.name,

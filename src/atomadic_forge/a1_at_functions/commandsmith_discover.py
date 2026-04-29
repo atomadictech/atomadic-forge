@@ -18,14 +18,13 @@ the modules it describes — that lives in tier a2 / a3 to keep a1 import-safe.
 from __future__ import annotations
 
 import ast
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
 
 from ..a0_qk_constants.commandsmith_types import (
     CommandSignatureCard,
     RegisteredCommandCard,
 )
-
 
 _PUBLIC = lambda name: not name.startswith("_")  # noqa: E731 — short pure helper
 

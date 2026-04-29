@@ -10,7 +10,6 @@ from __future__ import annotations
 import re
 from typing import Any
 
-
 _WORD_RE = re.compile(r"[A-Za-z][A-Za-z0-9]*")
 
 _CONTRACT = frozenset({"constant", "const", "schema", "manifest", "token",
@@ -105,7 +104,7 @@ def detect_effects(node: Any) -> list[str]:
                 if f.attr in ("write", "send", "post", "put", "delete",
                                "execute", "commit"):
                     effects.append("state")
-        if isinstance(child, (ast.Global, ast.Nonlocal)):
+        if isinstance(child, ast.Global | ast.Nonlocal):
             effects.append("state")
     if not effects:
         return ["pure"]

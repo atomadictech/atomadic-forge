@@ -18,13 +18,12 @@ space stays tractable even on a 600-symbol catalog.
 from __future__ import annotations
 
 import re
-from typing import Iterable
+from collections.abc import Iterable
 
 from ..a0_qk_constants.emergent_types import (
     CompositionChain,
     SymbolSignatureCard,
 )
-
 
 _OPTIONAL_RE = re.compile(r"^Optional\[(.+)\]$|^(.+)\s*\|\s*None$|^None\s*\|\s*(.+)$")
 _GENERIC_RE = re.compile(r"^(\w+)\[(.+)\]$")

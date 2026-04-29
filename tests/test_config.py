@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import json
 import urllib.error
-from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
 
+import atomadic_forge.a1_at_functions.provider_detect as _pd
 from atomadic_forge.a0_qk_constants.config_defaults import (
     CONFIG_FILE_NAME,
     DEFAULT_CONFIG,
@@ -22,12 +22,11 @@ from atomadic_forge.a1_at_functions.config_io import (
     save_config,
     validate_config,
 )
-import atomadic_forge.a1_at_functions.provider_detect as _pd
+from atomadic_forge.a4_sy_orchestration.cli import app
 
 detect_ollama = _pd.detect_ollama
 list_ollama_models = _pd.list_ollama_models
 check_provider = _pd.test_provider  # aliased: 'test_provider' at module scope triggers pytest collection
-from atomadic_forge.a4_sy_orchestration.cli import app
 
 runner = CliRunner()
 

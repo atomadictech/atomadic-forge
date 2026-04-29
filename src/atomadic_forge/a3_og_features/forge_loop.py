@@ -19,8 +19,12 @@ from pathlib import Path
 from typing import Any
 
 from ..a0_qk_constants.gen_language import (
-    ALLOWED_FILE_EXTS, EMITS_INIT_FILES, EMITS_PYPROJECT,
-    Language, normalize_language, pkg_root_for,
+    ALLOWED_FILE_EXTS,
+    EMITS_INIT_FILES,
+    EMITS_PYPROJECT,
+    Language,
+    normalize_language,
+    pkg_root_for,
 )
 from ..a0_qk_constants.tier_names import TIER_NAMES
 from ..a1_at_functions.certify_checks import certify
@@ -31,11 +35,19 @@ from ..a1_at_functions.forge_feedback import (
     parse_files_from_response,
     system_prompt,
 )
+from ..a1_at_functions.generation_quality import (
+    apply_docs_phase,
+    apply_docstring_phase,
+    apply_test_phase,
+)
 from ..a1_at_functions.llm_client import LLMClient, resolve_default_client
 from ..a1_at_functions.scaffold_js import render_js_readme, render_package_json
 from ..a1_at_functions.scaffold_pyproject import render_pyproject
 from ..a1_at_functions.scaffold_starter import (
-    render_gitignore, render_readme, render_tests_conftest, render_tests_init,
+    render_gitignore,
+    render_readme,
+    render_tests_conftest,
+    render_tests_init,
 )
 from ..a1_at_functions.scout_walk import harvest_repo
 from ..a1_at_functions.tier_init_rebuild import rebuild_tier_inits
@@ -196,7 +208,7 @@ def run_iterate(
     *,
     output: Path,
     package: str = "generated",
-    seed_repo: Path | None = None,
+    seed_repo: Path | list[Path] | None = None,
     llm: LLMClient | None = None,
     max_iterations: int = 5,
     target_score: float = 75.0,
@@ -223,11 +235,15 @@ def run_iterate(
                 if apply else output / pkg_root_for(lang, package))
     transcript = TranscriptLog(output) if apply else None
 
-    # Optional seed catalog from a sibling repo.
+    # Optional seed catalog from one or more sibling repos.
     seed_catalog: list[dict] = []
-    if seed_repo is not None and Path(seed_repo).exists():
-        scout = harvest_repo(Path(seed_repo))
-        seed_catalog = scout.get("symbols", [])
+    seed_repos = ([seed_repo] if isinstance(seed_repo, Path) else
+                  (list(seed_repo) if seed_repo else []))
+    for sr in seed_repos:
+        sr = Path(sr)
+        if sr.exists():
+            scout = harvest_repo(sr)
+            seed_catalog.extend(scout.get("symbols", []))
 
     turn_log: list[dict[str, Any]] = []
     history_files: list[str] = []
@@ -334,6 +350,52 @@ def run_iterate(
                          "files_written": written,
                          "raw_response_chars": len(response)})
 
+    quality_phases: list[dict[str, Any]] = []
+    if lang == "python":
+        docstrings = apply_docstring_phase(pkg_root)
+        quality_phases.append(docstrings)
+        for rel in docstrings.get("files_changed", []):
+            try:
+                history_files.append(str((pkg_root / rel).relative_to(output).as_posix()))
+            except ValueError:
+                pass
+        if docstrings.get("files_changed") and pkg_root.exists():
+            rebuild_tier_inits(pkg_root)
+
+        docs = apply_docs_phase(
+            output_root=output,
+            package_root=pkg_root,
+            package=package,
+            intent=intent,
+        )
+        quality_phases.append(docs)
+        history_files.extend(docs.get("files_written", []))
+
+        tests = apply_test_phase(
+            output_root=output,
+            package_root=pkg_root,
+            package=package,
+        )
+        quality_phases.append(tests)
+        history_files.extend(tests.get("files_written", []))
+
+        final_wire = scan_violations(pkg_root)
+        final_cert = certify(output, project=package, package=package)
+    else:
+        quality_phases.append({
+            "phase": "quality",
+            "language": lang,
+            "skipped": "deterministic doc/test phase is Python-only today",
+        })
+
+    ManifestStore(output).save("quality", {
+        "schema_version": "atomadic-forge.quality/v1",
+        "package": package,
+        "language": lang,
+        "phases": quality_phases,
+        "generated_at_utc": _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds"),
+    })
+
     report: dict[str, Any] = {
         "schema_version": "atomadic-forge.iterate/v1",
         "applied": True,
@@ -345,6 +407,7 @@ def run_iterate(
         "iterations": len(turn_log),
         "files_written_total": len(set(history_files)),
         "converged": converged,
+        "quality_phases": quality_phases,
         "final_wire": final_wire,
         "final_certify": {
             "score": (final_cert or {}).get("score", 0),

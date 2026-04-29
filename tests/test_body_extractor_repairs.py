@@ -7,11 +7,8 @@
 
 from __future__ import annotations
 
-import pathlib
-
 from atomadic_forge.a1_at_functions.body_extractor import _extract_python_body
 from atomadic_forge.a1_at_functions.classify_tier import classify_tier
-
 
 _AGENTIC_SWARM_SRC = '''\
 """sibling-refs regression."""

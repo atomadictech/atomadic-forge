@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from atomadic_forge.a1_at_functions.test_runner import run_pytest
 
 
@@ -44,6 +42,32 @@ def test_runs_passing_tests_and_credits_full_ratio(tmp_path):
     assert rep["ran"] is True
     assert rep["passed"] == 1
     assert rep["failed"] == 0
+    assert rep["pass_ratio"] == 1.0
+
+
+def test_runner_ignores_parent_pytest_addopts(tmp_path):
+    parent = tmp_path / "parent"
+    parent.mkdir()
+    (parent / "pyproject.toml").write_text(
+        "[tool.pytest.ini_options]\naddopts = '-q'\n",
+        encoding="utf-8",
+    )
+    root = _scaffold(parent / "generated")
+    pkg = root / "src" / "demo"
+    (pkg / "add.py").write_text("def add(a, b):\n    return a + b\n",
+                                  encoding="utf-8")
+    tests = root / "tests"
+    tests.mkdir()
+    (tests / "test_add.py").write_text(
+        "from demo.add import add\n"
+        "def test_add(): assert add(2, 3) == 5\n",
+        encoding="utf-8",
+    )
+
+    rep = run_pytest(output_root=root, package="demo")
+
+    assert rep["ran"] is True
+    assert rep["passed"] == 1
     assert rep["pass_ratio"] == 1.0
 
 

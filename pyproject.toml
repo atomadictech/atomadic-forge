@@ -4,11 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "atomadic-forge"
-version = "0.2.0"
+version = "0.2.2"
 description = "Atomadic Forge — absorb, enforce, emerge. Polyglot (Python + JavaScript/TypeScript) architecture guardian for AI-generated code."
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "Business Source License 1.1 (converts to Apache 2.0 on 2030-04-27)" }
+license = "BUSL-1.1"
 authors = [{ name = "Atomadic" }]
 keywords = ["atomadic", "ass-ade", "monadic", "architecture", "forge",
             "code-quality", "ai", "agents", "javascript", "typescript",
@@ -22,6 +22,7 @@ classifiers = [
     "Topic :: Software Development :: Quality Assurance",
 ]
 dependencies = [
+    "click>=8.1,<9",
     "typer>=0.15,<1",
     "rich>=14,<15",
 ]
@@ -31,6 +32,8 @@ dev = [
     "pytest>=7",
     "import-linter>=2.0,<3",
     "ruff>=0.4",
+    "build>=1,<2",
+    "twine>=5,<7",
 ]
 
 [project.scripts]
@@ -63,6 +66,13 @@ layers = [
 [tool.ruff]
 target-version = "py310"
 line-length = 100
+exclude = [
+    ".pytest_tmp*",
+    ".tmp_cli_ux",
+    ".atomadic-forge",
+    "build",
+    "dist",
+]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]

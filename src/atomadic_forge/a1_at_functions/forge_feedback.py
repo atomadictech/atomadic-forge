@@ -20,7 +20,6 @@ from __future__ import annotations
 
 from typing import Any
 
-
 _SYSTEM_PROMPT_PYTHON = """\
 You are a code-generation engine constrained by Atomadic Forge's 5-tier
 monadic architecture.
@@ -156,25 +155,36 @@ def pack_initial_intent(intent: str, *, package: str = "absorbed",
     else:
         target_path = f"`src/{package}/` — emit files under the 5-tier layout below."
     parts = [
-        f"# Intent",
-        f"",
+        "# Intent",
+        "",
         intent.strip(),
-        f"",
-        f"# Target package",
+        "",
+        "# Target package",
         target_path,
-        f"",
+        "",
     ]
     if seed_catalog:
-        parts.append(f"# Available building blocks ({len(seed_catalog)} symbols)")
+        # Deduplicate by qualname and prefer top-level symbols (no dots except class.method).
+        seen: set[str] = set()
+        unique_catalog: list[dict] = []
+        for s in seed_catalog:
+            qn = s.get("qualname", "")
+            # Skip method-level duplicates; prefer class-level or module-level.
+            base = qn.split(".")[0] if "." in qn else qn
+            if base not in seen:
+                seen.add(base)
+                unique_catalog.append(s)
+        MAX_SEEDS = 30
+        parts.append(f"# Available building blocks ({len(seed_catalog)} symbols — {len(unique_catalog)} unique top-level; showing {min(MAX_SEEDS, len(unique_catalog))})")
         parts.append("")
-        for s in seed_catalog[:40]:
+        for s in unique_catalog[:MAX_SEEDS]:
             parts.append(
                 f"- `{s.get('qualname','?')}`  "
                 f"(tier `{s.get('tier_guess','?')}`, "
                 f"effects {s.get('effects', [])})"
             )
-        if len(seed_catalog) > 40:
-            parts.append(f"- … {len(seed_catalog) - 40} more symbols available")
+        if len(unique_catalog) > MAX_SEEDS:
+            parts.append(f"- … {len(unique_catalog) - MAX_SEEDS} more unique symbols available")
         parts.append("")
         if language in ("javascript", "typescript"):
             parts.append("Reuse these where possible — import from the "
@@ -354,44 +364,70 @@ def pack_feedback(*, wire_report: dict[str, Any] | None = None,
 def parse_files_from_response(response: str) -> list[dict[str, str]]:
     """Best-effort: pull ``[{"path": …, "content": …}, …]`` out of an LLM reply.
 
-    Tolerant of triple-backtick fences and prose around the JSON.  Returns []
-    when no JSON array of file dicts is found.
+    Tolerant of:
+    - Triple-backtick fences (```json ... ```)
+    - Prose before/after the JSON array
+    - Truncated responses (extracts complete objects before the cutoff)
+    Returns [] when no valid file dicts are found.
     """
     import json as _json
     import re
 
     text = response.strip()
-    # Strip code fences if present.
-    fence = re.search(r"```(?:json)?\s*(\[.+?\])\s*```", text, re.DOTALL)
+
+    # Strategy 1: find JSON inside a code fence (greedy match for full array).
+    fence = re.search(r"```(?:json|python)?\s*(\[[\s\S]*?\])\s*```", text, re.DOTALL)
     if fence:
-        text = fence.group(1)
-    # Locate the first balanced JSON array.
+        candidate = fence.group(1)
+        try:
+            data = _json.loads(candidate)
+            if isinstance(data, list):
+                return [e for e in data
+                        if isinstance(e, dict)
+                        and isinstance(e.get("path"), str)
+                        and isinstance(e.get("content"), str)]
+        except _json.JSONDecodeError:
+            pass
+
+    # Strategy 2: balanced-bracket scan starting at first '['.
     start = text.find("[")
-    if start == -1:
-        return []
-    depth = 0
-    end = -1
-    for i, ch in enumerate(text[start:], start=start):
-        if ch == "[":
-            depth += 1
-        elif ch == "]":
-            depth -= 1
-            if depth == 0:
-                end = i
-                break
-    if end == -1:
-        return []
-    try:
-        data = _json.loads(text[start:end + 1])
-    except _json.JSONDecodeError:
-        return []
-    if not isinstance(data, list):
-        return []
-    out: list[dict[str, str]] = []
-    for entry in data:
-        if (isinstance(entry, dict)
-                and "path" in entry and "content" in entry
-                and isinstance(entry["path"], str)
-                and isinstance(entry["content"], str)):
-            out.append({"path": entry["path"], "content": entry["content"]})
-    return out
+    if start != -1:
+        depth = 0
+        end = -1
+        for i, ch in enumerate(text[start:], start=start):
+            if ch == "[":
+                depth += 1
+            elif ch == "]":
+                depth -= 1
+                if depth == 0:
+                    end = i
+                    break
+        if end != -1:
+            try:
+                data = _json.loads(text[start:end + 1])
+                if isinstance(data, list):
+                    out = [e for e in data
+                           if isinstance(e, dict)
+                           and isinstance(e.get("path"), str)
+                           and isinstance(e.get("content"), str)]
+                    if out:
+                        return out
+            except _json.JSONDecodeError:
+                pass
+
+    # Strategy 3: tolerant extraction — grab every complete {"path":…,"content":…} object
+    # even from a truncated/malformed array.  Uses a regex to find object boundaries.
+    objects = []
+    # Match objects that have at least "path" and "content" keys.
+    obj_pattern = re.compile(
+        r'\{\s*"path"\s*:\s*"((?:[^"\\]|\\.)*)"\s*,\s*"content"\s*:\s*"((?:[^"\\]|\\.)*?)"\s*\}',
+        re.DOTALL,
+    )
+    for m in obj_pattern.finditer(text):
+        try:
+            path = _json.loads(f'"{m.group(1)}"')
+            content = _json.loads(f'"{m.group(2)}"')
+            objects.append({"path": path, "content": content})
+        except _json.JSONDecodeError:
+            continue
+    return objects

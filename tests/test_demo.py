@@ -8,7 +8,9 @@ import pytest
 
 from atomadic_forge.a1_at_functions.llm_client import StubLLMClient
 from atomadic_forge.a3_og_features.demo_runner import (
-    get_preset, list_presets, run_demo,
+    get_preset,
+    list_presets,
+    run_demo,
 )
 
 
@@ -42,6 +44,21 @@ def test_run_demo_with_stub_writes_artifact(tmp_path):
     md = Path(result.artifact_md_path).read_text(encoding="utf-8")
     assert "forge demo calc" in md
     assert "Score arc" in md
+
+
+def test_run_demo_marks_failed_cli_as_not_converged(tmp_path):
+    """A generated CLI failure should make demo success honest."""
+    result = run_demo(
+        preset_name="calc",
+        output=tmp_path / "demo-out",
+        llm=StubLLMClient(canned=["[]"] * 30),
+        rounds=1,
+        iterations=1,
+        skip_cli_demo=False,
+    )
+    assert result.cli_demo_command
+    assert result.cli_demo_returncode != 0
+    assert result.converged is False
 
 
 def test_run_demo_rejects_unknown_preset(tmp_path):

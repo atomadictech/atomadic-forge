@@ -13,7 +13,6 @@ import json
 from pathlib import Path
 
 from ..a0_qk_constants.synergy_types import (
-    SynergyCandidateCard,
     SynergyScanReport,
 )
 from ..a1_at_functions.synergy_detect import detect_synergies

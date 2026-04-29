@@ -24,7 +24,7 @@ Detailed documentation of every command:
 - `forge auto` — The flagship command
 - `forge recon`, `forge cherry`, `forge finalize` — The absorption pipeline
 - `forge wire`, `forge certify` — Verification and scoring
-- `forge iterate`, `forge evolve` — LLM-driven code generation
+- `forge iterate`, `forge evolve`, `forge chat` — LLM-driven code generation and copilot workflows
 - Specialty commands: `emergent`, `synergy`, `commandsmith`
 
 ### [Tutorial: Absorb a Real Repository](03-tutorial.md)
@@ -41,9 +41,16 @@ Step-by-step walkthrough:
 Generate code from intent using AI:
 - `forge iterate` — Single-shot generation (N rounds)
 - `forge evolve` — Recursive improvement (catalog grows each round)
-- Provider setup (Gemini, Claude, GPT, Ollama, Stub)
+- `forge chat` — Forge-aware terminal copilot over bounded repo context
+- Provider setup (Nexus, Gemini, Claude, GPT, OpenRouter, Ollama, Stub)
 - Tips for better code quality
 - Examples and troubleshooting
+
+### [Release Checklist](RELEASE_CHECKLIST.md)
+Shippability gates for local development, demos, and release candidates:
+- Test, lint, import-layer, and CLI smoke commands
+- Local Ollama low-load and idle-machine profiles
+- Documentation and release-note review points
 
 ## ❓ FAQ & Troubleshooting
 
@@ -77,11 +84,11 @@ See [CONTRIBUTING.md](../CONTRIBUTING.md) for:
 
 - **GitHub:** https://github.com/atomadictech/atomadic-forge
 - **License:** [BSL-1.1](../LICENSE) (free for non-production, commercial license for production, converts to Apache 2.0 in 2030)
-- **Status:** Experimental, working, honest (0.1.0)
+- **Status:** Experimental, working, honest (0.2.2)
 
 ## 📊 Versions
 
-This documentation is for **Atomadic Forge 0.2.0**.
+This documentation is for **Atomadic Forge 0.2.2**.
 
 - **0.1.0** — Initial release
   - Core absorption pipeline
@@ -89,13 +96,28 @@ This documentation is for **Atomadic Forge 0.2.0**.
   - 90+ passing tests
   - Python only
 
-- **0.2.0** (current) — Polyglot
+- **0.2.2** (current) — Operational certify axis + GitHub readiness
+  - `forge certify` now uses the full 100-point rubric
+  - CI workflow and changelog presence count toward operational readiness
+  - `forge demo run` exits non-zero when the generated CLI demo fails
+  - Commandsmith registry generation is Ruff-clean
+  - 299 passing tests
+
+- **0.2.1** — Provider resilience + forge stress-test fixes
+  - Forge-aware chat copilot (`forge chat ask` / `forge chat repl`)
+  - Shared provider resolver across chat, demo, iterate, and evolve
+  - OpenRouter and AAAA-Nexus provider polish
+  - Deterministic docstring/docs/tests quality phase for Python generation
+  - GitHub Actions CI/release workflows, issue forms, PR template, Dependabot, and security policy
+  - 274 passing tests
+
+- **0.2.0** — Polyglot
   - JavaScript and TypeScript classified under the same 5-tier law
   - Pure-Python JS parser (no Node dependency); `node_modules/` skipped
   - Wire scan, certify checks, recon recommendations all polyglot-aware
   - Three new static showcase demo presets (`js-counter`, `js-bad-wire`, `mixed-py-js`)
   - Canonical `IGNORED_DIRS` + file-class taxonomy (source / docs / config / asset) and nested-`docs/`/`guides/` discovery
-  - 212 passing tests
+  - 260+ passing tests
 
 - **0.3.0** (roadmap)
   - Rust support

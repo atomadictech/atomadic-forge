@@ -21,17 +21,24 @@ from __future__ import annotations
 
 import json
 import sys
+import warnings
 from pathlib import Path
 from typing import Annotated
 
 import typer
 
 from .. import __version__
-from ..a3_og_features.forge_pipeline import (
-    run_auto, run_cherry, run_finalize, run_recon,
-)
-from ..a1_at_functions.wire_check import scan_violations
 from ..a1_at_functions.certify_checks import certify as certify_checks
+from ..a1_at_functions.wire_check import scan_violations
+from ..a3_og_features.forge_pipeline import (
+    run_auto,
+    run_cherry,
+    run_finalize,
+    run_recon,
+)
+
+# Suppress SyntaxWarnings from third-party code in seed/forged directories.
+warnings.filterwarnings("ignore", category=SyntaxWarning)
 
 
 def _force_utf8() -> None:
@@ -136,7 +143,7 @@ def cherry_cmd(
     if json_out:
         typer.echo(json.dumps(manifest, indent=2, default=str))
         return
-    typer.echo(f"\nCherry-pick manifest written to .atomadic-forge/cherry.json")
+    typer.echo("\nCherry-pick manifest written to .atomadic-forge/cherry.json")
     typer.echo(f"  selected: {len(manifest['items'])}")
 
 
@@ -189,13 +196,20 @@ def certify_cmd(
     project_root: Annotated[Path, typer.Argument(
         exists=True, file_okay=False, dir_okay=True, resolve_path=True)],
     package: Annotated[str | None, typer.Option("--package")] = None,
+    fail_under: Annotated[float | None, typer.Option("--fail-under",
+        help="Exit 1 when the certify score is below this threshold.")] = None,
     json_out: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
     """Score documentation, tests, tier layout, import discipline."""
+    if fail_under is not None and not 0 <= fail_under <= 100:
+        raise typer.BadParameter("--fail-under must be between 0 and 100")
     report = certify_checks(project_root, project=project_root.name,
                              package=package)
+    failed_gate = fail_under is not None and float(report["score"]) < fail_under
     if json_out:
         typer.echo(json.dumps(report, indent=2, default=str))
+        if failed_gate:
+            raise typer.Exit(code=1)
         return
     typer.echo(f"\nCertify: {project_root}")
     typer.echo(f"  score: {report['score']}/100")
@@ -205,6 +219,9 @@ def certify_cmd(
     typer.echo(f"  wire:  {'PASS' if report['no_upward_imports'] else 'FAIL'}")
     for issue in report["issues"]:
         typer.echo(f"    - {issue}")
+    if failed_gate:
+        typer.echo(f"  gate:  FAIL (score below --fail-under {fail_under:g})")
+        raise typer.Exit(code=1)
 
 
 @app.command("doctor")
@@ -237,6 +254,8 @@ def _register_specialty_apps() -> None:
          "LLM ↔ Forge loop: intent → architecturally-coherent code."),
         ("atomadic_forge.commands.evolve", "evolve",
          "Recursive self-improvement: iterate N times, growing catalog."),
+        ("atomadic_forge.commands.chat", "chat",
+         "Chat with a Forge-aware AI copilot over optional repo context."),
         ("atomadic_forge.commands.emergent", "emergent",
          "Symbol-level composition discovery."),
         ("atomadic_forge.commands.synergy", "synergy",
@@ -247,6 +266,12 @@ def _register_specialty_apps() -> None:
          "Run any feature → fan its output into emergent scan."),
         ("atomadic_forge.commands.config_cmd", "config",
          "Configure Atomadic Forge — show / set / test config + wizard."),
+        ("atomadic_forge.commands.emergent_then_synergy", "emergent-then-synergy",
+         "Run emergent → pipe JSON artifact to synergy."),
+        ("atomadic_forge.commands.synergy_then_emergent", "synergy-then-emergent",
+         "Run synergy → pipe JSON artifact to emergent."),
+        ("atomadic_forge.commands.evolve_then_iterate", "evolve-then-iterate",
+         "Run evolve → pipe JSON artifact to iterate."),
     ):
         try:
             mod = __import__(module_path, fromlist=["app"])

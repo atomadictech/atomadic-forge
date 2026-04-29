@@ -16,7 +16,6 @@ from __future__ import annotations
 
 from typing import Literal, TypedDict
 
-
 CommandSurface = Literal["typer_app", "register_fn", "wrapped_class"]
 
 

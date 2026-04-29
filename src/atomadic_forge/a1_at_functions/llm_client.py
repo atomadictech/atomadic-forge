@@ -31,7 +31,8 @@ import json
 import os
 import urllib.error
 import urllib.request
-from typing import Callable, Protocol
+from collections.abc import Callable
+from typing import Protocol
 
 
 class LLMClient(Protocol):
@@ -42,6 +43,26 @@ class LLMClient(Protocol):
     def call(self, prompt: str, *, system: str = "",
              max_tokens: int = 4096, temperature: float = 0.2) -> str:
         ...
+
+
+def _env_float(name: str, default: float) -> float:
+    raw = os.environ.get(name)
+    if raw is None or raw == "":
+        return default
+    try:
+        return float(raw)
+    except ValueError:
+        return default
+
+
+def _env_int(name: str, default: int | None) -> int | None:
+    raw = os.environ.get(name)
+    if raw is None or raw == "":
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        return default
 
 
 class StubLLMClient:
@@ -357,16 +378,25 @@ class OllamaClient:
     name = "ollama"
 
     def __init__(self, *, model: str = "qwen2.5-coder:7b",
-                 base_url: str = "http://localhost:11434"):
+                 base_url: str = "http://localhost:11434",
+                 timeout_s: float | None = None,
+                 num_predict: int | None = None):
         self.model = model
         self.base_url = base_url.rstrip("/")
+        self.timeout_s = timeout_s if timeout_s is not None else _env_float(
+            "FORGE_OLLAMA_TIMEOUT", 300.0
+        )
+        self.num_predict = num_predict if num_predict is not None else _env_int(
+            "FORGE_OLLAMA_NUM_PREDICT", None
+        )
 
     def call(self, prompt: str, *, system: str = "",
              max_tokens: int = 4096, temperature: float = 0.2) -> str:
+        num_predict = self.num_predict if self.num_predict is not None else max_tokens
         body = json.dumps({
             "model": self.model,
             "stream": False,
-            "options": {"temperature": temperature, "num_predict": max_tokens},
+            "options": {"temperature": temperature, "num_predict": max(1, num_predict)},
             "system": system,
             "prompt": prompt,
         }).encode("utf-8")
@@ -379,7 +409,7 @@ class OllamaClient:
         last_exc: Exception | None = None
         for attempt in range(3):
             try:
-                with urllib.request.urlopen(req, timeout=300) as resp:
+                with urllib.request.urlopen(req, timeout=self.timeout_s) as resp:
                     data = json.loads(resp.read().decode("utf-8"))
                 return data.get("response", "")
             except urllib.error.HTTPError as exc:
@@ -394,7 +424,96 @@ class OllamaClient:
                     f"Ollama unreachable at {self.base_url} — "
                     f"is `ollama serve` running? Detail: {exc}"
                 ) from exc
+            except TimeoutError as exc:
+                raise RuntimeError(
+                    f"Ollama timed out after {self.timeout_s:g}s while using "
+                    f"model {self.model!r}. Try a smaller local model, set "
+                    "`FORGE_OLLAMA_NUM_PREDICT` lower, or raise "
+                    "`FORGE_OLLAMA_TIMEOUT`."
+                ) from exc
         raise last_exc or RuntimeError("Ollama: 3 retries exhausted")
+
+
+class OpenRouterClient:
+    """OpenRouter — routes to 200+ models via OpenAI-compatible API.
+
+    Reads ``OPENROUTER_API_KEY``.  Default model: ``deepseek/deepseek-chat-v3-0324:free``
+    (free tier).  Override via ``FORGE_OPENROUTER_MODEL`` env var.
+    """
+
+    name = "openrouter"
+
+    BASE_URL = "https://openrouter.ai/api/v1/chat/completions"
+
+    def __init__(self, *, model: str | None = None,
+                 api_key_env: str = "OPENROUTER_API_KEY"):
+        self.model = (model
+                      or os.environ.get("FORGE_OPENROUTER_MODEL")
+                      or "google/gemma-3-27b-it:free")
+        self._api_key_env = api_key_env
+
+    def call(self, prompt: str, *, system: str = "",
+             max_tokens: int = 4096, temperature: float = 0.2) -> str:
+        api_key = os.environ.get(self._api_key_env, "")
+        if not api_key:
+            raise RuntimeError(
+                f"{self._api_key_env} not set — cannot call OpenRouter API"
+            )
+        messages = []
+        if system:
+            messages.append({"role": "system", "content": system})
+        messages.append({"role": "user", "content": prompt})
+        body_dict = {
+            "model": self.model,
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+            "messages": messages,
+        }
+        last_error: Exception | None = None
+        for attempt in range(3):
+            body = json.dumps(body_dict).encode("utf-8")
+            req = urllib.request.Request(
+                self.BASE_URL,
+                data=body,
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": "https://atomadic.tech",
+                    "X-Title": "Atomadic Forge",
+                },
+                method="POST",
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=120) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+                break
+            except urllib.error.HTTPError as exc:
+                detail = exc.read().decode("utf-8", errors="replace")[:600]
+                if exc.code == 400 and "instruction" in detail.lower() and attempt == 0:
+                    # Model doesn't support system role — fold it into user turn.
+                    merged = f"[System instructions]\n{system}\n\n[User]\n{prompt}" if system else prompt
+                    body_dict = {
+                        "model": self.model,
+                        "max_tokens": max_tokens,
+                        "temperature": temperature,
+                        "messages": [{"role": "user", "content": merged}],
+                    }
+                    continue
+                if exc.code == 429:
+                    import time
+                    last_error = RuntimeError(f"OpenRouter 429: {detail[:200]}")
+                    time.sleep(2.0 * (attempt + 1))
+                    continue
+                if exc.code in (500, 502, 503, 504):
+                    import time
+                    last_error = RuntimeError(f"OpenRouter {exc.code}: {detail[:200]}")
+                    time.sleep(1.5 ** attempt)
+                    continue
+                raise RuntimeError(f"OpenRouter API error {exc.code}: {detail}") from exc
+        else:
+            raise last_error or RuntimeError("OpenRouter API: 3 retries exhausted")
+        choices = data.get("choices") or []
+        return choices[0]["message"]["content"] if choices else ""
 
 
 def resolve_default_client() -> LLMClient:
@@ -425,7 +544,11 @@ def resolve_default_client() -> LLMClient:
                                                    "gemini-2.5-flash"))
     if os.environ.get("OPENAI_API_KEY"):
         return OpenAIClient()
+    if os.environ.get("OPENROUTER_API_KEY"):
+        return OpenRouterClient()
     if os.environ.get("FORGE_OLLAMA"):
         return OllamaClient(model=os.environ.get("FORGE_OLLAMA_MODEL",
-                                                  "qwen2.5-coder:7b"))
+                                                  "qwen2.5-coder:7b"),
+                            base_url=os.environ.get("OLLAMA_BASE_URL",
+                                                    "http://localhost:11434"))
     return StubLLMClient()

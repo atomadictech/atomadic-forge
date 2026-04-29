@@ -31,7 +31,7 @@ Three static showcase presets ship with Forge — they exercise
 fact. **No LLM key needed.**
 
 ```bash
-forge demo run --preset js-counter   # clean a0..a4 JS package, certify 100/100
+forge demo run --preset js-counter   # clean a0..a4 JS package, certify 60/100
 forge demo run --preset js-bad-wire  # the same package with one upward
                                      # import; wire flags it
 forge demo run --preset mixed-py-js  # one Python tier + one JS tier

@@ -7,7 +7,7 @@ the assimilate phase; this layer just records intent.
 
 from __future__ import annotations
 
-from typing import Iterable
+from collections.abc import Iterable
 
 
 def select_items(scout_report: dict, *, names: Iterable[str] | None = None,

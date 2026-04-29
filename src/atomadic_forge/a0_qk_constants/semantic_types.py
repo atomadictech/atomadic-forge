@@ -13,7 +13,6 @@ from __future__ import annotations
 
 from typing import Literal, TypedDict
 
-
 MergeDecision = Literal["merge", "rename_semantic", "rename_module"]
 
 

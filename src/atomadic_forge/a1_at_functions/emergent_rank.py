@@ -18,7 +18,7 @@ Output names are heuristic kebab-case combinations of distinct domains.
 from __future__ import annotations
 
 import hashlib
-from typing import Iterable
+from collections.abc import Iterable
 
 from ..a0_qk_constants.emergent_types import (
     CompositionChain,

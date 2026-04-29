@@ -13,11 +13,12 @@ import re
 from pathlib import Path
 
 from ..a0_qk_constants.lang_extensions import (
-    JAVASCRIPT_EXTS, PYTHON_EXTS, TYPESCRIPT_EXTS,
+    JAVASCRIPT_EXTS,
+    PYTHON_EXTS,
+    TYPESCRIPT_EXTS,
 )
-from ..a0_qk_constants.tier_names import TIER_NAMES, can_import, tier_index
+from ..a0_qk_constants.tier_names import TIER_NAMES, can_import
 from .js_parser import parse_imports
-
 
 _TIER_PATH_RE = re.compile(r"\.(?P<tier>a\d_[a-z_]+)\.")
 _TIER_SLASH_RE = re.compile(r"(?P<tier>a\d_[a-z_]+)(?:/|$)")

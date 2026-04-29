@@ -21,9 +21,8 @@ The caller decides whether to apply.
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
-
 
 _SOURCE_HEAD = re.compile(r"^a\d_source_")
 _FROM_LINE = re.compile(r"^from\s+([A-Za-z_][\w]*)\s+import\s+(.+)$", re.MULTILINE)
@@ -65,7 +64,7 @@ def build_symbol_map(tier_dir: Path) -> dict[str, str]:
         if not parsed:
             continue
         _root, flat_name = parsed
-        out[flat_name] = f"." + f.stem
+        out[flat_name] = "." + f.stem
     return out
 
 
@@ -87,7 +86,7 @@ def build_name_to_file_map(*tier_dirs: Path) -> dict[str, str]:
             if not parsed:
                 continue
             _root, name = parsed
-            out[name.lower()] = f"." + f.stem
+            out[name.lower()] = "." + f.stem
     return out
 
 
@@ -175,9 +174,8 @@ def repair_assimilation_output(package_root: Path,
     tiers = ["a0_qk_constants", "a1_at_functions", "a2_mo_composites",
              "a3_og_features", "a4_sy_orchestration"]
     tier_dirs = [package_root / t for t in tiers if (package_root / t).exists()]
-    name_to_file = build_name_to_file_map(*tier_dirs)
     out: dict[str, dict[str, str]] = {}
-    for t, tier_dir in zip(tiers, tier_dirs):
+    for t, tier_dir in zip(tiers, tier_dirs, strict=False):
         # name_to_file uses tier-internal relative paths.  When repairing
         # *a different* tier, we still need relative-from-self paths.  The
         # convention here: a single global map keyed by symbol with paths

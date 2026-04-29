@@ -2,17 +2,15 @@
 
 from __future__ import annotations
 
-import sys
 import tomllib
-from pathlib import Path
 
-import pytest
-
+from atomadic_forge.a1_at_functions.llm_client import StubLLMClient
 from atomadic_forge.a1_at_functions.scaffold_pyproject import render_pyproject
 from atomadic_forge.a1_at_functions.scaffold_starter import (
-    render_gitignore, render_readme, render_tests_conftest, render_tests_init,
+    render_gitignore,
+    render_readme,
+    render_tests_conftest,
 )
-from atomadic_forge.a1_at_functions.llm_client import StubLLMClient
 from atomadic_forge.a3_og_features.forge_loop import run_iterate
 
 

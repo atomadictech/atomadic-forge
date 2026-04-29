@@ -18,7 +18,6 @@ from pathlib import Path
 
 from ..a0_qk_constants.synergy_types import FeatureSurfaceCard
 
-
 _PHASE_VOCAB = {
     "recon": {"recon", "scout", "inventory", "discover"},
     "ingest": {"ingest", "scan", "harvest", "extract"},

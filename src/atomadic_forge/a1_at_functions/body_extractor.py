@@ -41,7 +41,7 @@ def _collect_top_level_names(tree: ast.Module) -> set[str]:
     """Return every name bound at module top level (classes, functions, vars)."""
     names: set[str] = set()
     for node in tree.body:
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef):
             names.add(node.name)
         elif isinstance(node, ast.Assign):
             for target in node.targets:
@@ -50,7 +50,7 @@ def _collect_top_level_names(tree: ast.Module) -> set[str]:
         elif isinstance(node, ast.AnnAssign):
             if isinstance(node.target, ast.Name):
                 names.add(node.target.id)
-        elif isinstance(node, (ast.Import, ast.ImportFrom)):
+        elif isinstance(node, ast.Import | ast.ImportFrom):
             for alias in node.names:
                 names.add(alias.asname or alias.name.split(".", 1)[0])
     return names
@@ -75,10 +75,9 @@ def _detect_state_markers(target: ast.AST) -> tuple[bool, bool]:
                             and t.value.id == "self"):
                         has_self = True
         for node in target.body:
-            if isinstance(node, (ast.Assign, ast.AnnAssign)):
+            if isinstance(node, ast.Assign | ast.AnnAssign):
                 value = getattr(node, "value", None)
-                if isinstance(value, (ast.List, ast.Dict, ast.Set,
-                                      ast.ListComp, ast.DictComp, ast.SetComp)):
+                if isinstance(value, ast.List | ast.Dict | ast.Set | ast.ListComp | ast.DictComp | ast.SetComp):
                     has_class_attr = True
     return has_self, has_class_attr
 
@@ -99,7 +98,7 @@ def _extract_python_body(source_text: str, symbol_name: str) -> ExtractedBody | 
 
     target: ast.AST | None = None
     for node in ast.walk(tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef):
             if node.name == symbol_name:
                 target = node
                 break
@@ -134,7 +133,7 @@ def _extract_python_body(source_text: str, symbol_name: str) -> ExtractedBody | 
     top_names = _collect_top_level_names(tree)
     referenced: set[str] = set()
     locally_bound: set[str] = {symbol_name}
-    if isinstance(target, (ast.FunctionDef, ast.AsyncFunctionDef)):
+    if isinstance(target, ast.FunctionDef | ast.AsyncFunctionDef):
         for arg in target.args.args + target.args.kwonlyargs:
             locally_bound.add(arg.arg)
         if target.args.vararg:
@@ -148,7 +147,7 @@ def _extract_python_body(source_text: str, symbol_name: str) -> ExtractedBody | 
             for t in node.targets:
                 if isinstance(t, ast.Name):
                     locally_bound.add(t.id)
-        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        elif isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
             locally_bound.add(node.name)
             for arg in node.args.args + node.args.kwonlyargs:
                 locally_bound.add(arg.arg)

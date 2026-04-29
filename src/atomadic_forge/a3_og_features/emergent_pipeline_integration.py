@@ -15,8 +15,9 @@ Output is shaped so it slots into existing report dicts under an
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 from ..a0_qk_constants.emergent_types import (
     EmergentCandidateCard,
@@ -25,7 +26,6 @@ from ..a0_qk_constants.emergent_types import (
 from ..a1_at_functions.emergent_compose import find_chains
 from ..a1_at_functions.emergent_rank import rank_chains
 from ..a1_at_functions.emergent_signature_extract import harvest_signatures
-
 
 _CONFIG_DEFAULTS: dict[str, dict[str, Any]] = {
     "scout":       {"max_depth": 3, "top_n": 10, "domain_jump_required": True,

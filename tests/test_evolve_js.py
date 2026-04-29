@@ -25,21 +25,28 @@ from pathlib import Path
 import pytest
 
 from atomadic_forge.a0_qk_constants.gen_language import (
-    ALLOWED_FILE_EXTS, DEFAULT_LANGUAGE, LANGUAGES,
-    PKG_ROOT_TEMPLATE, normalize_language, pkg_root_for,
+    ALLOWED_FILE_EXTS,
+    DEFAULT_LANGUAGE,
+    LANGUAGES,
+    PKG_ROOT_TEMPLATE,
+    normalize_language,
+    pkg_root_for,
 )
 from atomadic_forge.a1_at_functions.forge_feedback import (
-    pack_initial_intent, system_prompt,
+    pack_initial_intent,
+    system_prompt,
 )
 from atomadic_forge.a1_at_functions.llm_client import StubLLMClient
 from atomadic_forge.a1_at_functions.scaffold_js import (
-    render_js_readme, render_package_json,
+    render_js_readme,
+    render_package_json,
 )
 from atomadic_forge.a3_og_features.forge_evolve import run_evolve
 from atomadic_forge.a3_og_features.forge_loop import (
-    _safe_path, _scaffold_package, run_iterate,
+    _safe_path,
+    _scaffold_package,
+    run_iterate,
 )
-
 
 # ── gen_language constants ───────────────────────────────────────────────
 

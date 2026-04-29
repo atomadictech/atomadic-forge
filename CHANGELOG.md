@@ -1,5 +1,179 @@
 # Changelog
 
+## 0.2.2 — _Operational axis + 100/100 self-certify_
+
+`forge certify` now scores the full 0–100 range.  The v1 rubric topped
+out at 90 (35 structural + 25 runtime + 30 behavioural) with 10 points
+of reserved headroom that no axis credited.  This release closes the
+gap with a new **operational axis** worth 10 points total:
+
+| Axis | Points | Check |
+|---|---|---|
+| CI workflow present | 5 | `.github/workflows/*.yml` (or `.yaml`) — at least one non-empty file |
+| Changelog / release notes | 5 | `CHANGELOG.md` (or `.rst`, `RELEASE_NOTES.md`, `HISTORY.md`, `NEWS.md`) ≥ 200 bytes at root |
+
+Both checks are pure structural file-existence — no API calls, no slow
+runtime paths.  The CI axis credits intent (a workflow exists); the
+behavioural axis already credits actual test-pass behaviour, so there's
+no double-counting.
+
+### Added
+
+- `check_ci_workflow(root)` — pure helper at `a1_at_functions/certify_checks.py`
+- `check_changelog(root)` — pure helper at the same module
+- `score_components.operational` — new key in the certify result dict
+- `ci_workflow_present` and `changelog_present` — new top-level booleans
+  in the certify result dict
+- `detail.ci` and `detail.changelog` — new entries in the detail dict
+- 22 new tests in `tests/test_certify_operational_axis.py` covering both
+  helpers, the integrated 100/100 path, partial-credit (CI-only,
+  changelog-only), and the issue/recommendation surfacing on misses
+- README badge updated from 90/100 → 100/100
+
+### Fixed
+
+- The `# Score weights (sum to 100):` comment in `certify_checks.py` now
+  actually sums to 100 (was 90 in v0.2.1; the reserved headroom is now
+  spoken for).
+- Forge's own self-certify: **90 → 100**.  299 passing tests, 1
+  skipped (was 274 + 1).  Wire scan: PASS, 0 violations.
+- `forge demo run` now exits non-zero when the generated CLI demo fails,
+  while still writing the artifact for debugging.
+- `commandsmith sync` now regenerates a Ruff-clean command registry.
+- `forge certify --fail-under <score>` gives CI an explicit score gate.
+- Certification scans ignore `.pytest_tmp*` scratch trees and generated
+  smoke tests are Ruff-clean, so local verification does not depend on
+  manual cleanup order.
+
+### Notes for downstream certify consumers
+
+If your tooling asserts on a specific score value (e.g. `assert
+result["score"] == 90`), audit it: a project with `.github/workflows/`
+and `CHANGELOG.md` will now legitimately score higher than before.
+The fixture-based tests in `tests/test_stub_detector.py` were
+unaffected because their temp roots don't include the operational-axis
+files.
+
+## 0.2.1 — _Provider resilience + forge stress-test fixes_
+
+Discovered and fixed during a live stress-test: using Forge itself to
+absorb 23,487 symbols from five major agent frameworks (langchain,
+autogen, instructor, mem0, browser-use) while running `iterate`, `evolve`,
+`emergent`, `synergy`, and `commandsmith` end-to-end.  All fixes are in the
+forge source; the evolution run produced `generated/tool-agent` (60/100) and
+`generated/sovereign` (74/100) plus 12 registered CLI commands (12/12 smoke PASS).
+
+### Added
+
+- `forge chat ask` and `forge chat repl` — a Forge-aware chat copilot that
+  uses the same provider layer as `iterate` / `evolve`, supports `nexus`,
+  `openrouter`, `gemini`, `anthropic`, `openai`, `ollama`, and `stub`, and
+  packs bounded repo context while skipping `.env` and obvious secret files.
+- Deterministic Python quality phases after generation: missing docstrings
+  are filled, `docs/API.md` and `docs/TESTING.md` are created, and
+  `tests/test_generated_smoke.py` is added before final certification.
+- `.atomadic-forge/quality.json` records the docstring/docs/tests phase
+  results for every Python `iterate` / `evolve` output.
+- GitHub readiness assets: CI and release workflows, Dependabot config,
+  bug/feature issue forms, PR template, security policy, and source
+  distribution manifest.
+- Shared provider resolver used by `chat`, `demo`, `iterate`, and `evolve`
+  so aliases and help text no longer drift between commands.
+- CLI UX docs for chat, offline demo expectations, corrected certify scoring,
+  and the actual `--provider auto` resolution order.
+
+### Bug fixes
+
+**Bug 1 — `forge iterate` missing `nexus` provider**
+`commands/iterate.py` had no `nexus`/`aaaa-nexus` case in `_resolve_provider()`
+even though `forge evolve` already supported it.  Added
+`if name in ("nexus", "aaaa-nexus", "aaaa_nexus", "helix"): return AAAANexusClient()`.
+
+**Bug 2 — `forge iterate` missing `openrouter` provider**
+No OpenRouter support existed anywhere in forge.  Added `OpenRouterClient` to
+`a1_at_functions/llm_client.py` (OpenRouter's OpenAI-compatible endpoint,
+default model `google/gemma-3-27b-it:free`).  Added `openrouter`/`router`
+cases to both `iterate` and `evolve` provider resolvers.
+
+**Bug 3 — `forge iterate` only accepted a single `--seed`**
+`seed_repo: Path | None` rejected multiple seeds.  Changed to
+`seed_repo: list[Path] | None` in both `commands/iterate.py` and
+`a3_og_features/forge_loop.py`.  The seed catalog is now accumulated
+from all provided `--seed` paths.
+
+**Bug 4 — OpenRouter 400 on models without system-role support**
+`gemma-3-27b-it` (and similar models) return HTTP 400
+`"Developer instruction is not enabled"` when a `system` role message is
+sent.  `OpenRouterClient.call()` now retries with the system prompt folded
+into the user message on the first such failure.
+
+**Bug 5 — `parse_files_from_response` failed on truncated JSON arrays**
+When an LLM response was cut off mid-array the balanced-bracket scanner
+returned `[]`, writing 0 files.  Added a third strategy: regex-based
+extraction of complete `{"path", "content"}` objects from a partial array.
+Also fixed the fence regex from non-greedy to greedy capture.
+
+**Bug 6 — Seed catalog flooded the prompt with 460 K+ symbols**
+Multiple large seeds (langchain + mem0) pushed 460 K+ symbols into the
+prompt, confusing the LLM.  `pack_initial_intent()` now deduplicates
+method-level entries to base class names and caps the display at 30 unique
+top-level symbols.
+
+**Bug 7 — SyntaxWarning noise from third-party forged files**
+mem0's regex strings used invalid escapes (`\.`), causing Python
+`SyntaxWarning` on every forge command that loaded the seed catalog.  Added
+`warnings.filterwarnings("ignore", category=SyntaxWarning)` at CLI import
+time in `a4_sy_orchestration/cli.py`.
+
+**Bug 8 — `commandsmith smoke` referenced non-existent `unified_cli` module**
+The smoke test invoked
+`atomadic_forge.a4_sy_orchestration.unified_cli` which doesn't exist.
+Changed to `atomadic_forge.a4_sy_orchestration.cli`.  The current command
+surface now passes smoke test (12/12 PASS).
+
+**Bug 9 — Generated synergy adapters referenced `unified_cli`**
+The synergy-implement template hardcoded `unified_cli` in subprocess calls.
+Replaced with `cli` in all three generated adapter files
+(`emergent_then_synergy.py`, `synergy_then_emergent.py`,
+`evolve_then_iterate.py`) and registered them in `cli.py`.
+
+**Bug 10 — `forge certify` stub scan recursed into `forged/` directories**
+When certifying a project root without a `src/` directory,
+`detect_stubs` ran `rglob("*.py")` on the full tree — including 17 727
+stub skeletons in `forged/*/src/` — dragging the score from 60 → 20/100.
+`certify_checks.py` now sets `src_for_stubs = None` and skips stub
+detection entirely when there is no `src/` layout.
+
+### New / changed modules
+
+| File | Tier | Change |
+|------|------|--------|
+| `a1_at_functions/llm_client.py` | a1 | `OpenRouterClient` added; `resolve_default_client()` includes openrouter in auto-chain |
+| `commands/iterate.py` | a4 | nexus + openrouter providers; multi-seed `list[Path]` |
+| `commands/evolve.py` | a4 | nexus + openrouter providers |
+| `a3_og_features/forge_loop.py` | a3 | multi-seed accumulation loop |
+| `a1_at_functions/forge_feedback.py` | a1 | 3-strategy tolerant JSON parser; seed dedup + 30-symbol cap |
+| `a4_sy_orchestration/cli.py` | a4 | SyntaxWarning suppressor; 3 new synergy adapters registered |
+| `a3_og_features/commandsmith_feature.py` | a3 | smoke test CLI path fixed |
+| `a1_at_functions/certify_checks.py` | a1 | stub scan scoped to `src/` only; no-src fallback skips scan |
+| `commands/emergent_then_synergy.py` | a4 | new — emergent → synergy pipeline adapter |
+| `commands/synergy_then_emergent.py` | a4 | new — synergy → emergent pipeline adapter |
+| `commands/evolve_then_iterate.py` | a4 | new — evolve → iterate pipeline adapter |
+
+### Provider matrix (updated)
+
+| Provider | Cost | Env var | Default model |
+|----------|------|---------|---------------|
+| `gemini` | free tier | `GEMINI_API_KEY` / `GOOGLE_AI_STUDIO_KEY` | `gemini-2.5-flash` |
+| `nexus` / `aaaa-nexus` | paid | `AAAA_NEXUS_API_KEY` | (Nexus default) |
+| `anthropic` | paid | `ANTHROPIC_API_KEY` | `claude-3-5-sonnet-latest` |
+| `openai` | paid | `OPENAI_API_KEY` | `gpt-4o-mini` |
+| `openrouter` | free tier available | `OPENROUTER_API_KEY` | `google/gemma-3-27b-it:free` |
+| `ollama` | free, local | `FORGE_OLLAMA=1` | `qwen2.5-coder:7b` |
+| `stub` | free, offline | n/a | n/a |
+
+---
+
 ## 0.2.0 — _Polyglot (JavaScript / TypeScript) support_
 
 Forge is no longer Python-only. `recon`, `wire`, and `certify` now classify

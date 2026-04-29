@@ -12,20 +12,21 @@ Designed to produce a recordable 90-second showcase from a single command.
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 from typing import Annotated
 
+import click
 import typer
 
-from atomadic_forge.a1_at_functions.llm_client import (
-    AnthropicClient, GeminiClient, OllamaClient, OpenAIClient,
-    StubLLMClient, resolve_default_client,
+from atomadic_forge.a1_at_functions.provider_resolver import (
+    PROVIDER_HELP,
+    resolve_provider,
 )
 from atomadic_forge.a3_og_features.demo_runner import (
-    list_presets, run_demo,
+    DemoResult,
+    list_presets,
+    run_demo,
 )
-
 
 COMMAND_NAME = "demo"
 COMMAND_HELP = "One-shot launch-video verb: preset evolve + DEMO.md artifact."
@@ -34,25 +35,15 @@ COMMAND_HELP = "One-shot launch-video verb: preset evolve + DEMO.md artifact."
 app = typer.Typer(no_args_is_help=True, help=COMMAND_HELP)
 
 
+def _cli_demo_failed(result: DemoResult) -> bool:
+    return bool(result.cli_demo_command) and result.cli_demo_returncode != 0
+
+
 def _resolve_provider(name: str) -> object:
-    name = name.lower()
-    if name == "stub":
-        return StubLLMClient()
-    if name in ("anthropic", "claude"):
-        return AnthropicClient()
-    if name in ("openai", "gpt"):
-        return OpenAIClient()
-    if name in ("gemini", "google"):
-        return GeminiClient(model=os.environ.get("FORGE_GEMINI_MODEL",
-                                                   "gemini-2.5-flash"))
-    if name == "ollama":
-        return OllamaClient(
-            model=os.environ.get("FORGE_OLLAMA_MODEL", "qwen2.5-coder:7b"),
-            base_url=os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434"),
-        )
-    if name == "auto":
-        return resolve_default_client()
-    raise typer.BadParameter(f"unknown provider: {name!r}")
+    try:
+        return resolve_provider(name)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
 
 
 @app.command("list")
@@ -82,7 +73,7 @@ def run_cmd(
         help="Output directory.  Defaults to ./forge-demo-<preset>.",
         file_okay=False, dir_okay=True, resolve_path=True)] = None,
     provider: Annotated[str, typer.Option("--provider",
-        help="auto | gemini | anthropic | openai | ollama | stub")] = "auto",
+        help=PROVIDER_HELP)] = "auto",
     rounds: Annotated[int | None, typer.Option("--rounds",
         help="Override the preset's round count.")] = None,
     iterations: Annotated[int | None, typer.Option("--iterations",
@@ -92,17 +83,22 @@ def run_cmd(
 ) -> None:
     """Run the preset and produce a DEMO.md artifact."""
     llm = _resolve_provider(provider)
-    result = run_demo(
-        preset_name=preset,
-        output=output,
-        llm=llm,                      # type: ignore[arg-type]
-        rounds=rounds,
-        iterations=iterations,
-        skip_cli_demo=skip_cli_demo,
-    )
+    try:
+        result = run_demo(
+            preset_name=preset,
+            output=output,
+            llm=llm,                      # type: ignore[arg-type]
+            rounds=rounds,
+            iterations=iterations,
+            skip_cli_demo=skip_cli_demo,
+        )
+    except RuntimeError as exc:
+        raise click.ClickException(str(exc)) from exc
     if json_out:
         from dataclasses import asdict
         typer.echo(json.dumps(asdict(result), indent=2, default=str))
+        if _cli_demo_failed(result):
+            raise typer.Exit(code=1)
         return
 
     arc = " → ".join(f"{s:.0f}" for s in result.score_trajectory)
@@ -136,7 +132,11 @@ def run_cmd(
         typer.echo(f"    $ {' '.join(result.cli_demo_command)}")
         for line in (result.cli_demo_stdout or "(no output)").splitlines()[:6]:
             typer.echo(f"    {line}")
+        if _cli_demo_failed(result):
+            typer.echo("    generated CLI demo failed")
         typer.echo("")
     typer.echo(f"  Artifact:     {result.artifact_md_path}")
     typer.echo(f"  Output:       {result.output_root}")
     typer.echo("")
+    if _cli_demo_failed(result):
+        raise typer.Exit(code=1)

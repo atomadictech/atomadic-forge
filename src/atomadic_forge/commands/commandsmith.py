@@ -16,14 +16,12 @@ Sub-commands:
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
 from typing import Annotated
 
 import typer
 
 from atomadic_forge.a3_og_features.commandsmith_feature import Commandsmith
-
 
 app = typer.Typer(
     no_args_is_help=True,
@@ -102,7 +100,7 @@ def wrap_cmd(
         out_dir=out_dir,
     )
     typer.echo(f"Wrote wrapper → {out}")
-    typer.echo(f"Run ``atomadic-forge commandsmith sync`` to register it.")
+    typer.echo("Run ``atomadic-forge commandsmith sync`` to register it.")
 
 
 @app.command("smoke")

@@ -16,7 +16,6 @@ from __future__ import annotations
 
 from typing import Literal, TypedDict
 
-
 SynergyKind = Literal[
     "json_artifact",        # producer emits --json-out, consumer takes file arg
     "in_memory_pipe",       # producer's return type matches consumer's first arg

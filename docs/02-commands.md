@@ -437,12 +437,14 @@ forge certify OUTPUT [OPTIONS]
 
 **Options:**
 - `--package NAME` — Python package name (if not in root)
+- `--fail-under SCORE` — Exit 1 when the score is below this threshold
 - `--json` — Output JSON
 
 **Example:**
 
 ```bash
 forge certify ./output --package myapp
+forge certify ./output --package myapp --fail-under 90
 
 # Output:
 # Certify: myapp
@@ -455,14 +457,57 @@ forge certify ./output --package myapp
 ```
 
 **Scoring:**
-- 25 points each for: documentation, tests, tier layout, import discipline
-- 100/100 = gold standard
-- ≥75 = acceptable for production
+- Structural: docs (10), tier layout (10), upward-import discipline (10),
+  tests present (5)
+- Runtime: package import smoke (25)
+- Behavioural: generated Python tests pass-ratio (up to 30)
+- Stub bodies (`pass`, `NotImplementedError`, TODO implementations) deduct
+  points even when imports and tests are present
+- ≥75 = acceptable for a generated package; ≥90 is release-candidate quality
 - <50 = needs significant work
 
 ---
 
 ## LLM loop commands
+
+### forge chat
+
+Chat copilot over Forge docs/source and your configured AI agent.
+
+```bash
+forge chat SUBCOMMAND [OPTIONS]
+```
+
+**Subcommands:**
+- `ask "QUESTION"` — One-shot answer, optionally JSON
+- `repl` — Interactive terminal session; type `/exit` to leave
+
+**Options:**
+- `--provider PROVIDER` — `auto` | `nexus` | `aaaa-nexus` | `gemini` |
+  `anthropic` | `openai` | `openrouter` | `ollama` | `stub`
+- `--context PATH` / `-c PATH` — file or directory to include. Repeatable.
+- `--cwd-context / --no-cwd-context` — default is to use cwd when no explicit
+  `--context` is supplied.
+- `--max-files N` and `--max-chars N` — bound the context sent to the provider.
+
+**Examples:**
+
+```bash
+# Ask with bounded current-repo context
+forge chat ask "what CLI checks should I run before publishing?"
+
+# Use your AAAA-Nexus agent as the copilot
+export AAAA_NEXUS_API_KEY=an_...
+forge chat repl --provider nexus --context src --context docs
+
+# Scriptable offline smoke
+forge chat ask "hello" --provider stub --no-cwd-context --json
+```
+
+The context packer skips ignored directories, assets, `.env`, key/certificate
+files, and filenames containing obvious secret/credential markers.
+
+---
 
 ### forge iterate
 
@@ -480,14 +525,21 @@ forge iterate SUBCOMMAND [OPTIONS]
 
 **Options (for `run`):**
 - `--package NAME` — Python package name
-- `--provider PROVIDER` — LLM provider: `gemini` | `anthropic` | `openai` | `ollama` | `stub` | `auto` (default: `auto`)
+- `--provider PROVIDER` — LLM provider: `gemini` | `nexus` | `aaaa-nexus` | `anthropic` | `openai` | `openrouter` | `ollama` | `stub` | `auto` (default: `auto`)
 - `--max-iterations N` — Max rounds (default: 4)
+- `--seed PATH` — Absorb a repo's symbol catalog into the LLM context as building-block hints. Repeat the flag to provide multiple seed repos.
 
 **Environment variables:**
-- `GEMINI_API_KEY` — For `--provider gemini`
+- `AAAA_NEXUS_API_KEY` — For `--provider nexus` / `aaaa-nexus`
 - `ANTHROPIC_API_KEY` — For `--provider anthropic`
+- `GEMINI_API_KEY` / `GOOGLE_API_KEY` — For `--provider gemini`
 - `OPENAI_API_KEY` — For `--provider openai`
+- `OPENROUTER_API_KEY` — For `--provider openrouter`; override model with `FORGE_OPENROUTER_MODEL`
 - `FORGE_OLLAMA=1` — Enable Ollama (must be running on localhost:11434)
+- `FORGE_OLLAMA_MODEL` — Local model, default `qwen2.5-coder:7b`
+- `FORGE_OLLAMA_NUM_PREDICT` — Cap local output tokens per call
+- `FORGE_OLLAMA_TIMEOUT` — Local provider read timeout in seconds
+- `OLLAMA_BASE_URL` — Alternate Ollama endpoint
 
 **Example:**
 
@@ -501,6 +553,21 @@ forge iterate preflight "Build a tiny calculator CLI"
 forge iterate run "Build a tiny calculator CLI" ./output \
     --package calc --provider gemini --max-iterations 4
 
+# Execute with AAAA-Nexus (reliable for long runs)
+export AAAA_NEXUS_API_KEY=an_...
+forge iterate run "..." ./output --provider nexus
+
+# Execute with OpenRouter (free tier — 200+ models)
+export OPENROUTER_API_KEY=sk-or-...
+forge iterate run "..." ./output --provider openrouter
+
+# Execute with a low-load local model on a busy PC
+export FORGE_OLLAMA=1
+export FORGE_OLLAMA_MODEL=qwen2.5-coder:1.5b
+export FORGE_OLLAMA_NUM_PREDICT=768
+export FORGE_OLLAMA_TIMEOUT=180
+forge iterate run "..." ./output --provider ollama --max-iterations 2
+
 # Execute with Claude (paid)
 export ANTHROPIC_API_KEY=sk-...
 forge iterate run "..." ./output --provider anthropic
@@ -508,12 +575,21 @@ forge iterate run "..." ./output --provider anthropic
 # Use local Ollama (free, fully private)
 # First: ollama run qwen2.5-coder:7b
 forge iterate run "..." ./output --provider ollama
+
+# Multi-seed: provide two absorbed repos as building-block context
+forge iterate run "Build a tool-use agent" ./output \
+    --seed ./forged/langchain-picks \
+    --seed ./forged/mem0-picks \
+    --provider nexus --max-iterations 4
 ```
 
 **Output:**
 - Materialized code at `output/src/PACKAGE/`
 - Transcript of LLM loop iterations in `iterate.json`
 - Wire violations and certify scores logged per round
+- Python outputs also get `.atomadic-forge/quality.json`, generated
+  `docs/API.md`, `docs/TESTING.md`, missing docstrings, and
+  `tests/test_generated_smoke.py`
 
 ---
 
@@ -556,6 +632,8 @@ forge evolve run "..." ./output \
 - Final merged code at `output/src/PACKAGE/`
 - Per-round reports showing score trajectory
 - Halt reason (`rounds_exhausted` | `target_score_reached` | `stagnation_detected`)
+- Each Python round includes the same quality phases as `iterate`: generated
+  docstrings, docs, and import-smoke tests before final scoring
 
 ---
 
@@ -598,6 +676,42 @@ forge synergy SUBCOMMAND [OPTIONS]
 ```bash
 forge synergy scan ./output/src/myapp
 forge synergy implement ./output/src/myapp
+```
+
+---
+
+### forge emergent-then-synergy
+
+Pipeline adapter: run `forge emergent scan` and pipe the result into
+`forge synergy scan`. Useful for discovering composition chains and
+immediately finding feature wiring opportunities in one step.
+
+```bash
+forge emergent-then-synergy
+```
+
+---
+
+### forge synergy-then-emergent
+
+Pipeline adapter: run `forge synergy scan` and pipe the result into
+`forge emergent scan`. Surfaces emergent type-compatibility chains for
+features that synergy already identified as producer/consumer pairs.
+
+```bash
+forge synergy-then-emergent
+```
+
+---
+
+### forge evolve-then-iterate
+
+Pipeline adapter: run `forge evolve run` and immediately follow with
+`forge iterate run` on the evolved catalog. Useful for a final single-shot
+refinement pass after recursive self-improvement converges.
+
+```bash
+forge evolve-then-iterate
 ```
 
 ---

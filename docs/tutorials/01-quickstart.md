@@ -22,6 +22,11 @@ ollama pull qwen2.5-coder:7b
 export FORGE_OLLAMA=1
 export FORGE_OLLAMA_MODEL=qwen2.5-coder:7b
 
+# If your machine is busy, use the small fallback instead:
+export FORGE_OLLAMA_MODEL=qwen2.5-coder:1.5b
+export FORGE_OLLAMA_NUM_PREDICT=768
+export FORGE_OLLAMA_TIMEOUT=180
+
 # OR free cloud (Google AI Studio):
 export GEMINI_API_KEY=$(your-free-key)
 ```
@@ -60,7 +65,7 @@ python -m calc.a4_sy_orchestration.cli 7 + 6
 install required. Try the offline showcases:
 
 ```bash
-forge demo run --preset js-counter   # clean JS package, certify 100/100
+forge demo run --preset js-counter   # clean JS package, certify 60/100
 forge demo run --preset js-bad-wire  # the same package with one upward
                                      # import — wire flags it
 forge demo run --preset mixed-py-js  # one Python tier + one JS tier

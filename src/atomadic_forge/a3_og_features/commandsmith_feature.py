@@ -35,7 +35,6 @@ from ..a1_at_functions.commandsmith_render import (
     render_wrapper_module,
 )
 
-
 _REGISTRY_FILE = "_registry.py"
 _MANIFEST_FILE = "commandsmith_manifest.json"
 
@@ -233,10 +232,9 @@ class Commandsmith:
         """
         import os
         if cli_invocation is None:
-            # Run the unified CLI (where Commandsmith-registered verbs live),
-            # not atomadic_forge.cli which is the engine surface only.
+            # Use the forge CLI entry point.
             cli_invocation = [sys.executable, "-m",
-                              "atomadic_forge.a4_sy_orchestration.unified_cli"]
+                              "atomadic_forge.a4_sy_orchestration.cli"]
         env = os.environ.copy()
         env["PYTHONIOENCODING"] = "utf-8"
         env["PYTHONUTF8"] = "1"

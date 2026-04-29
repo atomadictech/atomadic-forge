@@ -1,0 +1,51 @@
+name: Bug report
+description: Report a reproducible Forge problem.
+title: "[Bug]: "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping harden Forge. Please include the smallest repro you can.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What happened, and what did you expect instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction
+      description: Exact commands, sample files, or a minimal repo layout.
+      placeholder: |
+        python -m atomadic_forge.a4_sy_orchestration.cli ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: output
+    attributes:
+      label: Output
+      description: Paste relevant terminal output. Redact secrets.
+      render: shell
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Output from `forge doctor --json`, Python version, OS, provider/model if relevant.
+      render: json
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I searched existing issues.
+          required: true
+        - label: I removed secrets, API keys, and local-only paths from the report.
+          required: true

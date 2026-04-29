@@ -16,7 +16,6 @@ from __future__ import annotations
 
 from typing import Literal, TypedDict
 
-
 Tier = Literal[
     "a0_qk_constants",
     "a1_at_functions",

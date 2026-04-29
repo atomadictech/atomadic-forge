@@ -11,10 +11,8 @@ import collections
 import datetime as _dt
 import json
 from pathlib import Path
-from typing import Iterable
 
 from ..a0_qk_constants.emergent_types import (
-    EmergentCandidateCard,
     EmergentScanReport,
     SymbolSignatureCard,
 )

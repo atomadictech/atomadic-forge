@@ -49,7 +49,7 @@ Try the showcase presets to see the pipeline against real JS source —
 no LLM key needed:
 
 ```bash
-forge demo run --preset js-counter   # clean JS package, certify 100/100
+forge demo run --preset js-counter   # clean JS package, certify 60/100
 forge demo run --preset js-bad-wire  # one upward import; wire flags it
 forge demo run --preset mixed-py-js  # Python tier + JS tier in one root
 ```
@@ -275,6 +275,29 @@ Error: 429 Too Many Requests
 - Use local Ollama (no rate limits): `export FORGE_OLLAMA=1`
 - Use stub provider for testing: `--provider stub`
 - Wait a bit and retry
+
+### Ollama is slow, crashing, or returns 500
+
+First unload any large model that is still resident:
+
+```bash
+ollama ps
+ollama stop codellama:7b-instruct
+```
+
+Then use the low-load Forge profile:
+
+```bash
+export FORGE_OLLAMA=1
+export FORGE_OLLAMA_MODEL=qwen2.5-coder:1.5b
+export FORGE_OLLAMA_NUM_PREDICT=768
+export FORGE_OLLAMA_TIMEOUT=180
+forge chat ask "Reply OK" --provider ollama --no-cwd-context
+```
+
+If that works, scale back up later to `qwen2.5-coder:7b` when the machine
+is idle. If it still fails, restart Ollama and retry the one-line chat
+smoke before running `iterate` or `evolve`.
 
 ### API key not found
 
