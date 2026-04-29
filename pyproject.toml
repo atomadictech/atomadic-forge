@@ -25,6 +25,9 @@ dependencies = [
     "click>=8.1,<9",
     "typer>=0.15,<1",
     "rich>=14,<15",
+    # Lane D W8 — .forge sidecar parser (a1.sidecar_parser) and the
+    # GitHub Action validator test surface both depend on PyYAML.
+    "pyyaml>=6,<7",
 ]
 
 [project.optional-dependencies]
