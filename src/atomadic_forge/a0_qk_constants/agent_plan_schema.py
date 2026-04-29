@@ -102,6 +102,10 @@ class AgentPlan(TypedDict, total=False):
     action_count: int            # full count regardless of top_n cap
     applyable_count: int
     next_command: str
+    # Codex feedback: surface the certify score on the plan envelope
+    # so MCP _summary digests don't have to guess. None when no
+    # certify_report fed the plan.
+    score: float | None
     # Provenance — what scans fed into this plan.
     sources: dict[str, str]      # {source_name: schema_version}
 

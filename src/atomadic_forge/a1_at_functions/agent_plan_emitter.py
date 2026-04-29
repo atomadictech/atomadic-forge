@@ -83,7 +83,10 @@ def _operational_cards(certify_report: dict | None,
             why="forge certify documentation_complete=False blocks any "
                  "score above 75/100; a one-paragraph README is worth +25.",
             risk="low",
-            applyable=False,
+            # forge plan-apply has a bounded F0050 handler that writes
+            # a stub README; the agent should replace it with real
+            # content before shipping.
+            applyable=True,
             write_scope=["README.md"],
             commands=[f"forge certify . --package {pkg_label}"],
             related_fcodes=[fcode_for_certify_axis("documentation_complete")],
@@ -307,6 +310,10 @@ def emit_agent_plan(
         action_count=len(cards),
         applyable_count=applyable,
         next_command=next_command,
+        # Codex feedback (round 3): surface the certify score on the
+        # plan envelope so MCP _summary digests inherit the real number.
+        score=(float(certify_report["score"])
+               if certify_report and "score" in certify_report else None),
         sources=sources,
     )
     # Defensive — TypedDict isn't enforced at runtime.

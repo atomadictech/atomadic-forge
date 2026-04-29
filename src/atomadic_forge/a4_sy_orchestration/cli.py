@@ -42,8 +42,10 @@ from ..a1_at_functions.receipt_emitter import build_receipt, receipt_to_json
 from ..a1_at_functions.scout_walk import harvest_repo
 from ..a1_at_functions.wire_check import scan_violations
 from ..a2_mo_composites.lineage_chain_store import LineageChainStore
+from ..a2_mo_composites.plan_store import PlanStore
 from ..a2_mo_composites.receipt_signer import sign_receipt
 from ..a3_og_features.forge_enforce import run_enforce
+from ..a3_og_features.forge_plan_apply import apply_all_applyable, apply_card
 from ..a3_og_features.mcp_server import serve_stdio as mcp_serve_stdio
 from ..a3_og_features.forge_pipeline import (
     run_auto,
@@ -291,6 +293,11 @@ def plan_cmd(
         help="Cap the action card list at N (action_count remains "
              "the full count).")] = 7,
     json_out: Annotated[bool, typer.Option("--json")] = False,
+    save: Annotated[bool, typer.Option(
+        "--save",
+        help="Persist the plan under .atomadic-forge/plans/<id>.json "
+             "so it can be addressed by `forge plan-step` / "
+             "`forge plan-apply`.")] = False,
 ) -> None:
     """Codex-driven 'next best action card' generator (agent_plan/v1).
 
@@ -311,6 +318,10 @@ def plan_cmd(
     """
     plan = run_auto_plan(target=target, goal=goal, mode=mode,
                           package=package, top_n=top_n)
+    plan_id = None
+    if save:
+        plan_id = PlanStore(target).save_plan(plan)
+        plan["id"] = plan_id  # so JSON / human output reflect the id
     if json_out:
         typer.echo(json.dumps(plan, indent=2, default=str))
         return
@@ -335,6 +346,147 @@ def plan_cmd(
             typer.echo(f"     next: {nc[:120]}")
         typer.echo("")
     typer.echo(f"  NEXT: {plan.get('next_command', '').strip()[:120]}")
+    if plan_id:
+        typer.echo(f"  saved: plan_id={plan_id}")
+        typer.echo(f"        forge plan-show {plan_id} --project {target}")
+
+
+@app.command("plan-list")
+def plan_list_cmd(
+    project: Annotated[Path, typer.Option(
+        "--project",
+        exists=True, file_okay=False, dir_okay=True, resolve_path=True,
+        help="Project root the plans are stored under.")] = Path("."),
+    json_out: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    """List saved agent_plan/v1 documents for ``--project``."""
+    plans = PlanStore(project).list_plans()
+    if json_out:
+        typer.echo(json.dumps(
+            {"schema_version": "atomadic-forge.plan.list/v1",
+             "project": str(project),
+             "plans": plans}, indent=2, default=str))
+        return
+    if not plans:
+        typer.echo(f"\nNo saved plans under {project}/.atomadic-forge/plans/")
+        typer.echo("Run `forge plan <target> --save` to persist one.")
+        return
+    typer.echo(f"\nForge — saved plans under {project}/.atomadic-forge/plans/")
+    typer.echo("-" * 60)
+    for p in plans:
+        typer.echo(f"  {p['plan_id']}  {p['verdict']:<6}  "
+                    f"actions={p['action_count']}  "
+                    f"applyable={p['applyable_count']}  "
+                    f"saved={p['saved_at_utc']}")
+        typer.echo(f"    goal: {p['goal'][:80]}")
+
+
+@app.command("plan-show")
+def plan_show_cmd(
+    plan_id: Annotated[str, typer.Argument(help="Plan id from plan-list.")],
+    project: Annotated[Path, typer.Option(
+        "--project",
+        exists=True, file_okay=False, dir_okay=True, resolve_path=True)] = Path("."),
+    json_out: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    """Pretty-print a saved agent_plan/v1 by id."""
+    store = PlanStore(project)
+    plan = store.load_plan(plan_id)
+    if plan is None:
+        raise typer.BadParameter(
+            f"plan id {plan_id!r} not found under "
+            f"{project}/.atomadic-forge/plans/"
+        )
+    state = store.load_state(plan_id) or {}
+    if json_out:
+        typer.echo(json.dumps({"plan": plan, "state": state},
+                                indent=2, default=str))
+        return
+    typer.echo(f"\nForge plan {plan_id}  ({plan.get('verdict', '?')})")
+    typer.echo("-" * 60)
+    typer.echo(f"  goal:    {plan.get('goal', '')}")
+    typer.echo(f"  mode:    {plan.get('mode', '')}")
+    typer.echo(f"  actions: {plan.get('action_count', 0)} "
+                f"({plan.get('applyable_count', 0)} applyable)")
+    for i, card in enumerate(plan.get("top_actions", []), 1):
+        cid = card.get("id", "?")
+        status = store.card_status(plan_id, cid)
+        tag = "AUTO" if card.get("applyable") else "REVIEW"
+        typer.echo(f"  {i}. [{tag}] [{status}] {card.get('title', '')}")
+        typer.echo(f"     id: {cid}")
+
+
+@app.command("plan-step")
+def plan_step_cmd(
+    plan_id: Annotated[str, typer.Argument(help="Plan id from plan-list.")],
+    card_id: Annotated[str, typer.Argument(help="Card id from plan-show.")],
+    project: Annotated[Path, typer.Option(
+        "--project",
+        exists=True, file_okay=False, dir_okay=True, resolve_path=True)] = Path("."),
+    apply: Annotated[bool, typer.Option(
+        "--apply",
+        help="Actually execute the card. Default is dry-run.")] = False,
+    json_out: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    """Apply ONE card from a saved plan (Codex's bounded-step verb)."""
+    store = PlanStore(project)
+    plan = store.load_plan(plan_id)
+    if plan is None:
+        raise typer.BadParameter(f"plan id {plan_id!r} not found")
+    result = apply_card(project, plan, card_id, apply=apply)
+    if json_out:
+        typer.echo(json.dumps(result, indent=2, default=str))
+        if result["status"] in {"failed", "rolled_back"}:
+            raise typer.Exit(code=1)
+        return
+    typer.echo(f"\nForge plan-step ({'APPLY' if apply else 'DRY-RUN'}) "
+                f"{plan_id}/{card_id}")
+    typer.echo(f"  status: {result['status']}")
+    detail = result.get("detail") or {}
+    for key, value in detail.items():
+        if isinstance(value, (dict, list)):
+            value = json.dumps(value, default=str)[:120]
+        typer.echo(f"  {key}: {value}")
+    if result["status"] in {"failed", "rolled_back"}:
+        raise typer.Exit(code=1)
+
+
+@app.command("plan-apply")
+def plan_apply_cmd(
+    plan_id: Annotated[str, typer.Argument(help="Plan id from plan-list.")],
+    project: Annotated[Path, typer.Option(
+        "--project",
+        exists=True, file_okay=False, dir_okay=True, resolve_path=True)] = Path("."),
+    apply: Annotated[bool, typer.Option(
+        "--apply",
+        help="Actually execute every applyable card. Default is dry-run.")] = False,
+    json_out: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    """Apply ALL applyable cards from a saved plan in order.
+
+    Halts on the first ``rolled_back`` or ``failed`` outcome so the
+    agent inspects before cascading further mutations.
+    """
+    store = PlanStore(project)
+    plan = store.load_plan(plan_id)
+    if plan is None:
+        raise typer.BadParameter(f"plan id {plan_id!r} not found")
+    result = apply_all_applyable(project, plan, apply=apply)
+    if json_out:
+        typer.echo(json.dumps(result, indent=2, default=str))
+        if result.get("halted_on") in {"failed", "rolled_back"}:
+            raise typer.Exit(code=1)
+        return
+    typer.echo(f"\nForge plan-apply ({'APPLY' if apply else 'DRY-RUN'}) "
+                f"{plan_id}")
+    typer.echo("-" * 60)
+    typer.echo(f"  applied: {result['applied_count']}  "
+                f"skipped: {result['skipped_count']}  "
+                f"halted_on: {result.get('halted_on') or '-'}")
+    for r in result["results"]:
+        typer.echo(f"  - [{r['status']:<12s}] {r['card_id']}")
+    if result.get("halted_on") in {"failed", "rolled_back"}:
+        raise typer.Exit(code=1)
 
 
 @app.command("enforce")
@@ -586,9 +738,22 @@ def mcp_serve_cmd(
           }
         }
 
-    Tools exposed: recon, wire, certify, enforce, audit_list.
-    Resources exposed: forge://docs/receipt, forge://docs/formalization,
-    forge://lineage/chain, forge://schema/receipt.
+    Tools exposed (8):
+      recon        — scout the repo + classify symbols into 5 tiers
+      wire         — upward-import scan; suggest_repairs is supported
+      certify      — score documentation / tests / layout / wire
+      enforce      — apply mechanical fixes; rolls back on regression
+      audit_list   — summarize .atomadic-forge lineage entries
+      auto_plan    — agent_plan/v1 'next best action card' generator
+      auto_step    — apply ONE card from a saved plan
+      auto_apply   — apply ALL applyable cards from a saved plan
+
+    Resources exposed (5):
+      forge://docs/receipt           — Receipt v1 schema docs
+      forge://docs/formalization     — AAM + BEP theorem citations
+      forge://lineage/chain          — local Vanguard lineage chain
+      forge://schema/receipt         — verdict enum + version constants
+      forge://summary/blockers       — one-call 'what's blocking?' summary
     """
     rc = mcp_serve_stdio(project_root=project)
     if rc != 0:

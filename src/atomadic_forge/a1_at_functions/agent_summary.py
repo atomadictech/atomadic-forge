@@ -208,7 +208,9 @@ def summarize_blockers(
     blockers.sort(key=_rank)
 
     auto = sum(1 for b in blockers if b.get("auto_fixable"))
-    score = (certify_report or {}).get("score", 0.0)
+    # Codex feedback: bare-wire callers have no certify score; render
+    # 'no score' instead of a misleading 0/100. None signals 'unknown'.
+    score = (certify_report or {}).get("score") if certify_report is not None else None
     if certify_report is None and wire_report is not None:
         # Bare-wire callers: derive a coarse verdict from wire alone.
         verdict = wire_report.get("verdict", "FAIL")
@@ -251,7 +253,9 @@ def render_summary_text(summary: dict, *, width: int = 60) -> str:
     auto = summary.get("auto_fixable_count", 0)
     glyph = {"PASS": "✓", "FAIL": "✗", "REFINE": "↻", "QUARANTINE": "⏸"}.get(
         verdict, "?")
-    lines.append(f"{glyph} {verdict}   score {score:.0f}/100   "
+    score_part = (f"score {score:.0f}/100   "
+                  if isinstance(score, (int, float)) else "")
+    lines.append(f"{glyph} {verdict}   {score_part}"
                   f"{n} blocker{'' if n == 1 else 's'} "
                   f"({auto} auto-fixable)")
     lines.append("─" * width)

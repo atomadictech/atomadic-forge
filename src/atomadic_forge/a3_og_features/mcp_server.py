@@ -24,11 +24,18 @@ from pathlib import Path as _Path
 
 from ..a1_at_functions.mcp_protocol import (
     dispatch_request,
+    register_auto_apply_handler,
     register_auto_plan_handler,
+    register_auto_step_handler,
     register_enforce_handler,
 )
+from ..a2_mo_composites.plan_store import PlanStore as _PlanStore
 from .forge_enforce import run_enforce as _run_enforce
 from .forge_pipeline import run_auto_plan as _run_auto_plan
+from .forge_plan_apply import (
+    apply_all_applyable as _apply_all_applyable,
+    apply_card as _apply_card,
+)
 
 
 def _bound_enforce(project_root, args):
@@ -44,17 +51,55 @@ def _bound_auto_plan(project_root, args):
     through the MCP dispatcher with the same a1↔a3 injection pattern
     used for enforce."""
     target = _Path(args.get("target", project_root)).resolve()
-    return _run_auto_plan(
+    plan = _run_auto_plan(
         target=target,
         goal=str(args.get("goal", "improve repo conformance")),
         mode=str(args.get("mode", "improve")),
         package=args.get("package"),
         top_n=int(args.get("top_n", 7)),
     )
+    if bool(args.get("save", False)):
+        plan_id = _PlanStore(target).save_plan(plan)
+        plan["id"] = plan_id
+    return plan
+
+
+def _bound_auto_step(project_root, args):
+    project = _Path(args.get("project", project_root)).resolve()
+    plan_id = str(args["plan_id"])
+    card_id = str(args["card_id"])
+    apply = bool(args.get("apply", False))
+    plan = _PlanStore(project).load_plan(plan_id)
+    if plan is None:
+        return {
+            "schema_version": "atomadic-forge.plan_apply/v1",
+            "plan_id": plan_id, "card_id": card_id, "apply": apply,
+            "status": "failed",
+            "detail": {"reason": f"plan id {plan_id!r} not found"},
+        }
+    return _apply_card(project, plan, card_id, apply=apply)
+
+
+def _bound_auto_apply(project_root, args):
+    project = _Path(args.get("project", project_root)).resolve()
+    plan_id = str(args["plan_id"])
+    apply = bool(args.get("apply", False))
+    plan = _PlanStore(project).load_plan(plan_id)
+    if plan is None:
+        return {
+            "schema_version": "atomadic-forge.plan_apply_all/v1",
+            "plan_id": plan_id, "apply": apply,
+            "results": [], "halted_on": "failed",
+            "applied_count": 0, "skipped_count": 0,
+            "detail": {"reason": f"plan id {plan_id!r} not found"},
+        }
+    return _apply_all_applyable(project, plan, apply=apply)
 
 
 register_enforce_handler(_bound_enforce)
 register_auto_plan_handler(_bound_auto_plan)
+register_auto_step_handler(_bound_auto_step)
+register_auto_apply_handler(_bound_auto_apply)
 
 
 def serve_stdio(

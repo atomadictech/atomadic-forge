@@ -179,6 +179,44 @@ def register_auto_plan_handler(handler: ToolHandler) -> None:
     _auto_plan_handler = handler
 
 
+def _tool_auto_step_unbound(project_root, args):
+    return {
+        "schema_version": "atomadic-forge.plan_apply/v1",
+        "wired": False,
+        "note": "auto_step not wired — import a3.mcp_server.",
+    }
+
+
+def _tool_auto_apply_unbound(project_root, args):
+    return {
+        "schema_version": "atomadic-forge.plan_apply_all/v1",
+        "wired": False,
+        "note": "auto_apply not wired — import a3.mcp_server.",
+    }
+
+
+_auto_step_handler: ToolHandler = _tool_auto_step_unbound
+_auto_apply_handler: ToolHandler = _tool_auto_apply_unbound
+
+
+def _tool_auto_step(project_root, args):
+    return _auto_step_handler(project_root, args)
+
+
+def _tool_auto_apply(project_root, args):
+    return _auto_apply_handler(project_root, args)
+
+
+def register_auto_step_handler(handler: ToolHandler) -> None:
+    global _auto_step_handler
+    _auto_step_handler = handler
+
+
+def register_auto_apply_handler(handler: ToolHandler) -> None:
+    global _auto_apply_handler
+    _auto_apply_handler = handler
+
+
 TOOLS: dict[str, dict[str, Any]] = {
     "recon": {
         "name": "recon",
@@ -274,10 +312,52 @@ TOOLS: dict[str, dict[str, Any]] = {
                               "default": "improve"},
                 "package":  {"type": ["string", "null"]},
                 "top_n":    {"type": "integer", "default": 7},
+                "save":     {"type": "boolean", "default": False,
+                              "description": "Persist the plan + return its id."},
             },
             "additionalProperties": False,
         },
         "handler": _tool_auto_plan,
+    },
+    "auto_step": {
+        "name": "auto_step",
+        "description": (
+            "Apply ONE card from a saved plan. apply=False is dry-run "
+            "(default); apply=True executes the bounded change. The "
+            "card's outcome (applied / rolled_back / skipped / failed) "
+            "is recorded in the plan's state file."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "project":  {"type": "string"},
+                "plan_id":  {"type": "string"},
+                "card_id":  {"type": "string"},
+                "apply":    {"type": "boolean", "default": False},
+            },
+            "required": ["plan_id", "card_id"],
+            "additionalProperties": False,
+        },
+        "handler": _tool_auto_step,
+    },
+    "auto_apply": {
+        "name": "auto_apply",
+        "description": (
+            "Apply ALL applyable cards from a saved plan in order. "
+            "Halts on the first rolled_back or failed outcome so the "
+            "agent can inspect before cascading further mutations."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "project":  {"type": "string"},
+                "plan_id":  {"type": "string"},
+                "apply":    {"type": "boolean", "default": False},
+            },
+            "required": ["plan_id"],
+            "additionalProperties": False,
+        },
+        "handler": _tool_auto_apply,
     },
 }
 
@@ -413,10 +493,12 @@ def _summary_for_tool(name: str, result: Any) -> dict[str, Any] | None:
     if schema == "atomadic-forge.agent_plan/v1":
         # Plans already ARE summary-shaped — surface a tiny digest
         # so MCP clients can branch without re-parsing the full plan.
+        # Codex feedback (round 3): the plan now carries a 'score'
+        # field; inherit it so MCP _summary matches forge://summary/blockers.
         return {
             "schema_version": "atomadic-forge.summary/v1",
             "verdict": result.get("verdict", "?"),
-            "score": 0,
+            "score": result.get("score"),
             "blocker_count": result.get("action_count", 0),
             "auto_fixable_count": result.get("applyable_count", 0),
             "blockers": [],
