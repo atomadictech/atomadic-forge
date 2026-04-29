@@ -40,6 +40,7 @@ from ..a1_at_functions.wire_check import scan_violations
 from ..a2_mo_composites.lineage_chain_store import LineageChainStore
 from ..a2_mo_composites.receipt_signer import sign_receipt
 from ..a3_og_features.forge_enforce import run_enforce
+from ..a3_og_features.mcp_server import serve_stdio as mcp_serve_stdio
 from ..a3_og_features.forge_pipeline import (
     run_auto,
     run_cherry,
@@ -454,6 +455,44 @@ def diff_cmd(
         f"-{len(diff['removed'])} removed / "
         f"~{len(diff['changed'])} changed"
     )
+
+
+mcp_app = typer.Typer(no_args_is_help=True,
+                       help="MCP server surface — speak Forge to coding agents.")
+
+
+@mcp_app.command("serve")
+def mcp_serve_cmd(
+    project: Annotated[Path, typer.Option(
+        "--project",
+        exists=True, file_okay=False, dir_okay=True, resolve_path=True,
+        help="Project root the MCP tools will operate against. "
+             "Defaults to the current working directory.")] = Path("."),
+) -> None:
+    """Run the MCP stdio JSON-RPC server (Cursor / Claude Code / Aider / Devin).
+
+    Add to your client's MCP config:
+
+        {
+          "mcpServers": {
+            "atomadic-forge": {
+              "command": "forge",
+              "args": ["mcp", "serve", "--project", "/path/to/your/repo"]
+            }
+          }
+        }
+
+    Tools exposed: recon, wire, certify, enforce, audit_list.
+    Resources exposed: forge://docs/receipt, forge://docs/formalization,
+    forge://lineage/chain, forge://schema/receipt.
+    """
+    rc = mcp_serve_stdio(project_root=project)
+    if rc != 0:
+        raise typer.Exit(code=rc)
+
+
+app.add_typer(mcp_app, name="mcp",
+               help="MCP server surface — speak Forge to coding agents.")
 
 
 @app.command("doctor")
