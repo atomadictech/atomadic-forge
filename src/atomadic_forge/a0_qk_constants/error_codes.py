@@ -174,6 +174,64 @@ F_CODE_REGISTRY: dict[str, FCode] = {
         auto_fixable=True,
         doc_anchor="f0053-upward-imports-present",
     ),
+    # ---- Sidecar drift (F0100-F0109; Lane D W8/W11) ----
+    "F0100": FCode(
+        code="F0100",
+        name="sidecar-source-unparseable",
+        severity="error",
+        title="Sidecar present but the source file did not parse.",
+        hint_key="",
+        auto_fixable=False,
+        doc_anchor="f0100-sidecar-source-unparseable",
+    ),
+    "F0101": FCode(
+        code="F0101",
+        name="sidecar-declares-missing-symbol",
+        severity="error",
+        title="Sidecar declares a symbol the source file doesn't have.",
+        hint_key="",
+        auto_fixable=False,
+        doc_anchor="f0101-sidecar-declares-missing-symbol",
+    ),
+    "F0102": FCode(
+        code="F0102",
+        name="sidecar-coverage-incomplete",
+        severity="warn",
+        title="Source has a public symbol the sidecar didn't declare (advisory).",
+        hint_key="",
+        auto_fixable=False,
+        doc_anchor="f0102-sidecar-coverage-incomplete",
+    ),
+    "F0103": FCode(
+        code="F0103",
+        name="sidecar-pure-violates-purity",
+        severity="error",
+        title="Sidecar declares Pure but source uses I/O / network / non-deterministic input.",
+        hint_key="",
+        auto_fixable=False,
+        doc_anchor="f0103-sidecar-pure-violates-purity",
+    ),
+    "F0106": FCode(
+        code="F0106",
+        name="sidecar-tier-mismatch",
+        severity="warn",
+        title="Sidecar declares a tier different from the source file's actual path tier.",
+        hint_key="",
+        auto_fixable=False,
+        doc_anchor="f0106-sidecar-tier-mismatch",
+    ),
+}
+
+
+# Sidecar S-code → F-code mapping. Exposed so the validator (a1) can
+# promote local drift labels into the global F-code namespace
+# without re-importing this whole registry.
+SIDECAR_S_TO_F: dict[str, str] = {
+    "S0000": "F0100",
+    "S0001": "F0101",
+    "S0002": "F0102",
+    "S0003": "F0103",
+    "S0006": "F0106",
 }
 """Canonical F-code registry. Adding a new code is additive; renaming
 or renumbering is a major schema bump (and requires updating every

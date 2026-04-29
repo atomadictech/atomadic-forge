@@ -23,6 +23,7 @@ import ast
 from pathlib import Path
 from typing import TypedDict
 
+from ..a0_qk_constants.error_codes import SIDECAR_S_TO_F
 from ..a0_qk_constants.sidecar_schema import VALID_EFFECTS, SidecarFile
 
 
@@ -30,7 +31,8 @@ SCHEMA_VERSION_VALIDATE_V1 = "atomadic-forge.sidecar.validate/v1"
 
 
 class ValidationFinding(TypedDict, total=False):
-    code: str          # Drift class label (S0001..S0007)
+    code: str          # Drift class label (S0001..S0007) — local
+    f_code: str        # Global F-code (F0100..F0109) — registered
     severity: str      # 'error' | 'warn' | 'info'
     symbol: str
     message: str
@@ -181,6 +183,14 @@ def validate_sidecar(
     # S0005 / S0007 — compose_with name resolution + Lean4 proves
     # discharge are reserved for Lane D W20 (Bao-Rompf checker).
     # Today we record but don't enforce.
+
+    # Promote each S-code to its registered F-code so downstream
+    # tools (forge audit / agent_summary / score_patch) can address
+    # sidecar drift in the same namespace as wire violations.
+    for f in findings:
+        s_code = f.get("code", "")
+        if s_code in SIDECAR_S_TO_F:
+            f["f_code"] = SIDECAR_S_TO_F[s_code]
 
     error_count = sum(1 for f in findings if f.get("severity") == "error")
     verdict = "PASS" if error_count == 0 else "FAIL"
