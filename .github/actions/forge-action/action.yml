@@ -1,0 +1,226 @@
+# Atomadic Forge — composite GitHub Action.
+#
+# Golden Path Lane C W1 deliverable. One-line install for any repo:
+#
+#   - uses: atomadictech/atomadic-forge/.github/actions/forge-action@main
+#     with:
+#       package_root: src/your_package
+#       fail_under: '75'
+#
+# What it does:
+#   1. Installs Forge from the same ref the action shipped from.
+#   2. Runs the full wire + certify chain with native fail flags.
+#   3. Writes a Forge Receipt v1 + a 60-wide rendered card.
+#   4. Uploads wire.json / certify.json / receipt.json as artifacts.
+#   5. Posts (or updates) a sticky PR comment with the rendered card +
+#      a one-line per-axis verdict.
+#
+# Soft-fail discipline:
+#   * The wire and certify gates fail the job non-zero by themselves
+#     when their thresholds are breached.
+#   * The PR-comment step is best-effort: when the action runs from a
+#     fork or without `pull-requests: write` permission, the comment
+#     is skipped and the job still reports its real verdict via exit
+#     code.
+
+name: 'Atomadic Forge — wire + certify gate'
+description: 'Run forge wire + certify on a tier-organized package and post a sticky PR comment with the Receipt card.'
+author: 'Atomadic Tech'
+branding:
+  icon: 'shield'
+  color: 'purple'
+
+inputs:
+  package_root:
+    description: 'Tier-organized package root (e.g. src/your_package).'
+    required: true
+  project_root:
+    description: 'Project root for forge certify (defaults to ".").'
+    required: false
+    default: '.'
+  package_name:
+    description: 'Python package name (forwarded to --package).'
+    required: false
+    default: ''
+  fail_under:
+    description: 'Certify threshold; the job fails when the score is below.'
+    required: false
+    default: '75'
+  receipt_path:
+    description: 'Where to write the emitted Receipt JSON (relative to project_root).'
+    required: false
+    default: '.atomadic-forge/receipt.json'
+  python_version:
+    description: 'Python version to install before running Forge.'
+    required: false
+    default: '3.11'
+  forge_ref:
+    description: 'Git ref (tag/branch/sha) of atomadic-forge to install. Defaults to the action ref.'
+    required: false
+    default: ''
+  comment_on_pr:
+    description: 'Post / update a sticky PR comment with the Receipt card. Set to "false" to skip.'
+    required: false
+    default: 'true'
+  upload_artifacts:
+    description: 'Upload wire/certify/receipt JSON as a build artifact.'
+    required: false
+    default: 'true'
+
+outputs:
+  certify_score:
+    description: 'Final certify score (0-100), as a string.'
+    value: ${{ steps.certify.outputs.score }}
+  wire_verdict:
+    description: 'Wire scan verdict (PASS / FAIL).'
+    value: ${{ steps.wire.outputs.verdict }}
+  receipt_path:
+    description: 'Path to the emitted Receipt JSON (relative to project_root).'
+    value: ${{ inputs.receipt_path }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python_version }}
+
+    - name: Install Atomadic Forge
+      shell: bash
+      run: |
+        set -euo pipefail
+        ref="${{ inputs.forge_ref }}"
+        if [ -z "$ref" ]; then
+          # Default: pin to the same ref the action repo is checked
+          # out at. GITHUB_ACTION_REF is set for actions invoked via
+          # `uses: owner/repo/.github/actions/...@ref`.
+          ref="${GITHUB_ACTION_REF:-main}"
+        fi
+        echo "Installing atomadic-forge from ref: $ref"
+        pip install --upgrade pip
+        pip install "atomadic-forge @ git+https://github.com/atomadictech/atomadic-forge@${ref}"
+        forge --version || python -m atomadic_forge --version || true
+
+    - name: Forge wire (upward-import discipline)
+      id: wire
+      shell: bash
+      working-directory: ${{ inputs.project_root }}
+      env:
+        PACKAGE_ROOT: ${{ inputs.package_root }}
+      run: |
+        set -euo pipefail
+        mkdir -p .atomadic-forge
+        # Native gate (Lane G1): exits 1 on any violation.
+        forge wire "$PACKAGE_ROOT" \
+          --fail-on-violations \
+          --json > .atomadic-forge/wire.json
+        verdict=$(python -c "import json; print(json.load(open('.atomadic-forge/wire.json'))['verdict'])")
+        echo "verdict=$verdict" >> "$GITHUB_OUTPUT"
+
+    - name: Forge certify (architecture conformance)
+      id: certify
+      shell: bash
+      working-directory: ${{ inputs.project_root }}
+      env:
+        PACKAGE_NAME: ${{ inputs.package_name }}
+        FAIL_UNDER: ${{ inputs.fail_under }}
+        RECEIPT_PATH: ${{ inputs.receipt_path }}
+      run: |
+        set -euo pipefail
+        package_arg=""
+        if [ -n "$PACKAGE_NAME" ]; then
+          package_arg="--package $PACKAGE_NAME"
+        fi
+        # Native gate + Receipt emission + card render.
+        forge certify . \
+          $package_arg \
+          --fail-under "$FAIL_UNDER" \
+          --emit-receipt "$RECEIPT_PATH" \
+          --print-card \
+          --json > .atomadic-forge/certify.json
+        score=$(python -c "import json; r=json.load(open('.atomadic-forge/certify.json')); print(r.get('score', r.get('total_score', 0)))")
+        echo "score=$score" >> "$GITHUB_OUTPUT"
+
+    - name: Render Receipt card (separate stdout for PR comment)
+      id: render
+      shell: bash
+      working-directory: ${{ inputs.project_root }}
+      env:
+        PACKAGE_NAME: ${{ inputs.package_name }}
+      run: |
+        set -euo pipefail
+        package_arg=""
+        if [ -n "$PACKAGE_NAME" ]; then
+          package_arg="--package $PACKAGE_NAME"
+        fi
+        # Re-render the card into a file we can read in the PR-comment step.
+        forge certify . $package_arg --print-card > .atomadic-forge/card.txt 2>&1 || true
+
+    - name: Post Receipt card as sticky PR comment
+      if: github.event_name == 'pull_request' && inputs.comment_on_pr == 'true'
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ github.token }}
+        script: |
+          const fs = require('fs');
+          const path = require('path');
+          const projectRoot = '${{ inputs.project_root }}';
+          const cardPath = path.join(projectRoot, '.atomadic-forge', 'card.txt');
+          let card = '(card unavailable)';
+          try {
+            card = fs.readFileSync(cardPath, 'utf8');
+          } catch (e) {
+            console.log(`Could not read ${cardPath}: ${e.message}`);
+          }
+          const score = '${{ steps.certify.outputs.score }}';
+          const verdict = '${{ steps.wire.outputs.verdict }}';
+          const marker = '<!-- atomadic-forge:receipt-card -->';
+          const body = [
+            marker,
+            '### Atomadic Forge — wire + certify',
+            '',
+            `**wire:** \`${verdict}\` &nbsp;·&nbsp; **certify:** \`${score}/100\``,
+            '',
+            '```',
+            card.trim(),
+            '```',
+            '',
+            '<sub>Posted by [forge-action](https://github.com/atomadictech/atomadic-forge/tree/main/.github/actions/forge-action). The card and JSON receipt are also uploaded as build artifacts on this run.</sub>'
+          ].join('\n');
+
+          const { owner, repo } = context.repo;
+          const issue_number = context.issue.number;
+          if (!issue_number) {
+            console.log('No PR number on this event; skipping comment.');
+            return;
+          }
+          // Find an existing sticky comment by marker.
+          const existing = await github.paginate(github.rest.issues.listComments, {
+            owner, repo, issue_number,
+          });
+          const prior = existing.find(c => c.body && c.body.includes(marker));
+          if (prior) {
+            await github.rest.issues.updateComment({
+              owner, repo, comment_id: prior.id, body,
+            });
+            console.log(`Updated sticky comment ${prior.id}.`);
+          } else {
+            await github.rest.issues.createComment({
+              owner, repo, issue_number, body,
+            });
+            console.log('Created sticky comment.');
+          }
+
+    - name: Upload Forge artifacts
+      if: always() && inputs.upload_artifacts == 'true'
+      uses: actions/upload-artifact@v4
+      with:
+        name: atomadic-forge-${{ github.run_id }}-${{ github.run_attempt }}
+        path: |
+          ${{ inputs.project_root }}/.atomadic-forge/wire.json
+          ${{ inputs.project_root }}/.atomadic-forge/certify.json
+          ${{ inputs.project_root }}/${{ inputs.receipt_path }}
+          ${{ inputs.project_root }}/.atomadic-forge/card.txt
+        if-no-files-found: warn
+        retention-days: 14
