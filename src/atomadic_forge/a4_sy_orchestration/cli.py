@@ -223,7 +223,10 @@ def wire_cmd(
     if suggest_repairs:
         typer.echo(f"  auto-fixable: {report['auto_fixable']}/{report['violation_count']}")
     for v in report["violations"][:10]:
-        line = f"    - {v['file']}: {v['from_tier']} ⟵ {v['to_tier']}.{v['imported']}"
+        fcode = v.get("f_code", "")
+        prefix = f"[{fcode}] " if fcode else ""
+        line = (f"    - {prefix}{v['file']}: "
+                f"{v['from_tier']} ⟵ {v['to_tier']}.{v['imported']}")
         typer.echo(line)
         if suggest_repairs and v.get("proposed_destination"):
             typer.echo(f"        → move to {v['proposed_destination']}/  "

@@ -20,6 +20,7 @@ import ast
 import re
 from pathlib import Path
 
+from ..a0_qk_constants.error_codes import fcode_for_tier_violation
 from ..a0_qk_constants.lang_extensions import (
     JAVASCRIPT_EXTS,
     PYTHON_EXTS,
@@ -87,6 +88,7 @@ def _scan_python_file(py: Path, package_root: Path,
                 "to_tier": to_tier,
                 "imported": alias.name,
                 "language": "python",
+                "f_code": fcode_for_tier_violation(from_tier, to_tier),
                 "proposed_fix": "",
             })
 
@@ -110,6 +112,7 @@ def _scan_js_file(js: Path, package_root: Path,
             "to_tier": to_tier,
             "imported": spec,
             "language": language,
+            "f_code": fcode_for_tier_violation(from_tier, to_tier),
             "proposed_fix": "",
         })
 
