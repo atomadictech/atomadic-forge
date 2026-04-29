@@ -30,6 +30,7 @@ import typer
 
 from .. import __version__
 from ..a1_at_functions.certify_checks import certify as certify_checks
+from ..a1_at_functions.error_hints import format_hint
 from ..a1_at_functions.manifest_diff import diff_manifests
 from ..a1_at_functions.progress_reporter import make_stderr_reporter
 from ..a1_at_functions.wire_check import scan_violations
@@ -234,6 +235,13 @@ def wire_cmd(
     if fail_on_violations and has_violations:
         typer.echo(f"  gate:       FAIL (--fail-on-violations set)")
         raise typer.Exit(code=1)
+    if has_violations and not suggest_repairs and not json_out:
+        typer.echo(
+            "\n"
+            + format_hint("wire_fail_with_violations",
+                          count=report["violation_count"], path=source),
+            err=True,
+        )
 
 
 @app.command("certify")
@@ -247,7 +255,9 @@ def certify_cmd(
 ) -> None:
     """Score documentation, tests, tier layout, import discipline."""
     if fail_under is not None and not 0 <= fail_under <= 100:
-        raise typer.BadParameter("--fail-under must be between 0 and 100")
+        raise typer.BadParameter(
+            format_hint("fail_under_out_of_range", value=fail_under)
+        )
     report = certify_checks(project_root, project=project_root.name,
                              package=package)
     failed_gate = fail_under is not None and float(report["score"]) < fail_under
@@ -266,6 +276,14 @@ def certify_cmd(
         typer.echo(f"    - {issue}")
     if failed_gate:
         typer.echo(f"  gate:  FAIL (score below --fail-under {fail_under:g})")
+        typer.echo(
+            "\n"
+            + format_hint("certify_below_threshold",
+                          score=report["score"],
+                          threshold=int(fail_under) if float(fail_under).is_integer() else fail_under,
+                          path=project_root),
+            err=True,
+        )
         raise typer.Exit(code=1)
 
 
@@ -285,17 +303,14 @@ def diff_cmd(
             data = json.loads(p.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
             raise typer.BadParameter(
-                f"{p}: could not parse as JSON ({exc}). This file does not "
-                "look like a Forge manifest — expected a JSON object with a "
-                "`schema_version` starting with `atomadic-forge.`."
+                format_hint("not_a_forge_manifest", path=p)
+                + f"\n\nUnderlying parse error: {exc}"
             ) from exc
         if not isinstance(data, dict) or not isinstance(
                 data.get("schema_version"), str) or not data["schema_version"].startswith(
                 "atomadic-forge."):
             raise typer.BadParameter(
-                f"{p}: This file does not look like a Forge manifest — "
-                "expected a JSON object with a `schema_version` starting "
-                "with `atomadic-forge.`."
+                format_hint("not_a_forge_manifest", path=p)
             )
         return data
 
