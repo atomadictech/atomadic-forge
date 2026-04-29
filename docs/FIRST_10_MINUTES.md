@@ -183,9 +183,17 @@ You now know enough to use Forge productively. For specific topics:
 - [04-llm-loops.md](04-llm-loops.md) — `iterate`, `evolve`, prompts, the loop.
 - [05-faq.md](05-faq.md) — troubleshooting, common gotchas.
 - [tutorials/](tutorials/) — quickstart tutorials and the JS / TS path.
+- **[AGENTS_GUIDE.md](AGENTS_GUIDE.md)** — using Forge from a coding
+  agent (Cursor / Claude Code / Aider / Devin) via the built-in MCP
+  server. One config snippet, **ten tools**, four resources. The
+  fastest way to put Forge in front of every PR your team's agents
+  touch.
 - [MULTI_REPO.md](MULTI_REPO.md) — absorbing more than one repo at once.
 - [CI_CD.md](CI_CD.md) — GitHub Actions, GitLab CI, pre-commit.
 - [AIR_GAPPED.md](AIR_GAPPED.md) — offline / on-prem install.
+- [RECEIPT.md](RECEIPT.md) — the canonical JSON wire format Forge emits
+  (reach for this once you start scripting around `forge certify
+  --emit-receipt`).
 - [FORMALIZATION.md](FORMALIZATION.md) — paper citations for the certify gates.
 
 If something on this page contradicts what you read in another doc,

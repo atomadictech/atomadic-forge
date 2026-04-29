@@ -410,10 +410,54 @@ See [CONTRIBUTING.md](../CONTRIBUTING.md)
 
 File an issue on GitHub with the `feature-request` label.
 
+## Using Forge from a coding agent
+
+### Can I plug Forge into Cursor / Claude Code / Aider / Devin?
+
+Yes — Forge ships an **MCP server**. Add this to your agent's MCP
+config:
+
+```json
+{
+  "mcpServers": {
+    "atomadic-forge": {
+      "command": "forge",
+      "args": ["mcp", "serve", "--project", "."],
+      "transport": "stdio"
+    }
+  }
+}
+```
+
+Once registered, the agent gets **10 tools** (`recon`, `wire`,
+`certify`, `enforce`, `audit_list`, `agent_summary`, `auto_plan`,
+`context_pack`, `preflight_change`, `score_patch` — plus four
+`plan_*` verbs from Codex-3) + 4 resources. See the full **[Agents
+Guide](AGENTS_GUIDE.md)** for integration patterns, the
+agent-friendly `agent_summary` / `context_pack` tools, the Forge
+Receipt schema agents should consume, F-code routing for mechanical
+fixes, the proposal-engine flow, and best practices.
+
+### What's the difference between AGENTS.md and the Agents Guide?
+
+- **`AGENTS.md`** at the repo root is for agents *building* Forge —
+  the dev contract: tier discipline, F-code namespace, schema
+  versioning, branch hygiene, the verification lane.
+- **`docs/AGENTS_GUIDE.md`** is for agents *using* Forge — Cursor /
+  Claude Code / Aider / etc. integrating via MCP, calling the 10
+  tools, consuming Receipts, running `preflight_change` /
+  `score_patch` guardrails, applying mechanical fixes via `enforce`.
+
+Both files together describe a complete agent contract: how to ship
+*to* Forge and how to ship *with* Forge.
+
 ## Further reading
 
 - [Getting started](01-getting-started.md)
 - [Command reference](02-commands.md)
 - [Tutorial: Absorb a real repo](03-tutorial.md)
 - [LLM loops](04-llm-loops.md)
+- **[Agents Guide — using Forge from an MCP client](AGENTS_GUIDE.md)**
+- [Forge Receipt schema](RECEIPT.md)
 - [Architecture guide](../ARCHITECTURE.md)
+- [Dev-agent operating manual (`AGENTS.md`)](../AGENTS.md)

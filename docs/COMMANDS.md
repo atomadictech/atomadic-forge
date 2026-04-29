@@ -67,6 +67,21 @@ Score docs, tests, layout, imports, importability, behavior, stub bodies.
 Returns 0–100 honest score with component breakdown. Use
 `--fail-under <score>` when this command should act as a CI gate.
 
+**Receipt + signing flags (Lane A W1+W2 / Golden Path):**
+- `--emit-receipt PATH` — writes a v1 Forge Receipt JSON to PATH.
+  Auto-creates parent dirs. Schema at
+  `a0_qk_constants/receipt_schema.py`; full spec in `docs/RECEIPT.md`.
+- `--print-card` — prints the rendered 60×24 box-drawing card to
+  stdout (the artifact the Lane E W2 viral demo screen-grabs).
+- `--sign` — calls AAAA-Nexus `/v1/verify/forge-receipt` and embeds
+  `{signature, key_id, issuer, issued_at_utc}` in the Receipt's
+  `signatures.aaaa_nexus` block. Graceful-degradation on key /
+  network / HTTP failures; never throws. Set `AAAA_NEXUS_API_KEY`.
+
+```bash
+forge certify . --emit-receipt out/receipt.json --sign --print-card
+```
+
 JS/TS-specific behaviour:
 - `tests` PASS recognises `tests/*.test.{js,mjs,jsx,cjs,ts,tsx}`,
   `*.spec.*`, and the Jest `__tests__/` directory convention.
@@ -109,6 +124,206 @@ Forge Studio (W8) and Lane E's PR-comment delta on the Forge Action.
 forge diff baseline/scout.json head/scout.json --json > delta.json
 ```
 
+### `forge enforce DIR`
+
+F-code-routed mechanical fixer (Lane A W6 / Golden Path). Reads the
+wire report, plans `EnforceAction`s keyed by F-code, applies them with
+rollback safety. Each action records its undo so a failed apply leaves
+the tree in its prior state.
+
+Currently routes:
+- **F0042** (a1 upward import) → move the importing file up to the
+  higher tier
+- 6 other auto-fixable F-codes (covered by smoke tests)
+
+```bash
+forge wire src/atomadic_forge --suggest-repairs --json | forge enforce -
+```
+
+### F-codes — citeable error catalog (Lane A W5)
+
+Every Forge error carries a stable 4-digit code of the form `F0042`.
+F-codes are part of the schema contract:
+
+- **Adding** an F-code is additive (minor version)
+- **Removing** or **renumbering** is a **major version bump**
+- The message string can change per locale; the F-code stays
+- F-codes power `forge enforce`'s mechanical fix routing
+
+Namespace allocation (defined at `a0_qk_constants/error_codes.py`):
+
+| Range | Domain |
+|---|---|
+| F0001–F0009 | scout / classification (info) |
+| F0010–F0019 | cherry-pick (warn) |
+| F0040–F0049 | wire / upward-import violations |
+| F0050–F0059 | certify axis failures |
+| F0060–F0069 | stub detection |
+| F0070–F0079 | import-repair |
+| F0080–F0089 | assimilate conflicts |
+| F0090–F0099 | receipt / signing |
+
+## Agent integration (MCP)
+
+### `forge mcp serve`
+
+Exposes the entire Forge pipeline (Receipt, wire, certify, enforce,
+audit_list) as an **MCP** (Model Context Protocol) server over stdio
+JSON-RPC (Lane C W4 / Golden Path). Any coding agent that speaks MCP —
+Cursor, Claude Code, Aider, Devin, Sweep — can `mcp.add atomadic-forge`
+and consume Forge's normative architectural law as a first-class tool.
+
+**5 tools** exposed: `recon`, `wire`, `certify`, `enforce`, `audit_list`.
+**4 resources** exposed (Receipt JSON, lineage chain, F-code registry,
+attestation pointers).
+
+```bash
+# One-round-trip smoke against any project (incl. Forge itself):
+printf '%s\n%s\n%s\n' \
+  '{"jsonrpc":"2.0","id":1,"method":"initialize"}' \
+  '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
+  '{"jsonrpc":"2.0","id":3,"method":"shutdown"}' \
+| forge mcp serve --project .
+```
+
+Returns server info, **10 tool schemas** (`recon`, `wire`, `certify`,
+`enforce`, `audit_list`, `agent_summary`, `auto_plan`, `context_pack`,
+`preflight_change`, `score_patch` — plus the four `plan_list` /
+`plan_show` / `plan_step` / `plan_apply` verbs from Codex-3), and a
+clean shutdown. The soft-fail contract from `receipt_signer.py`
+applies — every tool gracefully degrades when an upstream (e.g.,
+AAAA-Nexus signing) is unreachable.
+
+What this unlocks per Golden Path Lane C: the Forge Receipt JSON
+becomes consumable by every major coding-agent platform via the same
+schema as `forge certify --emit-receipt` — *one Receipt across
+terminal Card / PR comment / README badge / MCP resource / signed PDF
+CS-1*. The convergence the BEP-1 cycle predicted is now empirically
+reachable from `mcp.tools.list`.
+
+### `forge plan` — the proposal-engine surface
+
+Emits an `atomadic-forge.agent_plan/v1` JSON card — sister schema to
+the Forge Receipt, tuned for proposal-engine mode. Returns a ranked
+list of "next best action" cards instead of a giant manifest. Lane C
+direction (Codex-2 follow-up).
+
+```bash
+forge plan . --json > plan.json
+```
+
+Each plan emits:
+
+```json
+{
+  "schema_version": "atomadic-forge.agent_plan/v1",
+  "verdict": "REFINE",
+  "goal": "...",
+  "top_actions": [
+    {
+      "id": "ci-release-hardening",
+      "kind": "operational",
+      "why": "Forge certify score blocked by missing CI",
+      "write_scope": [".github/workflows/ci.yml", "CHANGELOG.md"],
+      "risk": "low",
+      "commands": ["python -m pytest", "forge certify ."],
+      "applyable": true
+    }
+  ],
+  "next_command": "forge plan apply ci-release-hardening --apply"
+}
+```
+
+The `auto_plan` MCP tool returns the same JSON to a coding agent in
+one round-trip. See [`docs/AGENTS_GUIDE.md`](AGENTS_GUIDE.md) for
+agent flows that consume this surface.
+
+### `forge plan-list` / `forge plan-show` / `forge plan-step` / `forge plan-apply`
+
+Persistence + apply chain for the proposal-engine (Codex-3 follow-up).
+Each `forge plan ... --save` writes a plan to
+`.atomadic-forge/plans/<id>.json` (id is content-addressed, so
+re-emitting an identical plan yields the same id — **re-emit-safe**).
+
+```bash
+# Save a fresh plan for later inspection
+forge plan . --save --json > /dev/null
+
+# List recent plans for this project
+forge plan-list
+
+# Read a saved plan card
+forge plan-show <plan-id>
+
+# Apply one card from a plan (rollback-safe)
+forge plan-step <plan-id> <card-id> --apply
+
+# Apply every card with applyable=true in one shot
+forge plan-apply <plan-id> --apply
+```
+
+Apply routing (defined at `a3_og_features/forge_plan_apply.py`):
+- **F0041–F0046** (architectural / wire violations) → `forge enforce --apply`
+- **F0050** (docs missing) → bounded stub README writer
+- All routes are **rollback-safe** — failed applies leave the tree
+  untouched and the plan-state file records why.
+
+State trace: every step / apply event is appended to
+`.atomadic-forge/plans/<id>.state.json` so an agent can resume after a
+failed apply or audit a historical plan.
+
+### `forge context-pack [TARGET]` (Codex-4)
+
+Emits an `atomadic-forge.context_pack/v1` JSON bundle — the single
+command an active coding agent should run on **first orientation** to
+a repo. Wraps scout + wire + certify and adds:
+
+- `repo_purpose` — first paragraph of README, falling back to
+  pyproject description, then dirname.
+- `architecture_law` — pinned 5-tier law text (so the agent doesn't
+  have to look it up).
+- `tier_map`, `blockers_summary`, `best_next_action`.
+- `test_commands` — detected from pyproject / tox.ini / package.json /
+  Cargo.toml / Makefile.
+- `release_gate` — the canonical `ruff && pytest && wire && certify
+  ≥ 75` recipe.
+- `risky_files`, `recent_lineage`, `pinned_resources`.
+
+```bash
+forge context-pack . --json > context.json
+```
+
+Agents that prefer MCP can call the matching `context_pack` tool over
+JSON-RPC for the same payload in one round-trip.
+
+### `forge preflight INTENT FILE...` (Codex-4)
+
+Pre-edit guardrail. For each proposed file the agent intends to
+write, emits `atomadic-forge.preflight/v1` with:
+
+- `detected_tier` — by path-segment match against tier names.
+- `forbidden_imports` — tiers above this file's tier (read-only, but
+  the agent should treat as hard rules before drafting).
+- `likely_tests` — mirror-style: `tests/test_<stem>.py`,
+  `<stem>_test.py`, etc.
+- `siblings_to_read` — first 5 `.py` siblings in the same dir.
+- Overall `write_scope_too_broad` flag (default threshold = 8 files;
+  override with `--scope-threshold N`).
+
+```bash
+forge preflight 'Add a parser helper' \
+    src/atomadic_forge/a1_at_functions/parser.py
+```
+
+Exits **1** when `write_scope_too_broad` is true — designed to be
+called from a pre-commit hook or an agent's tool-use loop. Add
+`--json` for machine-readable output.
+
+(`score_patch` — diff-scoring of a candidate unified-diff — is
+intentionally MCP-only. Diff strings are awkward as positional CLI
+args; agents pipe the diff through the `score_patch` MCP tool
+instead.)
+
 ## Code generation (LLM-driven)
 
 ### `forge iterate run "INTENT" OUTPUT`
@@ -118,14 +333,23 @@ provider (`auto | gemini | nexus | aaaa-nexus | anthropic | openai | openrouter 
 Pass `--seed PATH` (repeatable) to supply absorbed-repo symbol catalogs as
 building-block hints for the LLM.
 
+**Compiler Feedback Loop (Lane A W3 / Golden Path):** add
+`--max-fix-rounds N` to drive a build-error → fix loop until 100%
+compile or the round-budget is exhausted. The Compiler Agent (pure
+helper at `a1_at_functions/compiler_feedback.py`) re-prompts the LLM
+with the build's stderr until the emit compiles. Result report carries
+a new `fix_rounds` field counting the fix iterations consumed.
+
 ```bash
 forge iterate run "build a calculator CLI" ./out --provider gemini
 
-# Multi-seed: build from absorbed framework patterns
+# Multi-seed + compiler-loop: build from absorbed framework patterns
+# and auto-recover from compile errors (up to 5 fix rounds per turn):
 forge iterate run "build a tool-use agent" ./out \
     --seed ./forged/langchain-picks \
     --seed ./forged/mem0-picks \
-    --provider nexus
+    --provider nexus \
+    --max-fix-rounds 5
 ```
 
 ### `forge evolve run "INTENT" OUTPUT --auto N`

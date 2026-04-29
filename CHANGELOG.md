@@ -1,11 +1,28 @@
 # Changelog
 
-## Unreleased — _Pre-audit lanes + Golden Path Lane A W0_
+## Unreleased — _Pre-audit + GP-A W0–W6 + GP-C W1/W2/W4 + Codex-1/2/3/4_
 
-10 commits accumulated since `0.2.2` ship, mapped onto the lanes in
-`launch/forge/GOLDEN_PATH-20260428.md`. Test trajectory: **301 → 363
-passing, 2 skipped**. `forge wire src/atomadic_forge` PASS at every
-commit. `forge certify .` = **100/100** held.
+25+ commits accumulated since `0.2.2` ship, mapped onto the lanes in
+`launch/forge/GOLDEN_PATH-20260428.md` plus four Codex-direction
+follow-up rounds. Test trajectory: **301 → 611 passing, 2 skipped**.
+`forge wire src/atomadic_forge` PASS at every commit. `forge certify
+.` = **100/100** held.
+
+**Lane A is 6-of-7 named-deliverables shipped** (W2 RefAgent framework
+remains; recommended for a delegated agent). **Lane C is 3-of-6
+shipped** (W1 forge-action, W2 pre-commit-hooks, W4 mcp serve).
+
+**Codex direction is 4-of-4 shipped**: agent_summary (Codex-1),
+agent_plan (Codex-2), plan-apply chain (Codex-3), copilot's copilot
+(Codex-4 — context_pack / preflight / score_patch). Forge is now the
+**architectural control plane** any coding agent (Cursor, Claude
+Code, Aider, Devin, Copilot, Sweep) can wrap around.
+
+Lane A is **6 weeks ahead of W0 baseline** — the entire critical-path
+stack from schema → emitter → renderer → signer → F-codes → enforce
+shipped on master. Lane C delivered W1 (composite GitHub Action +
+self-certify dogfood), W2 (`.pre-commit-hooks.yaml`), and W4 (`forge
+mcp serve` — 10 MCP tools after Codex-1..4).
 
 ### Added — pre-audit operational scaffolding
 
@@ -48,8 +65,206 @@ commit. `forge certify .` = **100/100** held.
   cited (`aethel-nexus-proofs` — 29 theorems, 0 sorry, 0 axioms — and
   `mhed-toe-codex-v22` — 538 theorems, 0 sorry). All signing / lineage
   / attestation fields default to `None` so unsigned dev Receipts
-  remain structurally valid. Tier-pure a0 (imports limited to
-  `__future__` and `typing`).
+  remain structurally valid. Tier-pure a0.
+
+### Added — Golden Path Lane A W1 (emitter + card)
+
+- **`receipt_emitter.py` + `card_renderer.py`** (`237c35f`, GP-A W1) —
+  paired pure-a1 deliverables. Emitter is the inverse of the schema:
+  pure transformer `(CertifyResult, WireReport, ScoutReport) →
+  ForgeReceiptV1`. Card renderer is the 60×24 box-drawing renderer
+  that powers the "62 → 5" viral demo (Lane E W2).
+- **`forge certify --emit-receipt PATH`** writes a v1 Receipt JSON.
+- **`forge certify --print-card`** prints the rendered card to stdout —
+  the artifact the Lane E W2 demo screen-grabs.
+- Both flags compose with `--json`, `--fail-under`, `--package`.
+
+### Added — Golden Path Lane A W2 (signer)
+
+- **`receipt_signer.py` + `forge certify --sign`** (`0670880`, GP-A W2).
+  Stateful signer wrapping AAAA-Nexus `/v1/verify/forge-receipt` with
+  graceful-degradation: missing API key, 4xx, 5xx, network error all
+  fall back to unsigned-but-structurally-valid. The signer never
+  throws.
+
+### Added — Golden Path Lane A W5 (F-code registry)
+
+- **F-code registry** (`f4c2548`, GP-A W5) at
+  `a0_qk_constants/error_codes.py` — every Forge error now carries a
+  stable 4-digit code (`F0042`-style) that is **never reused or
+  renumbered**. 12 seed codes covering scout, cherry-pick, wire,
+  certify, stub-detect, import-repair, assimilate, signing namespaces.
+  Adding an F-code is additive; renumbering is a major schema bump.
+
+### Added — Golden Path Lane A W6 (enforce)
+
+- **`forge enforce`** (`b4e7ff2`, GP-A W6) — F-code-routed mechanical
+  fixer. Pure planner at `a1_at_functions/enforce_planner.py` produces
+  an `EnforceAction` list keyed by F-code; the executor applies them
+  with rollback safety. Acceptance gate met: F0042 (a1 upward import)
+  auto-resolvable; smoke covers 7 fix paths.
+
+### Added — Golden Path Lane C W1 (forge-action)
+
+- **`forge-action` composite GitHub Action + self-certify dogfood**
+  (`dae64d1`, GP-C W1) — the Action's CI runs `forge certify .`
+  against itself before publishing, propagating the BEP self-host gate
+  pattern from Lane A to Lane C. Drop-in for any consuming repo via
+  `.github/workflows/*.yml`.
+
+### Added — Golden Path Lane C W2 (pre-commit hooks)
+
+- **`.pre-commit-hooks.yaml` manifest** (`6c8a36b`, GP-C W2) — Husky-
+  style capture: once one developer adds Forge to
+  `.pre-commit-config.yaml`, every contributor inherits the gate. Hook
+  runs `forge wire --fail-on-violations` (read-only by default; opt-in
+  to fail-below via repo-side config). Powers the W3 distribution loop.
+
+### Added — Golden Path Lane A W4 (Vanguard local chain)
+
+- **Local Vanguard chain stub** (`a8e2c7e`, GP-A W4) — every Receipt
+  now gets a real `lineage_path` populated from a content-addressed
+  local chain, with the same graceful-degradation contract as the W2
+  signer: when AAAA-Nexus `/v1/forge/lineage` ships, the publisher
+  slots in transparently. Until then the chain is local-only and
+  Receipt-verified. Closes Lane A W4.
+
+### Added — Golden Path Lane A W3 (Compiler Feedback Loop)
+
+- **`forge iterate --max-fix-rounds N`** (`6bae93b`, GP-A W3) — pure
+  helper at `a1_at_functions/compiler_feedback.py` wired into
+  `forge_loop.run_iterate`. The Compiler Agent of the RefAgent family:
+  drives a build-error → fix loop iteratively until 100% compile or
+  the round-budget is exhausted. Each iterate turn now runs
+  `_run_fix_rounds` after the file write. Report includes a new
+  `fix_rounds` field (count of fix iterations consumed).
+- 8 new tests at `tests/test_compiler_feedback.py` — pure-module
+  coverage + a stub-LLM `run_iterate` simulating broken-then-fixed
+  sequences.
+
+### Added — agent-native blocker summary surface (Codex-1 feedback)
+
+- **`agent_summary` MCP tool + `a1_at_functions/agent_summary.py`**
+  (`69d4ea9`) — pure helper that returns a compact, agent-friendly
+  summary of the top blockers for a given project (certify axes
+  failing, wire violations, stub bodies, missing CI/CHANGELOG). Seed
+  for the broader Codex-direction redesign tracked on
+  `gp-codex-2-agent-plan-cards` (return action cards instead of giant
+  manifests). Exposed as a 6th MCP tool alongside the W4 surface.
+
+### Added — Codex-2 agent plan cards (`atomadic-forge.agent_plan/v1`)
+
+- **`agent_plan/v1` schema + `forge plan` + `auto_plan` MCP tool**
+  (`c7ad6d8`, Codex-2) — sister schema to the Forge Receipt, tuned for
+  proposal-engine mode: returns ranked "next best action" cards
+  instead of giant manifests. New a0 schema at
+  `a0_qk_constants/agent_plan_schema.py`, paired emitter at
+  `a1_at_functions/agent_plan_emitter.py`, CLI verb `forge plan`, and
+  a new MCP tool `auto_plan` exposed alongside the W4 surface (now 7
+  tools total).
+- Each plan card carries: `goal`, `top_actions[]` (with `id`, `kind`,
+  `why`, `write_scope`, `risk`, `commands`, `applyable`),
+  `next_command`, and a verdict (PASS / REFINE / QUARANTINE / REJECT).
+- Same forward-compat schema discipline as the Receipt:
+  `schema_version` regex, optional fields default to `None` / `[]`,
+  consumers ignore unknown fields.
+
+### Added — Codex-3 plan apply chain (`2cafbcc`)
+
+- **`forge plan` `--save` + `plan-list` / `plan-show` / `plan-step` /
+  `plan-apply` verbs + MCP tools** — closing the proposal-engine vision
+  from Codex-1/2: agent inspects an emitted plan card → accepts /
+  steps / applies → Forge applies the chosen actions with rollback
+  safety → state persists across runs.
+- New a2 composite `a2_mo_composites/plan_store.py` — append-only plan
+  store + per-card state at `.atomadic-forge/plans/<id>.[state.]json`.
+  `compute_plan_id` is **content-addressed** so re-emitting a
+  structurally-identical plan yields the same id (re-emit-safe).
+- New a3 feature `a3_og_features/forge_plan_apply.py` —
+  `apply_card` / `apply_all_applyable` orchestrators with two routes:
+  - architectural F0041–F0046 → `forge enforce --apply` (rollback-safe)
+  - operational F0050 (docs missing) → bounded stub README writer
+  Halts on first failed / rolled_back; records every event to plan state.
+
+### Added — Codex-4 copilot's copilot (`fa50644`)
+
+Direct response to Codex's "Forge is the architectural control plane
+*around* any agent" directive. Three pure-a1 primitives + 3 MCP tools
++ 2 CLI verbs land Forge as the **always-on senior engineer** sitting
+beside any coding agent:
+
+- **`a1_at_functions/agent_context_pack.py`** — emits
+  `atomadic-forge.context_pack/v1`. The bundle an agent should load
+  on first orientation: repo purpose (README → pyproject → dirname),
+  pinned 5-tier law, tier_map, blockers digest, best-next-action,
+  detected test commands, release gate, risky files, recent lineage,
+  pinned `forge://` resources.
+- **`a1_at_functions/preflight_change.py`** — emits
+  `atomadic-forge.preflight/v1`. Per-file: detected_tier,
+  forbidden_imports, mirror-style likely_tests, siblings_to_read,
+  cross-tier warnings, scope-too-broad flag at 8 files default.
+- **`a1_at_functions/patch_scorer.py`** — emits
+  `atomadic-forge.patch_score/v1`. Parses unified-diff and surfaces
+  architectural_risk (new upward imports), public_api_risk
+  (`__init__.py` touched), release_risk (pyproject / version /
+  CHANGELOG / LICENSE), test_risk (code without tests), >200-line
+  blast-radius flag → `needs_human_review` boolean + suggested
+  validation commands.
+- **3 new MCP tools**: `context_pack`, `preflight_change`,
+  `score_patch` (registered alongside the W4 / Codex-1/2/3 surface —
+  **10 tools total**). All three are pure-a1 — no a3 injection
+  needed; they read from reports + filesystem only.
+- **`forge context-pack [target] [--json]`** — runs scout + wire +
+  certify, emits the bundle. The single command an agent should run
+  on first orientation.
+- **`forge preflight <intent> <file...> [--scope-threshold N] [--json]`** —
+  pre-edit guardrail. CLI exits 1 when write_scope too broad.
+  (`score_patch` is intentionally MCP-only — diff strings are
+  awkward as positional CLI args.)
+- **+29 tests** at `tests/test_copilots_copilot.py` (10 context_pack /
+  10 preflight / 8 score_patch / 1 mcp_protocol update). Trajectory:
+  **301 → 611 passing**, 2 skipped. `forge wire` PASS at every
+  commit. `forge certify .` = **100/100** held.
+- Live smoke against Codex's atomadic-lang downstream: `forge
+  context-pack ./atomadic-lang` returned tier_map 282 files / 0
+  blockers / `release_gate: ruff && pytest && wire && certify ≥ 75`.
+
+Companion to Codex-1 (`69d4ea9`, agent_summary), Codex-2 (`c7ad6d8`,
+agent_plan), and Codex-3 (`2cafbcc`, plan-apply chain).
+
+### Added — Codex docs walkthrough (`178d020`)
+
+- New affordances walkthrough for the Atomadic-Lang downstream agent —
+  concrete `try-these` snippets covering the agent flows AGENTS_GUIDE.md
+  describes, runnable end-to-end against a fresh checkout.
+
+### Added — Golden Path Lane C W4 (forge mcp serve)
+
+- **`forge mcp serve`** (`9f63085`, GP-C W4) — stdio JSON-RPC server
+  exposing the entire Forge pipeline to any coding agent that speaks
+  MCP (Cursor, Claude Code, Aider, Devin, Sweep). 5 tools (`recon`,
+  `wire`, `certify`, `enforce`, `audit_list`) + 4 resources, soft-fail
+  contract, tier-clean. New modules:
+  `a1_at_functions/mcp_protocol.py` (pure JSON-RPC framing),
+  `a3_og_features/mcp_server.py` (stdio loop), CLI verb in
+  `a4_sy_orchestration/cli.py`.
+- **F0042 case study** during W4 development: an a3-import sneaking
+  into a1 was caught by `forge wire` mid-implementation. Fix was the
+  canonical injection refactor — the enforce handler registration moved
+  to a3 where it belongs. Tier discipline held by construction.
+- 21 new tests at `tests/test_mcp_protocol.py` covering the JSON-RPC
+  init/tools-list/shutdown round-trip + every tool's
+  inputSchema/outputSchema contract.
+- **Live demo on Forge itself**:
+  ```
+  printf '%s\n%s\n%s\n' \
+    '{"jsonrpc":"2.0","id":1,"method":"initialize"}' \
+    '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
+    '{"jsonrpc":"2.0","id":3,"method":"shutdown"}' \
+    | forge mcp serve --project .
+  ```
+  Returns server info, 5 tools, clean shutdown — single round-trip
+  proves the surface is reachable from any MCP client.
 
 ### Fixed
 
