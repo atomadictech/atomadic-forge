@@ -8,6 +8,7 @@ Public verbs:
     forge finalize    — assimilate + wire + certify (consumes cherry.json)
     forge wire        — upward-import scanner over a tier-organized package
     forge certify     — score documentation/tests/layout/imports
+    forge diff        — compare two Forge JSON manifests
     forge config      — show / set / test configuration
 
 Specialty verbs (advanced):
@@ -29,6 +30,7 @@ import typer
 
 from .. import __version__
 from ..a1_at_functions.certify_checks import certify as certify_checks
+from ..a1_at_functions.manifest_diff import diff_manifests
 from ..a1_at_functions.wire_check import scan_violations
 from ..a3_og_features.forge_pipeline import (
     run_auto,
@@ -232,6 +234,65 @@ def certify_cmd(
     if failed_gate:
         typer.echo(f"  gate:  FAIL (score below --fail-under {fail_under:g})")
         raise typer.Exit(code=1)
+
+
+@app.command("diff")
+def diff_cmd(
+    left: Annotated[Path, typer.Argument(
+        exists=True, file_okay=True, dir_okay=False, resolve_path=True,
+        help="Left (baseline) Forge JSON manifest.")],
+    right: Annotated[Path, typer.Argument(
+        exists=True, file_okay=True, dir_okay=False, resolve_path=True,
+        help="Right (candidate) Forge JSON manifest.")],
+    json_out: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    """Compare two Forge JSON manifests (scout/cherry/assimilate/wire/certify/synergy/emergent)."""
+    def _load(p: Path) -> dict:
+        try:
+            data = json.loads(p.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise typer.BadParameter(
+                f"{p}: could not parse as JSON ({exc}). This file does not "
+                "look like a Forge manifest — expected a JSON object with a "
+                "`schema_version` starting with `atomadic-forge.`."
+            ) from exc
+        if not isinstance(data, dict) or not isinstance(
+                data.get("schema_version"), str) or not data["schema_version"].startswith(
+                "atomadic-forge."):
+            raise typer.BadParameter(
+                f"{p}: This file does not look like a Forge manifest — "
+                "expected a JSON object with a `schema_version` starting "
+                "with `atomadic-forge.`."
+            )
+        return data
+
+    left_doc = _load(left)
+    right_doc = _load(right)
+    diff = diff_manifests(left_doc, right_doc)
+
+    if json_out:
+        typer.echo(json.dumps(diff, indent=2, default=str))
+        return
+
+    typer.echo(f"\nForge diff: {left.name} → {right.name}")
+    typer.echo("-" * 60)
+    typer.echo(f"  left:        {diff['left_schema']}")
+    typer.echo(f"  right:       {diff['right_schema']}")
+    typer.echo(f"  compatible:  {diff['compatible']}")
+    if diff["summary"]:
+        typer.echo("  summary:")
+        for k, v in diff["summary"].items():
+            if isinstance(v, (str, int, float, bool)) or v is None:
+                typer.echo(f"    {k}: {v}")
+            elif isinstance(v, dict):
+                typer.echo(f"    {k}: {v}")
+            elif isinstance(v, list):
+                typer.echo(f"    {k}: {len(v)} item(s)")
+    typer.echo(
+        f"  +{len(diff['added'])} added / "
+        f"-{len(diff['removed'])} removed / "
+        f"~{len(diff['changed'])} changed"
+    )
 
 
 @app.command("doctor")
