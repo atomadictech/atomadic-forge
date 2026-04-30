@@ -1072,6 +1072,43 @@ def doctor_cmd(
         typer.echo(f"  {k:24s} {v}")
 
 
+@app.command("cs1")
+def cs1_cmd(
+    project: Annotated[str, typer.Argument(help="Project root path.")] = ".",
+    receipt: Annotated[Path | None, typer.Option("--receipt", help="Path to receipt.json.")] = None,
+    out: Annotated[Path | None, typer.Option("--out", help="Output path for CS-1.md.")] = None,
+    json_out: Annotated[bool, typer.Option("--json", help="Emit CS-1 as JSON instead of Markdown.")] = False,
+) -> None:
+    """Generate a Conformity Statement CS-1 v1 (EU AI Act / SR 11-7 / FDA PCCP / CMMC-AI)."""
+    from ..a1_at_functions.cs1_renderer import render_cs1, render_cs1_markdown
+
+    project_path = Path(project).resolve()
+    if receipt is None:
+        receipt = project_path / ".atomadic-forge" / "receipt.json"
+    if not receipt.exists():
+        typer.secho(f"Receipt not found at {receipt}. Run 'forge auto' first.", fg="red", err=True)
+        raise typer.Exit(code=1)
+    try:
+        receipt_data = json.loads(receipt.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        typer.secho(f"Failed to load receipt: {exc}", fg="red", err=True)
+        raise typer.Exit(code=1)
+    try:
+        cs1 = render_cs1(receipt_data)
+    except ValueError as exc:
+        typer.secho(f"Receipt validation failed: {exc}", fg="red", err=True)
+        raise typer.Exit(code=1)
+    if json_out:
+        typer.echo(json.dumps(cs1, indent=2, default=str))
+        return
+    md = render_cs1_markdown(cs1)
+    if out is None:
+        out = project_path / ".atomadic-forge" / "CS-1.md"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(md, encoding="utf-8")
+    typer.secho(f"\nForge CS-1 — Conformity Statement written to {out}", fg="green")
+
+
 # Specialty sub-apps — registered lazily so any import error in one doesn't
 # break the others.
 def _register_specialty_apps() -> None:
