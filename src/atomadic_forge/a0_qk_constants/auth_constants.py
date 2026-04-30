@@ -33,9 +33,9 @@ DEFAULT_AUTH_ENDPOINT = "https://forge-auth.atomadic.tech/v1/forge/auth/verify"
 """Remote endpoint that verifies a user's ``fk_live_*`` API key.
 
 Returns JSON shaped by ``VerifyResult`` (after a1 parsing). Operators
-can override at runtime via the ``FORGE_AUTH_URL`` env var; tests
-inject a fake by passing a different ``auth_endpoint`` to the a2
-client constructor.
+can override at runtime via the ``FORGE_AUTH_URL`` env var; tests inject
+a fake by passing a different ``auth_endpoint`` to the a2 client
+constructor.
 """
 
 DEFAULT_USAGE_ENDPOINT = "https://forge-auth.atomadic.tech/v1/forge/usage/log"
@@ -44,6 +44,16 @@ DEFAULT_USAGE_ENDPOINT = "https://forge-auth.atomadic.tech/v1/forge/usage/log"
 The a2 client swallows every exception this endpoint can raise —
 billing telemetry must NEVER block a paying user's tool execution.
 """
+
+AUTH_URL_ENV = "FORGE_AUTH_URL"
+"""Optional runtime override for the Forge auth verify endpoint.
+
+Useful for staging auth workers, local smoke tests, and launch-day DNS
+cutovers while still exercising the same MCP subscription gate.
+"""
+
+USAGE_URL_ENV = "FORGE_USAGE_URL"
+"""Optional runtime override for the Forge usage logging endpoint."""
 
 
 # ---- env / key shape ----------------------------------------------------
