@@ -26,7 +26,7 @@ enabled = true
 # Replace `id` after creating the namespace via `wrangler kv namespace create`.
 [[kv_namespaces]]
 binding = "FORGE_RECEIPTS"
-id = "REPLACE_AFTER_WRANGLER_CREATE"
+id = "b0d9380f6dbb42a1936e037627e6e7ff"
 
 [vars]
 DEFAULT_BRANCH = "main"
