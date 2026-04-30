@@ -18,7 +18,6 @@ from __future__ import annotations
 
 from typing import TypedDict
 
-
 SCHEMA_VERSION_POLICY_V1 = "atomadic-forge.policy/v1"
 
 

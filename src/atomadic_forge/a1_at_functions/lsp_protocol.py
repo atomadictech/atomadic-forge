@@ -37,10 +37,8 @@ from typing import Any, TypedDict
 from urllib.parse import unquote, urlparse
 
 from .. import __version__
-from ..a0_qk_constants.error_codes import SIDECAR_S_TO_F
 from .sidecar_parser import parse_sidecar_text
 from .sidecar_validator import validate_sidecar
-
 
 SERVER_NAME = "forge-lsp"
 
@@ -254,8 +252,7 @@ def compute_definition(
     except SyntaxError:
         return None
     for node in tree.body:
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef,
-                              ast.ClassDef)) and node.name == target_name:
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef) and node.name == target_name:
             return {
                 "uri": "file:///" + str(source_path).replace("\\", "/"),
                 "range": {

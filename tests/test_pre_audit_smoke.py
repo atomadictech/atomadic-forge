@@ -19,7 +19,6 @@ from pathlib import Path
 
 import pytest
 
-
 _ROOT = Path(__file__).resolve().parents[1]
 _PKG = _ROOT / "src" / "atomadic_forge"
 
@@ -130,9 +129,10 @@ def test_wire_check_suggest_repairs_is_wired() -> None:
     """Lane D2 landed: scan_violations(... suggest_repairs=True) returns
     a non-zero auto_fixable count on a synthesized illegal a1->a2 import.
     """
-    from atomadic_forge.a1_at_functions.wire_check import scan_violations
+    import pathlib
+    import tempfile
 
-    import tempfile, pathlib
+    from atomadic_forge.a1_at_functions.wire_check import scan_violations
     with tempfile.TemporaryDirectory() as tmp:
         pkg = pathlib.Path(tmp) / "pkg"
         a1 = pkg / "a1_at_functions"

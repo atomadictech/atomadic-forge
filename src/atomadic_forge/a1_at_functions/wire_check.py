@@ -25,6 +25,7 @@ from ..a0_qk_constants.lang_extensions import (
     JAVASCRIPT_EXTS,
     PYTHON_EXTS,
     TYPESCRIPT_EXTS,
+    path_parts_contain_ignored_dir,
 )
 from ..a0_qk_constants.tier_names import TIER_NAMES, can_import
 from .js_parser import parse_imports
@@ -208,7 +209,8 @@ def scan_violations(
     for f in package_root.rglob("*"):
         if not f.is_file():
             continue
-        if "__pycache__" in f.parts or "node_modules" in f.parts:
+        rel_parts = f.relative_to(package_root).parts
+        if path_parts_contain_ignored_dir(rel_parts):
             continue
         from_tier = _tier_of_file(f, package_root)
         if from_tier is None:

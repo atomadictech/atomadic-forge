@@ -8,7 +8,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
 import typer.testing
 
 from atomadic_forge.a1_at_functions.agent_context_pack import (
@@ -16,7 +15,6 @@ from atomadic_forge.a1_at_functions.agent_context_pack import (
     emit_context_pack,
 )
 from atomadic_forge.a1_at_functions.mcp_protocol import (
-    TOOLS,
     dispatch_request,
 )
 from atomadic_forge.a1_at_functions.patch_scorer import (

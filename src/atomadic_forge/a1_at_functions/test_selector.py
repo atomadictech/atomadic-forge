@@ -16,7 +16,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TypedDict
 
-
 SCHEMA_VERSION_TEST_SELECT_V1 = "atomadic-forge.test_select/v1"
 
 _TIER_NAMES = (

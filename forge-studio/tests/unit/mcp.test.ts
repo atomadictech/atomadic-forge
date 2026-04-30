@@ -1,24 +1,24 @@
-﻿import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vitest";
 import type { WireReport } from "@/lib/types";
-import { SEVERITY_WEIGHTS } from "@/lib/types";
+import { fCodeSeverity } from "@/lib/types";
 
-describe("SEVERITY_WEIGHTS", () => {
-  it("error=4", () => expect(SEVERITY_WEIGHTS.error).toBe(4));
-  it("warn=2", () => expect(SEVERITY_WEIGHTS.warn).toBe(2));
-  it("info=1", () => expect(SEVERITY_WEIGHTS.info).toBe(1));
+describe("fCodeSeverity", () => {
+  it("F004x = 4 (structural)", () => expect(fCodeSeverity("F0041")).toBe(4));
+  it("F003x = 2 (effect)", () => expect(fCodeSeverity("F0031")).toBe(2));
+  it("other = 1", () => expect(fCodeSeverity("F0011")).toBe(1));
 });
 
 function computeDebt(r: WireReport, rate: number): number {
-  return r.violations.reduce((t, v) => t + (SEVERITY_WEIGHTS[v.severity] ?? 1) * rate, 0);
+  return r.violations.reduce((t, v) => t + fCodeSeverity(v.f_code) * rate, 0);
 }
-const base: WireReport = { schema_version: "1", source: "/p", violations: [
-  { file: "a.py", line: 1, severity: "error", message: "x" },
-  { file: "b.py", line: 2, severity: "warn", message: "y" },
-  { file: "c.py", line: 3, severity: "info", message: "z" },
-], violation_count: 3, autofixable_count: 1, files_scanned: 10 };
+const base: WireReport = { schema_version: "1", source_dir: "/p", violations: [
+  { file: "a.py", from_tier: "a1", to_tier: "a3", imported: "X", f_code: "F0041" },
+  { file: "b.py", from_tier: "a1", to_tier: "a2", imported: "Y", f_code: "F0031" },
+  { file: "c.py", from_tier: "a0", to_tier: "a1", imported: "Z", f_code: "F0011" },
+], violation_count: 3, auto_fixable: 1 };
 
 describe("computeDebt", () => {
-  it("$80/hr: error(4)+warn(2)+info(1)=7*80=560", () => expect(computeDebt(base, 80)).toBe(560));
+  it("$80/hr: F004(4)+F003(2)+other(1)=7*80=560", () => expect(computeDebt(base, 80)).toBe(560));
   it("scales linearly", () => expect(computeDebt(base, 100)).toBe(700));
   it("zero violations -> 0", () => expect(computeDebt({ ...base, violations: [], violation_count: 0 }, 80)).toBe(0));
 });

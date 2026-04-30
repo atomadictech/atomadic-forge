@@ -26,9 +26,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: "pnpm"
-          cache-dependency-path: forge-studio/pnpm-lock.yaml
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --no-frozen-lockfile
       - name: TypeScript type-check
         run: pnpm typecheck
       - name: Unit tests (Vitest)
@@ -37,7 +35,7 @@ jobs:
         run: pnpm build
       - name: Bundle size gate (< 8 MB JS)
         run: |
-          TOTAL=$(find dist/assets -name "*.js" -exec wc -c {} + | tail -1 | awk '\''{print $1}'\'')
+          TOTAL=$(find dist/assets -name "*.js" -exec wc -c {} + | tail -1 | awk '{print $1}')
           echo "Total JS: $TOTAL bytes"
           if [ "$TOTAL" -gt 8388608 ]; then echo "Exceeds 8 MB ($TOTAL)"; exit 1; fi
 
@@ -55,6 +53,8 @@ jobs:
           sudo apt-get update && sudo apt-get install -y \
             libwebkit2gtk-4.1-dev build-essential curl wget file \
             libssl-dev libayatana-appindicator3-dev librsvg2-dev
+      - name: Create frontend dist placeholder for Tauri macro
+        run: mkdir -p dist
       - name: cargo check
         working-directory: forge-studio/src-tauri
         run: cargo check --release

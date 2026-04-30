@@ -103,19 +103,48 @@ def wrap_cmd(
     typer.echo("Run ``atomadic-forge commandsmith sync`` to register it.")
 
 
+_CORE_VERBS = [
+    "init", "auto", "recon", "cherry", "finalize", "wire", "plan",
+    "context-pack", "preflight", "recipes", "plan-list", "plan-show",
+    "plan-step", "plan-apply", "enforce", "certify", "sbom", "diff",
+    "doctor", "cs1", "sidecar", "mcp", "status",
+]
+
+
 @app.command("smoke")
 def smoke_cmd(
+    include_core: Annotated[bool, typer.Option(
+        "--include-core/--no-core",
+        help="Also smoke-test core verbs (init, wire, certify, etc.).")] = True,
     json_out: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
     """Run ``<verb> --help`` for every registered command and report."""
+    import os
+    import subprocess
     cs = Commandsmith(package_root=_resolve_package_root())
     cards = cs.discover()
     results = cs.smoke(cards)
+    if include_core:
+        env = os.environ.copy()
+        env["PYTHONIOENCODING"] = "utf-8"
+        env["PYTHONUTF8"] = "1"
+        cli = [sys.executable, "-m", "atomadic_forge.a4_sy_orchestration.cli"]
+        for verb in _CORE_VERBS:
+            if verb in results:
+                continue
+            try:
+                rc = subprocess.run(
+                    cli + [verb, "--help"],
+                    capture_output=True, timeout=20, env=env,
+                ).returncode
+            except (subprocess.TimeoutExpired, FileNotFoundError):
+                rc = 1
+            results[verb] = rc == 0
     if json_out:
         typer.echo(json.dumps(results, indent=2))
         return
     pad = max((len(n) for n in results), default=0)
-    for name, ok in results.items():
+    for name, ok in sorted(results.items()):
         mark = "PASS" if ok else "FAIL"
         typer.echo(f"  {mark:5s} {name:<{pad}}")
     failed = [n for n, ok in results.items() if not ok]

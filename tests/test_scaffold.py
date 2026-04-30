@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-import tomllib
+try:
+    import tomllib  # py3.11+
+except ModuleNotFoundError:
+    import tomli as tomllib  # py3.10 fallback
 
 from atomadic_forge.a1_at_functions.llm_client import StubLLMClient
 from atomadic_forge.a1_at_functions.scaffold_pyproject import render_pyproject

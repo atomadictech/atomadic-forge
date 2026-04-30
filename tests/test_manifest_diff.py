@@ -11,7 +11,6 @@ from typer.testing import CliRunner
 from atomadic_forge.a1_at_functions.manifest_diff import diff_manifests
 from atomadic_forge.a4_sy_orchestration.cli import app
 
-
 # --------------------------------------------------------------------------- #
 # pure-function tests
 # --------------------------------------------------------------------------- #

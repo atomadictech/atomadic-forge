@@ -20,7 +20,6 @@ from atomadic_forge.a1_at_functions.receipt_emitter import (
     receipt_to_json,
 )
 
-
 _CERTIFY_PASS = {
     "schema_version": "atomadic-forge.certify/v1",
     "score": 100.0,

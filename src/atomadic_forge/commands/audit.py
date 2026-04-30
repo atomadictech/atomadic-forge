@@ -46,7 +46,7 @@ app = typer.Typer(no_args_is_help=True, help=COMMAND_HELP)
 def list_cmd(
     project: Annotated[Path, typer.Argument(
         exists=True, file_okay=False, dir_okay=True, resolve_path=True,
-        help="Project root containing .atomadic-forge/.")],
+        help="Project root containing .atomadic-forge/.")] = Path("."),
     json_out: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
     """Summarize each artifact: run count, latest write time, path."""
@@ -111,7 +111,7 @@ def show_cmd(
 @app.command("log")
 def log_cmd(
     project: Annotated[Path, typer.Argument(
-        exists=True, file_okay=False, dir_okay=True, resolve_path=True)],
+        exists=True, file_okay=False, dir_okay=True, resolve_path=True)] = Path("."),
     last: Annotated[int, typer.Option("--last",
         help="Show only the most recent N entries.")] = 20,
     json_out: Annotated[bool, typer.Option("--json")] = False,

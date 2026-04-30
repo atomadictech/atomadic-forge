@@ -39,16 +39,12 @@ notes field.
 """
 from __future__ import annotations
 
-from collections import Counter
 from typing import Any, TypedDict
 
 from ..a0_qk_constants.error_codes import (
-    F_CODE_REGISTRY,
-    fcode_for_certify_axis,
     fcode_for_tier_violation,
     get_fcode,
 )
-
 
 _SEVERITY_RANK = {"error": 0, "warn": 1, "info": 2}
 
@@ -254,7 +250,7 @@ def render_summary_text(summary: dict, *, width: int = 60) -> str:
     glyph = {"PASS": "✓", "FAIL": "✗", "REFINE": "↻", "QUARANTINE": "⏸"}.get(
         verdict, "?")
     score_part = (f"score {score:.0f}/100   "
-                  if isinstance(score, (int, float)) else "")
+                  if isinstance(score, int | float) else "")
     lines.append(f"{glyph} {verdict}   {score_part}"
                   f"{n} blocker{'' if n == 1 else 's'} "
                   f"({auto} auto-fixable)")

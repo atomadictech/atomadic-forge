@@ -12,8 +12,6 @@ from __future__ import annotations
 import textwrap
 from pathlib import Path
 
-import pytest
-
 from atomadic_forge.a0_qk_constants.sidecar_schema import (
     REQUIRED_SIDECAR_FIELDS,
     REQUIRED_SYMBOL_FIELDS,
@@ -25,7 +23,6 @@ from atomadic_forge.a1_at_functions.sidecar_parser import (
     parse_sidecar_file,
     parse_sidecar_text,
 )
-
 
 # ---- a0 schema constants ----------------------------------------------
 

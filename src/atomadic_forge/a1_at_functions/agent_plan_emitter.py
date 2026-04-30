@@ -21,7 +21,6 @@ Ranking: same deterministic order as ``agent_summary``:
 from __future__ import annotations
 
 import datetime as _dt
-from typing import Any
 
 from ..a0_qk_constants.agent_plan_schema import (
     REQUIRED_PLAN_FIELDS,
@@ -35,7 +34,6 @@ from ..a0_qk_constants.error_codes import (
     fcode_for_tier_violation,
     get_fcode,
 )
-
 
 _KIND_RANK = {
     "operational":  0,

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import cytoscape, { type Core } from "cytoscape";
 import { useForgeStore } from "@/store";
+import { ActionableCard } from "@/components/ui/ActionableCard";
 
 export function AgentTopologyMap() {
   const cyRef = useRef<HTMLDivElement>(null);
@@ -23,44 +24,75 @@ export function AgentTopologyMap() {
       container: cyRef.current,
       elements: { nodes, edges },
       style: [
-        { selector: "node", style: { shape: "ellipse", width: 80, height: 36, "background-color": "data(color)", "background-opacity": 0.2, "border-color": "data(color)", "border-width": 2, label: "data(label)", "text-valign": "center", "text-halign": "center", color: "#e2e8f0", "font-size": 10 } },
-        { selector: "node[type='studio']", style: { width: 110, height: 44, "font-size": 12, "font-weight": "bold", "background-opacity": 0.35 } },
-        { selector: "edge", style: { width: 1.5, "line-color": "#334155", "target-arrow-color": "#475569", "target-arrow-shape": "triangle", "curve-style": "bezier", opacity: 0.7 } },
-        { selector: "edge[type='resource']", style: { "line-style": "dashed" } },
+        {
+          selector: "node",
+          style: {
+            shape: "ellipse", width: 80, height: 36,
+            "background-color": "data(color)", "background-opacity": 0.15,
+            "border-color": "data(color)", "border-width": 1.5,
+            label: "data(label)", "text-valign": "center", "text-halign": "center",
+            color: "#94a3b8", "font-size": 9, "font-family": "monospace",
+          },
+        },
+        {
+          selector: "node[type='studio']",
+          style: { width: 110, height: 44, "font-size": 11, "font-weight": "bold", "background-opacity": 0.3, color: "#e2e8f0" },
+        },
+        {
+          selector: "edge",
+          style: {
+            width: 1, "line-color": "#1a1a1a",
+            "target-arrow-color": "#334155", "target-arrow-shape": "triangle",
+            "curve-style": "bezier", opacity: 0.7,
+          },
+        },
+        {
+          selector: "edge[type='resource']",
+          style: { "line-style": "dashed" },
+        },
       ],
-      layout: { name: "cose", animate: false, randomize: false, padding: 24 },
+      layout: { name: "cose", animate: false, randomize: false, padding: 24 } as any,
       userZoomingEnabled: true,
       userPanningEnabled: true,
     });
     cy.on("mouseover", "node", (evt) => {
       if (evt.target.id() === "studio") return;
       const targetId = evt.target.id();
-      cy.edges().filter((e) => e.data("source") === "studio" && e.data("target") === targetId)
-        .style("width", 3).style("opacity", 1);
+      cy.edges()
+        .filter((e) => e.data("source") === "studio" && e.data("target") === targetId)
+        .style("width", 3)
+        .style("opacity", 1);
     });
-    cy.on("mouseout", "node", () => { cy.edges().style("width", 1.5).style("opacity", 0.7); });
+    cy.on("mouseout", "node", () => { cy.edges().style("width", 1).style("opacity", 0.7); });
     cyInstance.current = cy;
     return () => { cy.destroy(); cyInstance.current = null; };
   }, [tools, resources, status]);
 
-  if (status !== "connected" || (tools.length === 0 && resources.length === 0)) {
-    return (
-      <section style={{ padding: 24 }}>
-        <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 8, color: "#f1f5f9" }}>Agent Topology</h2>
-        <div style={{ height: 160, display: "flex", alignItems: "center", justifyContent: "center", color: "#475569", fontSize: 14, border: "1px dashed #334155", borderRadius: 8 }}>
-          Connect to a project to see the MCP tool topology
-        </div>
-      </section>
-    );
-  }
   return (
-    <section style={{ padding: 24 }}>
-      <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 4, color: "#f1f5f9" }}>Agent Topology</h2>
-      <p style={{ fontSize: 12, color: "#64748b", marginBottom: 12 }}>
-        <span style={{ color: "#34d399" }}>● tools</span>{" · "}
-        <span style={{ color: "#a78bfa" }}>● resources</span>{" — hover for live edge pulse"}
-      </p>
-      <div ref={cyRef} data-testid="agent-topology" style={{ width: "100%", height: 400, background: "#0f172a", borderRadius: 8, border: "1px solid #1e293b" }} />
-    </section>
+    <div className="p-6 max-w-4xl">
+      <ActionableCard title="Agent Topology" delay={0}>
+        {status !== "connected" || (tools.length === 0 && resources.length === 0) ? (
+          <div className="h-40 flex items-center justify-center border border-dashed border-cyber-border">
+            <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-monolith-muted">
+              Connect to a project to see the MCP tool topology
+            </span>
+          </div>
+        ) : (
+          <>
+            <div className="flex gap-4 font-mono text-[9px] uppercase tracking-widest mb-3">
+              <span className="text-cyber-success">● {tools.length} tools</span>
+              <span className="text-violet-400">● {resources.length} resources</span>
+              <span className="text-monolith-muted ml-auto">hover for edge pulse</span>
+            </div>
+            <div
+              ref={cyRef}
+              data-testid="agent-topology"
+              className="w-full border border-cyber-border bg-cyber-dark"
+              style={{ height: 380 }}
+            />
+          </>
+        )}
+      </ActionableCard>
+    </div>
   );
 }

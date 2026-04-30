@@ -14,17 +14,16 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
 import typer.testing
 
-from atomadic_forge.a2_mo_composites.plan_store import (
-    PlanStore,
-    compute_plan_id,
-)
 # Importing a3.mcp_server wires auto_step / auto_apply handlers.
 import atomadic_forge.a3_og_features.mcp_server  # noqa: F401
 from atomadic_forge.a1_at_functions.agent_plan_emitter import emit_agent_plan
 from atomadic_forge.a1_at_functions.mcp_protocol import dispatch_request
+from atomadic_forge.a2_mo_composites.plan_store import (
+    PlanStore,
+    compute_plan_id,
+)
 from atomadic_forge.a3_og_features.forge_plan_apply import (
     apply_all_applyable,
     apply_card,

@@ -23,7 +23,6 @@ from atomadic_forge.a1_at_functions.local_signer import (
     verify_receipt_local,
 )
 
-
 # ── helpers ───────────────────────────────────────────────────────────────
 
 def _minimal_receipt() -> dict:
@@ -50,7 +49,9 @@ def _gen_ed25519_pem(tmp_path: Path) -> Path:
     try:
         from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
         from cryptography.hazmat.primitives.serialization import (
-            Encoding, NoEncryption, PrivateFormat,
+            Encoding,
+            NoEncryption,
+            PrivateFormat,
         )
     except ImportError:
         pytest.skip("cryptography not installed")
@@ -102,7 +103,9 @@ def test_soft_fail_non_ed25519_key(tmp_path):
     try:
         from cryptography.hazmat.primitives.asymmetric.rsa import generate_private_key
         from cryptography.hazmat.primitives.serialization import (
-            Encoding, NoEncryption, PrivateFormat,
+            Encoding,
+            NoEncryption,
+            PrivateFormat,
         )
     except ImportError:
         pytest.skip("cryptography not available")

@@ -22,7 +22,6 @@ from __future__ import annotations
 
 from typing import Literal, TypedDict
 
-
 SCHEMA_VERSION_AGENT_PLAN_V1 = "atomadic-forge.agent_plan/v1"
 SCHEMA_VERSION_AGENT_ACTION_V1 = "atomadic-forge.agent_action/v1"
 

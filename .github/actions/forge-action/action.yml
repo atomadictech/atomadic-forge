@@ -99,7 +99,8 @@ runs:
         fi
         echo "Installing atomadic-forge from ref: $ref"
         pip install --upgrade pip
-        pip install "atomadic-forge @ git+https://github.com/atomadictech/atomadic-forge@${ref}"
+        pip install "atomadic-forge[dev] @ git+https://github.com/atomadictech/atomadic-forge@${ref}"
+        # Self-certify needs pytest/cryptography on PATH for the runtime + signing axes.
         forge --version || python -m atomadic_forge --version || true
 
     - name: Forge wire (upward-import discipline)

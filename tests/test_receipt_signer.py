@@ -16,9 +16,7 @@ production code path is exactly the same.
 """
 from __future__ import annotations
 
-import io
 import json
-import os
 import urllib.error
 from copy import deepcopy
 from pathlib import Path

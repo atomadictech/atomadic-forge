@@ -15,7 +15,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TypedDict
 
-
 SCHEMA_VERSION_ROLLBACK_V1 = "atomadic-forge.rollback/v1"
 
 

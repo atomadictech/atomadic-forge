@@ -12,10 +12,9 @@ two read paths.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, TypedDict
+from typing import TypedDict
 
 from .lineage_reader import read_lineage
-
 
 SCHEMA_VERSION_WHY_V1 = "atomadic-forge.why/v1"
 SCHEMA_VERSION_WHAT_FAILED_V1 = "atomadic-forge.what_failed/v1"

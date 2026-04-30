@@ -17,11 +17,12 @@ from __future__ import annotations
 
 import json
 import re
-from pathlib import Path
 
 import pytest
 import typer.testing
 
+# Importing the a3 mcp_server module wires the auto_plan handler.
+import atomadic_forge.a3_og_features.mcp_server  # noqa: F401
 from atomadic_forge.a0_qk_constants.agent_plan_schema import (
     ACTION_KINDS,
     PLAN_MODES,
@@ -31,8 +32,6 @@ from atomadic_forge.a0_qk_constants.agent_plan_schema import (
     SCHEMA_VERSION_AGENT_PLAN_V1,
 )
 from atomadic_forge.a1_at_functions.agent_plan_emitter import emit_agent_plan
-# Importing the a3 mcp_server module wires the auto_plan handler.
-import atomadic_forge.a3_og_features.mcp_server  # noqa: F401
 from atomadic_forge.a1_at_functions.mcp_protocol import dispatch_request
 from atomadic_forge.a4_sy_orchestration.cli import app
 

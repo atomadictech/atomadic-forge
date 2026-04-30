@@ -19,7 +19,6 @@ from __future__ import annotations
 
 from typing import Literal, TypedDict
 
-
 SCHEMA_VERSION_SIDECAR_V1 = "atomadic-forge.sidecar/v1"
 
 

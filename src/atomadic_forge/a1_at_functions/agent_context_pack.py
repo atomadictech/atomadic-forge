@@ -16,11 +16,10 @@ from __future__ import annotations
 import re
 from collections import Counter
 from pathlib import Path
-from typing import Any, TypedDict
+from typing import TypedDict
 
 from .agent_summary import summarize_blockers
 from .lineage_reader import read_lineage
-
 
 SCHEMA_VERSION_CONTEXT_PACK_V1 = "atomadic-forge.context_pack/v1"
 

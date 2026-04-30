@@ -21,7 +21,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-
 _DIRNAME = ".atomadic-forge"
 _PLANS_SUBDIR = "plans"
 

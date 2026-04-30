@@ -18,9 +18,8 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
-from typing import IO
-
 from pathlib import Path as _Path
+from typing import IO
 
 from ..a1_at_functions.mcp_protocol import (
     dispatch_request,
@@ -34,6 +33,8 @@ from .forge_enforce import run_enforce as _run_enforce
 from .forge_pipeline import run_auto_plan as _run_auto_plan
 from .forge_plan_apply import (
     apply_all_applyable as _apply_all_applyable,
+)
+from .forge_plan_apply import (
     apply_card as _apply_card,
 )
 

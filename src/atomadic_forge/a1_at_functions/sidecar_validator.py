@@ -24,8 +24,7 @@ from pathlib import Path
 from typing import TypedDict
 
 from ..a0_qk_constants.error_codes import SIDECAR_S_TO_F
-from ..a0_qk_constants.sidecar_schema import VALID_EFFECTS, SidecarFile
-
+from ..a0_qk_constants.sidecar_schema import SidecarFile
 
 SCHEMA_VERSION_VALIDATE_V1 = "atomadic-forge.sidecar.validate/v1"
 
@@ -61,8 +60,7 @@ def _collect_top_level_symbols(tree: ast.AST) -> dict[str, ast.AST]:
     """Map name -> AST node for every top-level def / class."""
     out: dict[str, ast.AST] = {}
     for node in tree.body if hasattr(tree, "body") else []:  # type: ignore[attr-defined]
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef,
-                              ast.ClassDef)):
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef):
             if not node.name.startswith("_"):
                 out[node.name] = node
     return out

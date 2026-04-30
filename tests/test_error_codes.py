@@ -10,7 +10,6 @@ import json
 import re
 from pathlib import Path
 
-import pytest
 import typer.testing
 
 from atomadic_forge.a0_qk_constants.error_codes import (

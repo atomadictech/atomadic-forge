@@ -1,0 +1,30 @@
+@import "tailwindcss";
+
+@theme {
+  --color-cyber-cyan: #22d3ee;
+  --color-cyber-cyan-dim: rgba(34, 211, 238, 0.15);
+  --color-cyber-chrome: #e8eaf0;
+  --color-cyber-dark: #000000;
+  --color-cyber-panel: #080808;
+  --color-cyber-border: #1a1a1a;
+  --color-cyber-alert: #f43f5e;
+  --color-cyber-success: #10b981;
+  --color-monolith-muted: #7a8492;
+  --color-monolith-gray: #9aa3b0;
+  --color-brand-violet: #7c3aed;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  background-color: var(--color-cyber-dark);
+  color: var(--color-cyber-chrome);
+  font-family: ui-monospace, "JetBrains Mono", "Fira Code", monospace;
+  overflow-x: hidden;
+  margin: 0;
+}
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #000; }
+::-webkit-scrollbar-thumb { background: #1a1a1a; border-radius: 0; }
+::-webkit-scrollbar-thumb:hover { background: #22d3ee; }

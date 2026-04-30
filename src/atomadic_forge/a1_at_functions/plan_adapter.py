@@ -14,8 +14,6 @@ plan with each card's recommended_handling field populated.
 from __future__ import annotations
 
 from copy import deepcopy
-from typing import Any
-
 
 SCHEMA_VERSION_ADAPTED_PLAN_V1 = "atomadic-forge.agent_plan_adapted/v1"
 

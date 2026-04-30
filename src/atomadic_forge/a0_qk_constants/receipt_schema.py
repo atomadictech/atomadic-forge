@@ -45,7 +45,6 @@ from __future__ import annotations
 
 from typing import Literal, TypedDict
 
-
 SCHEMA_VERSION_V1 = "atomadic-forge.receipt/v1"
 SCHEMA_VERSION_V1_1 = "atomadic-forge.receipt/v1.1"
 SCHEMA_VERSION_V1_2 = "atomadic-forge.receipt/v1.2"

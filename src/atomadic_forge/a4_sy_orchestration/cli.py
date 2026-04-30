@@ -37,28 +37,24 @@ from ..a1_at_functions.agent_summary import (
 from ..a1_at_functions.card_renderer import render_receipt_card
 from ..a1_at_functions.certify_checks import certify as certify_checks
 from ..a1_at_functions.error_hints import format_hint
+from ..a1_at_functions.local_signer import sign_receipt_local
 from ..a1_at_functions.manifest_diff import diff_manifests
-from ..a1_at_functions.progress_reporter import make_stderr_reporter
 from ..a1_at_functions.preflight_change import preflight_change
+from ..a1_at_functions.progress_reporter import make_stderr_reporter
+from ..a1_at_functions.receipt_emitter import build_receipt, receipt_to_json
 from ..a1_at_functions.recipes import all_recipes, get_recipe, list_recipes
+from ..a1_at_functions.sbom_emitter import emit_sbom
+from ..a1_at_functions.scout_walk import harvest_repo
 from ..a1_at_functions.sidecar_parser import (
     find_sidecar_for,
     parse_sidecar_file,
 )
 from ..a1_at_functions.sidecar_validator import validate_sidecar
-from ..a1_at_functions.receipt_emitter import build_receipt, receipt_to_json
-from ..a1_at_functions.compliance_checker import check_compliance
-from ..a1_at_functions.local_signer import sign_receipt_local
-from ..a1_at_functions.sbom_emitter import emit_sbom
-from ..a1_at_functions.scout_walk import harvest_repo
 from ..a1_at_functions.wire_check import scan_violations
 from ..a2_mo_composites.lineage_chain_store import LineageChainStore
 from ..a2_mo_composites.plan_store import PlanStore
 from ..a2_mo_composites.receipt_signer import sign_receipt
 from ..a3_og_features.forge_enforce import run_enforce
-from ..a3_og_features.forge_plan_apply import apply_all_applyable, apply_card
-from ..a3_og_features.lsp_server import serve_stdio as lsp_serve_stdio
-from ..a3_og_features.mcp_server import serve_stdio as mcp_serve_stdio
 from ..a3_og_features.forge_pipeline import (
     run_auto,
     run_auto_plan,
@@ -66,6 +62,8 @@ from ..a3_og_features.forge_pipeline import (
     run_finalize,
     run_recon,
 )
+from ..a3_og_features.forge_plan_apply import apply_all_applyable, apply_card
+from ..a3_og_features.mcp_server import serve_stdio as mcp_serve_stdio
 
 # Suppress SyntaxWarnings from third-party code in seed/forged directories.
 warnings.filterwarnings("ignore", category=SyntaxWarning)
@@ -302,7 +300,7 @@ def wire_cmd(
                 f"→ {dest}"
             )
     if fail_on_violations and has_violations:
-        typer.echo(f"  gate:       FAIL (--fail-on-violations set)")
+        typer.echo("  gate:       FAIL (--fail-on-violations set)")
         raise typer.Exit(code=1)
     if has_violations and not suggest_repairs and not json_out:
         typer.echo(
@@ -555,7 +553,7 @@ def sidecar_validate_cmd(
     try:
         source_text = source_file.read_text(encoding="utf-8")
     except OSError as exc:
-        raise typer.BadParameter(f"could not read {source_file}: {exc}")
+        raise typer.BadParameter(f"could not read {source_file}: {exc}") from exc
     rep = validate_sidecar(
         parse["sidecar"], source_text=source_text, source_path=source_file,
     )
@@ -605,7 +603,7 @@ def recipes_cmd(
         typer.echo("-" * 60)
         for n in names:
             typer.echo(f"  {n:<22}  {catalogue[n]['description'][:60]}")
-        typer.echo(f"\n  forge recipes <name>  — show one recipe")
+        typer.echo("\n  forge recipes <name>  — show one recipe")
         return
     recipe = get_recipe(name)
     if recipe is None:
@@ -729,7 +727,7 @@ def plan_step_cmd(
     typer.echo(f"  status: {result['status']}")
     detail = result.get("detail") or {}
     for key, value in detail.items():
-        if isinstance(value, (dict, list)):
+        if isinstance(value, dict | list):
             value = json.dumps(value, default=str)[:120]
         typer.echo(f"  {key}: {value}")
     if result["status"] in {"failed", "rolled_back"}:
@@ -929,7 +927,6 @@ def certify_cmd(
         # so signatures.aaaa_nexus can carry the lineage_path the
         # Vanguard endpoint sees. Skip on --no-lineage (future flag).
         receipt = LineageChainStore(project_root).link_and_append(receipt)
-        receipt["compliance_mappings"] = check_compliance(receipt)
         if sign:
             receipt = sign_receipt(receipt)
         if local_sign:
@@ -951,6 +948,50 @@ def certify_cmd(
                           path=project_root),
             err=True,
         )
+        raise typer.Exit(code=1)
+
+
+@app.command("status")
+def status_cmd(
+    project_root: Annotated[Path, typer.Argument(
+        exists=True, file_okay=False, dir_okay=True, resolve_path=True,
+        help="Project root.")] = Path("."),
+    json_out: Annotated[bool, typer.Option("--json")] = False,
+    fail_under: Annotated[float | None, typer.Option(
+        "--fail-under",
+        help="Exit 1 when the certify score is below this threshold.")] = None,
+) -> None:
+    """Quick health snapshot: wire violations + certify score in one call.
+
+    The go-to command when you want a fast answer to 'is my project clean?'
+    without running the full auto pipeline.
+    """
+    wire_report = scan_violations(project_root)
+    certify_report = certify_checks(project_root, project=project_root.name)
+    violations = wire_report["violation_count"]
+    score = certify_report["score"]
+    overall = "PASS" if (violations == 0 and score >= (fail_under or 75)) else "FAIL"
+    if json_out:
+        typer.echo(json.dumps({
+            "schema_version": "atomadic-forge.status/v1",
+            "project": str(project_root),
+            "verdict": overall,
+            "wire": {"violations": violations, "verdict": wire_report.get("verdict")},
+            "certify": {"score": score, "issues": certify_report.get("issues", [])},
+        }, indent=2, default=str))
+        if overall == "FAIL" and fail_under is not None:
+            raise typer.Exit(code=1)
+        return
+    typer.echo(f"\nForge status: {project_root}")
+    typer.echo("-" * 60)
+    wire_ok = violations == 0
+    score_ok = score >= (fail_under or 75)
+    typer.echo(f"  wire:    {'PASS' if wire_ok else 'FAIL':5s}  {violations} violation(s)")
+    typer.echo(f"  certify: {'PASS' if score_ok else 'FAIL':5s}  {score}/100")
+    for issue in certify_report.get("issues", []):
+        typer.echo(f"    - {issue}")
+    typer.echo(f"\n  {'✓ CLEAN' if overall == 'PASS' else '✗ NEEDS WORK'}")
+    if overall == "FAIL" and fail_under is not None:
         raise typer.Exit(code=1)
 
 
@@ -1029,7 +1070,7 @@ def diff_cmd(
     if diff["summary"]:
         typer.echo("  summary:")
         for k, v in diff["summary"].items():
-            if isinstance(v, (str, int, float, bool)) or v is None:
+            if isinstance(v, str | int | float | bool) or v is None:
                 typer.echo(f"    {k}: {v}")
             elif isinstance(v, dict):
                 typer.echo(f"    {k}: {v}")
@@ -1106,45 +1147,12 @@ app.add_typer(mcp_app, name="mcp",
                help="MCP server surface — speak Forge to coding agents.")
 
 
-lsp_app = typer.Typer(
-    no_args_is_help=True,
-    help="Forge LSP — diagnostics + hover for .forge sidecar files "
-         "(VS Code / Neovim / Helix / IntelliJ).",
-)
-
-
-@lsp_app.command("serve")
-def lsp_serve_cmd() -> None:
-    """Run the forge-lsp stdio JSON-RPC server.
-
-    Add to your editor's LSP config:
-
-      VS Code (settings.json or extension):
-        "files.associations": { "*.forge": "yaml" },
-        // launch forge-lsp with: command='forge', args=['lsp', 'serve']
-
-      Neovim (lspconfig):
-        require'lspconfig'.forge_lsp.setup{
-          cmd = {'forge', 'lsp', 'serve'},
-          filetypes = {'forge'},
-          root_dir = require'lspconfig'.util.find_git_ancestor,
-        }
-
-    Provides:
-      * publishDiagnostics (S0001 / S0003 / etc., F0100-coded) on
-        every didOpen / didChange / didSave
-      * textDocument/hover — markdown summary of the symbol's
-        effect, tier, compose_with, proves clauses
-      * textDocument/definition — goto-source from
-        `name: login` line in foo.py.forge → foo.py:login
-    """
-    rc = lsp_serve_stdio()
-    if rc != 0:
-        raise typer.Exit(code=rc)
-
-
-app.add_typer(lsp_app, name="lsp",
-               help="Forge LSP — diagnostics + hover for .forge sidecar files.")
+def _check_optional_dep(module: str) -> str:
+    try:
+        __import__(module)
+        return "ok"
+    except ImportError:
+        return "missing"
 
 
 @app.command("doctor")
@@ -1152,19 +1160,32 @@ def doctor_cmd(
     json_out: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
     """Environment diagnostic."""
+    optional = {
+        "complexipy": _check_optional_dep("complexipy"),
+        "cryptography": _check_optional_dep("cryptography"),
+        "tomli": _check_optional_dep("tomli"),
+    }
     info = {
         "atomadic_forge_version": __version__,
         "python": sys.version.split()[0],
         "executable": sys.executable,
         "platform": sys.platform,
         "stdout_encoding": getattr(sys.stdout, "encoding", "?"),
+        "optional_deps": optional,
     }
     if json_out:
         typer.echo(json.dumps(info, indent=2))
         return
     typer.echo("\nAtomadic Forge — doctor")
     for k, v in info.items():
+        if k == "optional_deps":
+            continue
         typer.echo(f"  {k:24s} {v}")
+    typer.echo("  optional dependencies:")
+    for dep, status in optional.items():
+        mark = "✓" if status == "ok" else "✗"
+        note = "" if status == "ok" else f"  (pip install {dep})"
+        typer.echo(f"    {mark} {dep}{note}")
 
 
 @app.command("cs1")
@@ -1181,20 +1202,23 @@ def cs1_cmd(
     if receipt is None:
         receipt = project_path / ".atomadic-forge" / "receipt.json"
     if not receipt.exists():
-        typer.secho(f"Receipt not found at {receipt}. Run 'forge auto' first.", fg="red", err=True)
+        typer.secho(
+            f"Receipt not found at {receipt}.\n"
+            f"Generate one first:\n"
+            f"  forge certify {project_path} --emit-receipt {receipt}",
+            fg="red", err=True,
+        )
         raise typer.Exit(code=1)
     try:
         receipt_data = json.loads(receipt.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         typer.secho(f"Failed to load receipt: {exc}", fg="red", err=True)
-        raise typer.Exit(code=1)
-    if not receipt_data.get("compliance_mappings"):
-        receipt_data["compliance_mappings"] = check_compliance(receipt_data)
+        raise typer.Exit(code=1) from exc
     try:
         cs1 = render_cs1(receipt_data)
     except ValueError as exc:
         typer.secho(f"Receipt validation failed: {exc}", fg="red", err=True)
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from exc
     if json_out:
         typer.echo(json.dumps(cs1, indent=2, default=str))
         return
@@ -1204,89 +1228,6 @@ def cs1_cmd(
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(md, encoding="utf-8")
     typer.secho(f"\nForge CS-1 — Conformity Statement written to {out}", fg="green")
-
-
-
-
-@app.command("report")
-def report_cmd(
-    project: Annotated[str, typer.Argument(help="Project root path.")] = ".",
-    receipt: Annotated[Path | None, typer.Option("--receipt", help="Path to receipt.json.")] = None,
-    out: Annotated[Path | None, typer.Option("--out", help="Output path for NSQR report.")] = None,
-    json_out: Annotated[bool, typer.Option("--json", help="Emit NSQR as JSON.")] = False,
-    rate: Annotated[float, typer.Option("--rate", help="Team hourly rate USD.")] = 150.0,
-) -> None:
-    """Generate a National Software Quality Report (CISQ-referenced, publishable Markdown)."""
-    from ..a1_at_functions.nsqr_renderer import render_nsqr, render_nsqr_markdown
-    from ..a1_at_functions.roi_calculator import calculate_roi
-    project_path = Path(project).resolve()
-    if receipt is None:
-        receipt = project_path / ".atomadic-forge" / "receipt.json"
-    if not receipt.exists():
-        typer.secho(f"Receipt not found at {receipt}. Run 'forge auto' first.", fg="red", err=True)
-        raise typer.Exit(code=1)
-    try:
-        receipt_data = json.loads(receipt.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        typer.secho(f"Failed to load receipt: {exc}", fg="red", err=True)
-        raise typer.Exit(code=1)
-    if not receipt_data.get("compliance_mappings"):
-        receipt_data["compliance_mappings"] = check_compliance(receipt_data)
-    roi = calculate_roi(receipt_data, team_hourly_rate=rate)
-    nsqr = render_nsqr(receipt_data, roi, compliance=receipt_data.get("compliance_mappings"))
-    if json_out:
-        typer.echo(json.dumps(nsqr, indent=2, default=str))
-        return
-    md = render_nsqr_markdown(nsqr)
-    if out is None:
-        out = project_path / ".atomadic-forge" / "national-quality-report.md"
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(md, encoding="utf-8")
-    typer.secho(f"\nNational Software Quality Report written to {out}", fg="green")
-    bp = nsqr.get("crisis_basis_points", 0.0)
-    typer.secho(f"Crisis contribution: {bp:.4f} basis points of the $2.41T CISQ benchmark", fg="cyan")
-
-
-
-
-@app.command("roi")
-def roi_cmd(
-    project: Annotated[str, typer.Argument(help="Project root path.")] = ".",
-    receipt: Annotated[Path | None, typer.Option("--receipt", help="Path to receipt.json.")] = None,
-    out: Annotated[Path | None, typer.Option("--out", help="Output path for ROI report.")] = None,
-    json_out: Annotated[bool, typer.Option("--json", help="Emit ROI as JSON.")] = False,
-    rate: Annotated[float, typer.Option("--rate", help="Team hourly rate USD.")] = 150.0,
-) -> None:
-    """Generate a CISQ-based ROI report (TD-principal reduction in USD)."""
-    from ..a1_at_functions.roi_calculator import calculate_roi, render_roi_markdown
-    project_path = Path(project).resolve()
-    if receipt is None:
-        receipt = project_path / ".atomadic-forge" / "receipt.json"
-    if not receipt.exists():
-        typer.secho(f"Receipt not found at {receipt}. Run 'forge auto' first.", fg="red", err=True)
-        raise typer.Exit(code=1)
-    try:
-        receipt_data = json.loads(receipt.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        typer.secho(f"Failed to load receipt: {exc}", fg="red", err=True)
-        raise typer.Exit(code=1)
-    roi = calculate_roi(receipt_data, team_hourly_rate=rate)
-    if json_out:
-        typer.echo(json.dumps(roi, indent=2))
-        return
-    md = render_roi_markdown(roi, project_name=project_path.name)
-    if out is None:
-        out = project_path / ".atomadic-forge" / "roi-report.md"
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(md, encoding="utf-8")
-    mult = roi["roi_multiplier"]
-    grade = roi["grade"]
-    avoided = roi["avoided_remediation_cost_usd"] + roi["annual_carry_reduction_usd"]
-    typer.secho(
-        f"\nForge ROI -- {grade} | {mult:.1f}x ROI | ${avoided:,.0f} avoided cost",
-        fg="green",
-    )
-    typer.secho(f"Report written to {out}", fg="green")
 
 
 # Specialty sub-apps — registered lazily so any import error in one doesn't
