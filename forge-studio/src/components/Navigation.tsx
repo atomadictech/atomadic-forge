@@ -103,7 +103,7 @@ export function Navigation({
                 exit={{ opacity: 0 }}
                 className="font-mono text-[8px] text-monolith-muted"
               >
-                atomadic-forge 0.3.1
+                atomadic-forge 0.3.2
               </motion.span>
             )}
           </AnimatePresence>
