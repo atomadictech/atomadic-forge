@@ -53,6 +53,8 @@ jobs:
           sudo apt-get update && sudo apt-get install -y \
             libwebkit2gtk-4.1-dev build-essential curl wget file \
             libssl-dev libayatana-appindicator3-dev librsvg2-dev
+      - name: Create frontend dist placeholder for Tauri macro
+        run: mkdir -p dist
       - name: cargo check
         working-directory: forge-studio/src-tauri
         run: cargo check --release

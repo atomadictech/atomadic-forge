@@ -17,11 +17,12 @@ export function ArchitectureGraph() {
     const edges=EDGES.map(([from,to])=>({data:{id:`${from}-${to}`,source:from,target:to}}));
     cyInstance.current?.destroy();
     const cy=cytoscape({container:cyRef.current,elements:{nodes,edges},
-      style:[
-        {selector:"node",style:{"shape":"round-rectangle",width:120,height:56,"background-color":"data(color)","background-opacity":0.15,"border-color":"data(color)","border-width":2,label:"data(label)","text-valign":"center","text-halign":"center",color:"#e2e8f0","font-size":11,"white-space":"pre","text-wrap":"wrap"}},
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      style:([
+        {selector:"node",style:{"shape":"round-rectangle",width:120,height:56,"background-color":"data(color)","background-opacity":0.15,"border-color":"data(color)","border-width":2,label:"data(label)","text-valign":"center","text-halign":"center",color:"#e2e8f0","font-size":11,"white-space":"pre","text-wrap":"wrap"} as Record<string,unknown>},
         {selector:"node:selected",style:{"background-opacity":0.4,"border-width":3}},
         {selector:"edge",style:{width:1.5,"line-color":"#334155","target-arrow-color":"#475569","target-arrow-shape":"triangle","curve-style":"bezier",opacity:0.6}},
-      ],
+      ] as any),
       layout:{name:"preset"},userZoomingEnabled:true,userPanningEnabled:true,
     });
     cy.on("tap","node",(evt)=>{const tier=evt.target.id() as Tier;setSelectedTier(selectedTier===tier?null:tier);});

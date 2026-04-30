@@ -18,7 +18,14 @@ export function ComplexityHeatmap(){
     if(files.length===0)return;
     fetchComplexity(files).then(setComplexities).catch(()=>setUnavailable(true));
   },[scoutReport]);
-  if(!scoutReport)return null;
+  if(!scoutReport)return(
+    <section style={{padding:24}}>
+      <h2 style={{fontSize:18,fontWeight:600,marginBottom:8,color:"#f1f5f9"}}>Complexity Heatmap</h2>
+      <div style={{height:160,display:"flex",alignItems:"center",justifyContent:"center",color:"#475569",fontSize:14,border:"1px dashed #334155",borderRadius:8}}>
+        Scan a project to render the complexity heatmap
+      </div>
+    </section>
+  );
   if(unavailable)return(
     <section style={{padding:24}}>
       <h2 style={{fontSize:18,fontWeight:600,marginBottom:8,color:"#f1f5f9"}}>Complexity Heatmap</h2>
@@ -28,7 +35,14 @@ export function ComplexityHeatmap(){
       </div>
     </section>
   );
-  if(!complexities)return null;
+  if(!complexities)return(
+    <section style={{padding:24}}>
+      <h2 style={{fontSize:18,fontWeight:600,marginBottom:8,color:"#f1f5f9"}}>Complexity Heatmap</h2>
+      <div style={{height:160,display:"flex",alignItems:"center",justifyContent:"center",color:"#94a3b8",fontSize:13,border:"1px dashed #334155",borderRadius:8,gap:10}}>
+        <span>⟳</span> Calculating cognitive complexity…
+      </div>
+    </section>
+  );
   const sorted=[...complexities].sort((a,b)=>b.score-a.score);
   return(
     <section style={{padding:24}}>
