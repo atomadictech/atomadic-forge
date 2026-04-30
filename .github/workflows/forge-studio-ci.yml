@@ -35,7 +35,7 @@ jobs:
         run: pnpm build
       - name: Bundle size gate (< 8 MB JS)
         run: |
-          TOTAL=$(find dist/assets -name "*.js" -exec wc -c {} + | tail -1 | awk '\''{print $1}'\'')
+          TOTAL=$(find dist/assets -name "*.js" -exec wc -c {} + | tail -1 | awk '{print $1}')
           echo "Total JS: $TOTAL bytes"
           if [ "$TOTAL" -gt 8388608 ]; then echo "Exceeds 8 MB ($TOTAL)"; exit 1; fi
 
