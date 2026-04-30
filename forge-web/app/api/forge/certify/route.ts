@@ -20,7 +20,7 @@ export async function POST(req: Request) {
   if (body.sign) args.push("--sign");
   if (body.failUnder !== undefined) args.push("--fail-under", String(body.failUnder));
   try {
-    const result = await runForgeJson(args);
+    const result = await runForgeJson(args, { timeoutMs: 120_000 });
     return NextResponse.json(result);
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });

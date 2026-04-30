@@ -47,6 +47,9 @@ coverage/
 .nyc_output/
 *.tsbuildinfo
 
+# investor-site is maintained separately in atomadic-investor-site repo
+investor-site/
+
 # Local environment
 .env
 .env.local

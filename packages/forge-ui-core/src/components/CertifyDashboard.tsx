@@ -21,22 +21,31 @@ export function CertifyDashboard() {
   const [running, setRunning] = useState(false);
   const [emitReceipt, setEmitReceipt] = useState(false);
   const [localSign, setLocalSign] = useState(false);
+  // Certify runs on the project root, which may differ from the scan source path.
+  // Default: walk up from source path to find the repo/package root.
+  const [certifyRoot, setCertifyRoot] = useState<string>("");
+
+  // When projectRoot changes, default certifyRoot to it (user can override).
+  useEffect(() => {
+    if (projectRoot && !certifyRoot) setCertifyRoot(projectRoot);
+  }, [projectRoot]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleCertify() {
-    if (!projectRoot) {
+    const root = certifyRoot.trim() || projectRoot;
+    if (!root) {
       setError("scan a project first");
       return;
     }
     setRunning(true);
     setError(null);
     try {
-      const result = await client.certify(projectRoot, {
+      const result = await client.certify(root, {
         emitReceipt,
         localSign,
       });
       setCertifyResult(result);
       if (emitReceipt) {
-        const r = await client.receipt(projectRoot);
+        const r = await client.receipt(root);
         setReceipt(r);
       }
     } catch (e) {
@@ -58,18 +67,34 @@ export function CertifyDashboard() {
   return (
     <div className="p-6 space-y-5 max-w-4xl">
       <ActionableCard delay={0}>
-        <div className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-center justify-between">
-          <div>
-            <div className="flex items-center gap-2 text-cyber-cyan">
-              <ShieldCheck size={14} />
-              <h2 className="font-mono text-[11px] uppercase tracking-[0.3em]">
-                Conformance Certify
-              </h2>
-            </div>
-            <p className="font-mono text-[9px] text-monolith-muted mt-1">
-              Score: documentation · tests · tier layout · upward imports
-            </p>
+        <div className="mb-4">
+          <div className="flex items-center gap-2 text-cyber-cyan mb-2">
+            <ShieldCheck size={14} />
+            <h2 className="font-mono text-[11px] uppercase tracking-[0.3em]">
+              Conformance Certify
+            </h2>
           </div>
+          <p className="font-mono text-[9px] text-monolith-muted mb-3">
+            Score: documentation · tests · tier layout · upward imports
+          </p>
+          <div className="flex items-center gap-2 bg-cyber-dark border border-cyber-border px-3 py-2 focus-within:border-cyber-cyan transition-colors">
+            <ShieldCheck size={12} className="text-monolith-muted flex-shrink-0" />
+            <input
+              type="text"
+              value={certifyRoot}
+              onChange={(e) => setCertifyRoot(e.target.value)}
+              placeholder="Project root path (defaults to scan path)…"
+              onKeyDown={(e) => e.key === "Enter" && !running && handleCertify()}
+              className="flex-1 bg-transparent font-mono text-xs text-cyber-chrome placeholder:text-monolith-muted outline-none"
+              aria-label="certify path"
+            />
+          </div>
+          <p className="font-mono text-[8px] text-monolith-muted mt-1">
+            Tip: certify on the repo root (where README/CHANGELOG/.github live) to score docs + CI checks.
+          </p>
+        </div>
+        <div className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-center justify-between">
+          <div />
           <div className="flex flex-col gap-2 sm:items-end">
             <label className="flex items-center gap-2 font-mono text-[9px] uppercase tracking-widest text-monolith-muted">
               <input
@@ -92,7 +117,7 @@ export function CertifyDashboard() {
             </label>
             <NeonButton
               onClick={handleCertify}
-              disabled={running || !projectRoot}
+              disabled={running || !(certifyRoot.trim() || projectRoot)}
               variant={running ? "success" : "cyan"}
             >
               {running ? "Certifying…" : "Run Certify"}
