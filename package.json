@@ -1,0 +1,24 @@
+{
+  "name": "atomadic-forge-monorepo",
+  "version": "0.3.2",
+  "private": true,
+  "description": "Atomadic Forge UI monorepo — shared core, Tauri desktop (forge-studio), Next.js PWA (forge-web)",
+  "packageManager": "pnpm@9.12.0",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "dev:studio": "pnpm --filter forge-studio dev",
+    "dev:web": "pnpm --filter forge-web dev",
+    "build": "pnpm -r --filter=./packages/* --filter=./forge-studio --filter=./forge-web build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "test:e2e": "pnpm -r --filter=./forge-studio --filter=./forge-web test:e2e",
+    "lint": "pnpm -r lint",
+    "clean": "pnpm -r exec rimraf dist .next .turbo node_modules"
+  },
+  "devDependencies": {
+    "rimraf": "^6.0.1",
+    "typescript": "^5.6.3"
+  }
+}

@@ -1,234 +1,139 @@
-# Atomadic Forge 0.1.0 — Launch Checklist
+# Atomadic Forge — Launch Checklist (v0.3.2)
 
-**Status: READY FOR LAUNCH** ✓
+**Status:** UI parity foundation shipped · 841 Python tests passing · Tauri + PWA builds green
 
-Completed: April 27, 2026
-
----
-
-## Phase 0/1: Code Validation ✓
-
-- [x] **Installation works**: `pip install -e . && python -m atomadic_forge --help` → OK
-- [x] **All commands functional**: Tested recon, auto, cherry, finalize, wire, certify, iterate, evolve, etc.
-- [x] **Tests passing**: 90/90 tests pass (`pytest tests/`)
-- [x] **Deprecation warnings fixed**: datetime.utcnow() → datetime.now(timezone.utc)
-- [x] **Doctor check**: Environment diagnostic runs without errors
-- [x] **Eats own dogfood**: `forge auto src/atomadic_forge ./out` materializes correctly
-- [x] **Import discipline**: Forge's own code passes `forge wire` check
-
-## Phase 2: Capability Assessment ✓
-
-- [x] **Absorption pipeline**: scout → cherry-pick → materialize → wire → certify (fully functional)
-- [x] **LLM integration**: iterate and evolve commands integrated with Gemini, Claude, GPT, Ollama
-- [x] **Dry-run mode**: Default safe behavior (nothing written without `--apply`)
-- [x] **JSON output**: Machine-readable format for all major verbs
-- [x] **Conflict resolution**: `--on-conflict` modes (rename, first, last, fail) working
-- [x] **Composition discovery**: `forge emergent` and `forge synergy` commands present
-- [x] **Commandsmith**: Auto-registration of CLI commands working
-
-## Phase 3: Deliverables ✓
-
-### Code (53 source files, 6510 LOC)
-
-- [x] **Monadic structure**: All code in a0–a4 tiers, no upward imports
-- [x] **Clean architecture**: manifest_store (a2), forge_pipeline (a3), cli (a4) separation
-- [x] **Composition-based**: Features combine verified lower-tier blocks
-- [x] **No deprecation warnings**: UTC datetime fixed across 3 files
-
-### README.md (enhanced)
-
-- [x] **Badges**: Python 3.10+, License, Tests passing
-- [x] **Hero section**: Clear problem statement + solution
-- [x] **5-tier diagram**: Visual ASCII diagram of architecture
-- [x] **Quick start**: 3-command getting started
-- [x] **Command table**: All 10+ commands with brief descriptions
-- [x] **Known limits**: Honest about heuristics, no semantic merge, etc.
-- [x] **Design philosophy**: 5 core principles
-- [x] **Status section**: Clear accomplishments + pending items (✓90 tests, ✗not on PyPI yet)
-
-### Documentation Suite (1721 LOC in 6 files)
-
-1. **docs/README.md** (112 lines)
-   - Navigation guide to all docs
-   - Quick links to guides by use case
-   - Pro tips, status, roadmap
-
-2. **docs/01-getting-started.md** (153 lines)
-   - Installation (PyPI + source)
-   - 5-minute first run walkthrough
-   - Understanding the output (tier dirs, STATUS.md, .atomadic-forge/)
-   - Next steps
-
-3. **docs/02-commands.md** (408 lines)
-   - Core commands: auto, recon, cherry, finalize, wire, certify
-   - LLM commands: iterate, evolve
-   - Specialty commands: emergent, synergy, commandsmith, doctor
-   - Full option reference for each command
-   - Examples and output samples
-
-4. **docs/03-tutorial.md** (326 lines)
-   - Step-by-step absorption of a real repo
-   - How to analyze with recon
-   - Dry-run vs. apply workflow
-   - How to fix wire violations
-   - Certification scoring
-   - Inspecting provenance trail
-
-5. **docs/04-llm-loops.md** (356 lines)
-   - Why LLM loops (architecture + code generation)
-   - Provider setup (Gemini, Claude, GPT, Ollama, Stub)
-   - iterate (single-shot) vs. evolve (recursive)
-   - Tips for better code quality
-   - 3 full examples (CSV processor, web scraper, REST API)
-   - Troubleshooting (rate limits, quality issues, stagnation)
-
-6. **docs/05-faq.md** (366 lines)
-   - General questions (formatter vs. Forge, generator vs. absorber)
-   - Installation & setup (permission errors, missing commands)
-   - Using forge auto (dry-runs, conflicts, symbol picking)
-   - Wire violations (how to fix upward imports)
-   - Certify scoring (how to reach 75+/100)
-   - LLM loops (rate limits, code quality, stagnation)
-   - Performance & scalability
-   - Contributing guidelines
-
-### Existing Documentation
-
-- [x] **ARCHITECTURE.md**: System design, tier organization, data flows (4KB)
-- [x] **CONTRIBUTING.md**: How to extend, PR guidelines (1.6KB)
-- [x] **CHANGELOG.md**: Version history, roadmap (1.2KB)
-
-## Phase 4: Quality Audit ✓
-
-### Code Quality
-
-- [x] Tests: 90/90 passing (4.69s total)
-- [x] No deprecation warnings (fixed utcnow issue)
-- [x] Import discipline: Zero upward-import violations in Forge itself
-- [x] Module organization: Every file in correct tier
-- [x] Module docstrings: Present on all source files
-
-### Documentation Quality
-
-- [x] **Clarity**: Language is concise and jargon-free (5th-grade reading level target)
-- [x] **Completeness**: All commands, options, and workflows documented
-- [x] **Examples**: Every major use case has a worked example
-- [x] **Navigation**: Docs index and cross-references throughout
-- [x] **Consistency**: Formatting, terminology, code blocks consistent
-- [x] **Honesty**: Limits and roadmap clearly stated
-
-### User Experience
-
-- [x] **Getting started**: <10 minutes from "pip install" to first absorption
-- [x] **Troubleshooting**: FAQ covers 20+ common issues with solutions
-- [x] **Learning curve**: Docs progress from basics → advanced → LLM loops
-- [x] **Safe by default**: Dry-run mode prevents accidental overwrites
-- [x] **Provenance**: Every run generates audit trail (lineage.jsonl)
-
-## Phase 5: Future Work (Honest Roadmap)
-
-### In 0.2.0 (Q2 2026)
-
-- [ ] Cryptographic signing of conformance certificates
-- [ ] Customizable tier classification (override defaults)
-- [ ] TypeScript support (beta)
-- [ ] Pre-built workflow templates
-
-### In 0.3.0 (Q4 2026)
-
-- [ ] Rust support
-- [ ] Semantic merge (intelligent handling of duplicate classes)
-- [ ] IDE plugins (VS Code, JetBrains)
-- [ ] Integration with LangChain, CrewAI
-
-### Permanent backlog
-
-- [ ] C++, Go, Java support
-- [ ] Web UI for absorption + visualization
-- [ ] SaaS platform (atomadic.tech hosting)
-- [ ] Enterprise features (audit logging, RBAC, org management)
+Last refreshed: 2026-04-30
 
 ---
 
-## Launch Artifacts
+## What this checklist tracks
 
-### Buildable / Shippable
+The forge has three faces today:
 
-- [x] Source code (53 Python files, 6.5K LOC)
-- [x] Test suite (90 tests, fully passing)
-- [x] README.md (enhanced for conversion)
-- [x] Documentation (6 files, 1.7K lines)
-- [x] Setup/config files (pyproject.toml, import-linter contracts)
-- [x] License (BSL-1.1, converts to Apache 2.0 in 2030)
-- [x] Changelog and contributing guide
+1. **Python CLI** (`atomadic_forge`) — the engine
+2. **Tauri desktop app** (`forge-studio`) — primary user UI
+3. **Next.js PWA** (`forge-web`) — same UI, browser-native, installable
 
-### Blocked
-
-- [ ] GitHub repo (needs manual account permissions or different account)
-- [ ] PyPI registry (needs admin action)
-
-### Future (Not in 0.1.0)
-
-- [ ] Storefront update at atomadic.tech (separate task)
+All three must hold launch readiness simultaneously. Item-by-item below.
 
 ---
 
-## Verification Commands
+## Engine (Python CLI) — `pip install atomadic_forge`
 
-Run these to verify all artifacts:
+- [x] **Installation works** — `pip install -e ".[dev]"` succeeds
+- [x] **All commands functional** — recon, auto, cherry, finalize, wire, certify, plan, plan-step, plan-apply, context-pack, preflight, enforce, doctor, recipes, sbom, cs1, iterate, evolve, emergent, synergy, audit, mcp serve
+- [x] **Tests passing** — 841/841 (`pytest tests/ -q`)
+- [x] **MCP server** — `forge mcp serve` exposes 21 tools + 5 resources over JSON-RPC stdio
+- [x] **JSON output contracts** — every verb supports `--json`, schema-versioned
+- [x] **Receipts** — schema v1 / v1.1 / v1.2 / v2 with optional ed25519 + AAAA-Nexus signatures
+- [x] **EU AI Act / FDA PCCP conformity** — `forge cs1` generates conformity statement from receipt
+- [x] **Eats own dogfood** — `forge auto src/atomadic_forge ./out` materializes correctly
+- [x] **Import discipline** — zero upward-import violations in forge itself
+- [ ] **PyPI registry** — published as `atomadic-forge` (admin action)
 
-```bash
-# Install and run
-pip install -e ".[dev]"
+---
 
-# Test suite
-python -m pytest tests/ -q
-# Expected: 90 passed
+## UI Architecture
 
-# CLI smoke test
-python -m atomadic_forge doctor
-# Expected: version, Python, platform, encoding
+- [x] **Monorepo** — pnpm workspace at `atomadic-forge/`
+- [x] **Shared core** — `@atomadic/forge-ui-core` package with full ForgeClient interface, types, components, theme
+- [x] **Identical UI guarantee** — both shells render the same `<ForgeShell client={…}/>` from core
+- [x] **Transport abstraction** — `TauriForgeClient` (IPC), `HttpForgeClient` (fetch), `StubForgeClient` (tests)
 
-# Forge on itself
-python -m atomadic_forge auto src/atomadic_forge ./test-out
-# Expected: 222 symbols, dry-run OK
+---
 
-# Code quality
-python -m atomadic_forge wire src/atomadic_forge
-# Expected: not applicable (source not tier-organized)
+## Forge Studio (Tauri desktop)
 
-# Help
-python -m atomadic_forge --help
-# Expected: all 10+ commands listed
-```
+- [x] **Builds clean** — `pnpm --filter forge-studio build` (vite production)
+- [x] **Bundle config** — `tauri.conf.json` valid, identifier `com.atomadic.forge-studio`
+- [x] **Window** — 1400×900 default, min 900×600, centered
+- [x] **Icons** — 32, 128, 128@2x, .ico (all valid RGBA)
+- [x] **Tailwind v4 + cyberpunk theme** — tokens loaded from shared core
+- [x] **Cytoscape architecture & topology graphs** — 2069 modules transformed
+- [x] **MCP bridge** — Rust `forge_connect` / `forge_call_tool` / `forge_complexipy_score`
+- [x] **Vitest unit tests** — 11/11 passing
+- [ ] **Code-signing certificates** — Apple Developer ID + Microsoft Authenticode (admin action)
+- [ ] **Auto-update channel** — Tauri updater wired (next session)
+
+---
+
+## Forge Web (Next.js 15 PWA)
+
+- [x] **Builds clean** — `pnpm --filter forge-web build` (Turbopack)
+- [x] **Identical UI** — imports `<ForgeShell>` from shared core, supplies HTTP client
+- [x] **Manifest** — `/manifest.webmanifest` with 192/512 maskable icons
+- [x] **Service worker** — `/sw.js` with shell-cache + SWR asset strategy + network-only API
+- [x] **Install prompt** — `<InstallPwaButton>` handling `beforeinstallprompt`
+- [x] **API routes** — `/api/forge/{connect,recon,wire,certify,plan,plan/[id]/step,doctor,tools,resources,receipt,complexity}`
+- [x] **Forge runner** — `lib/forge-runner.ts` proxies to `python -m atomadic_forge` (configurable via `FORGE_BIN`)
+- [ ] **Hosting target chosen** — Vercel / Cloudflare Pages / self-host (decision pending)
+- [ ] **Custom domain** — `forge.atomadic.tech` (admin action)
+- [ ] **CDN-cached app shell** — verify Cache-Control headers post-deploy
+
+---
+
+## Verb coverage in the UI
+
+| Verb           | UI screen        | Wired |
+|----------------|------------------|-------|
+| recon          | Scan             | ✅    |
+| wire           | Scan / Debt      | ✅    |
+| certify        | Certify          | ✅    |
+| receipt browse | Certify          | ✅    |
+| plan           | Plan             | ✅    |
+| plan-step      | Plan (Apply btn) | ✅    |
+| doctor         | Doctor           | ✅    |
+| tools/list     | Topology         | ✅    |
+| resources/list | Topology         | ✅    |
+| complexity     | Complexity       | ✅    |
+| enforce        | (next session)   | ⏳    |
+| auto           | (next session)   | ⏳    |
+| cherry / finalize | (next session) | ⏳    |
+| context-pack   | (next session)   | ⏳    |
+| preflight      | (next session)   | ⏳    |
+| iterate / evolve | (next session) | ⏳    |
+| emergent / synergy | (next session) | ⏳  |
+| recipes / sbom / cs1 | (next session) | ⏳ |
+
+The `ForgeClient` interface already declares all of these — the screens
+remain to be built.
+
+---
+
+## Testing
+
+- [x] **Engine tests** — 841/841 passing
+- [x] **Studio unit tests** — 11/11 passing (fCodeSeverity, debt math, brittleness)
+- [x] **Studio Playwright smoke** — header, nav, drop-zone, empty states
+- [ ] **Core component tests** (Vitest + RTL on `@atomadic/forge-ui-core`) — next session
+- [ ] **Web Playwright e2e** — next session
+
+---
+
+## Documentation
+
+- [x] **Engine** — README, ARCHITECTURE, CONTRIBUTING, EVOLUTION, SECURITY, CHANGELOG, docs/01–05
+- [x] **forge-ui-core** — README with architecture diagram + usage examples
+- [x] **forge-web** — README explaining shell role + run instructions
+- [x] **LAUNCH_CHECKLIST** — this file (v0.3.2 reality)
+
+---
+
+## Repo state
+
+- [x] **`.gitignore`** — covers Python + JS monorepo, build outputs, Cargo target
+- [ ] **Pruned merged feature branches** — next session (9 stale branches detected)
+- [x] **GitHub remote** — `git@github.com:atomadictech/atomadic-forge.git` configured
 
 ---
 
 ## Sign-off
 
-**Code**: PASS (all tests, no warnings, eats own dogfood)
+**Engine:** ✅ PASS
+**Tauri shell:** ✅ PASS (build verified, tests green)
+**PWA shell:** ✅ PASS (build verified, PWA assets present)
+**Shared core:** ✅ PASS (typecheck clean, public API stable)
+**Verb coverage:** 🟡 REFINE (10/22 wired in UI, all in `ForgeClient`)
+**Testing:** 🟡 REFINE (engine + studio green, core/web pending)
 
-**Documentation**: PASS (1.7K lines, 6 files, complete)
-
-**README**: PASS (enhanced, badges, clear problem/solution)
-
-**Architecture**: PASS (monadic, zero upward imports)
-
-**Overall Verdict**: ✅ **PASS** — Ready for launch
-
----
-
-## Next Steps (Not in 0.1.0)
-
-1. **GitHub**: Create `atomadictech/atomadic-forge` (requires account permissions)
-2. **PyPI**: Publish to Python Package Index
-3. **Storefront**: Update atomadic.tech with Forge product page
-4. **Launch**: Announce on social media, Hacker News, Reddit
-
----
-
-**Shipped by**: Claude Code (Haiku 4.5)  
-**Date**: April 27, 2026  
-**Build time**: ~3 hours  
-**Lines added**: +1750 (docs) +3 (fixes)  
-**Commits**: 3 (fixes, README, docs)
+**Overall verdict:** **REFINE** — foundation shippable, verb-coverage expansion + tests scheduled for next session.

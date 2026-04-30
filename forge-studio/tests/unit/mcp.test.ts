@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import type { WireReport } from "@/lib/types";
-import { fCodeSeverity } from "@/lib/types";
+import type { WireReport } from "@atomadic/forge-ui-core";
+import { fCodeSeverity } from "@atomadic/forge-ui-core";
 
 describe("fCodeSeverity", () => {
   it("F004x = 4 (structural)", () => expect(fCodeSeverity("F0041")).toBe(4));

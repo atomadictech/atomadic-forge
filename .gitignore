@@ -22,3 +22,36 @@ htmlcov/
 forge-demo-*/
 forge-evolve-*/
 forge-iterate-*/
+
+# ─── JavaScript / TypeScript monorepo ───────────────────────────────────
+node_modules/
+.pnpm-store/
+.pnpm-debug.log*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build outputs
+forge-studio/dist/
+forge-studio/.vite/
+forge-studio/src-tauri/target/
+forge-studio/src-tauri/gen/
+forge-studio/src-tauri/Cargo.lock
+forge-web/.next/
+forge-web/out/
+forge-web/next-env.d.ts
+packages/*/dist/
+
+# Test / coverage
+coverage/
+.nyc_output/
+*.tsbuildinfo
+
+# Local environment
+.env
+.env.local
+.env.*.local
+
+# Editor
+.cursor/
+*.swp
