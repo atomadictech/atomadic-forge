@@ -1,0 +1,54 @@
+# Atomadic Forge — regulated policy preset
+# Lane G G7 / Golden Path enterprise-readiness templates.
+#
+# For organisations subject to:
+#   EU AI Act 2024/1689 (Art. 9 risk-management, Art. 11 technical
+#     documentation, Art. 17 quality-management)
+#   SR 11-7 (model risk management / validation)
+#   ISO/IEC 42001:2023 (AI management systems)
+#
+# Cross-links to Lane F compliance mappings:
+#   docs/compliance/EU_AI_ACT_MAPPING.md  (Art. 9/11/15/17)
+#   docs/compliance/SR_11_7_MAPPING.md    (model validation framework)
+#   docs/compliance/ISO_42001_MAPPING.md  (AI management controls)
+#
+# All gates are hard-fail. Deviations MUST be documented in your
+# organisation's risk register before deployment.
+# See also: strict.toml, permissive.toml
+
+[tool.forge.agent]
+
+# EU AI Act Art. 9(6): adequate accuracy and robustness.
+# SR 11-7 §6: fitness-for-purpose validation.
+# Raise to 100 for Annex III high-risk systems.
+certify_threshold = 90
+
+# Zero tolerance for architectural violations.
+require_wire_pass = true
+
+# EU AI Act Art. 11(1)(e): immutable audit anchor per artefact.
+require_local_sign = true
+
+# Sigstore transparency log for external auditability.
+require_remote_sign = true
+
+# EU AI Act Art. 11 + Annex IV §2(c): component inventory required.
+# SR 11-7 §7.5: third-party component tracking for model provenance.
+emit_sbom = true
+
+# SR 11-7 §6.3: reproducibility requirement for model validation.
+seed_determinism = 42
+
+# EU AI Act Art. 12: logging requirements for high-risk AI systems.
+emit_receipt = true
+
+# ISO/IEC 42001 §8.5: no regressions (non-conformance).
+fail_on_new_violations = true
+max_auto_fixable_violations = 0
+
+# EU AI Act Art. 9(7): systematic risk management throughout lifecycle.
+# SR 11-7 §8: model inventory and change tracking.
+append_lineage = true
+
+# EU AI Act Art. 12(1): logs retained >= 6 months.
+min_local_lineage_depth = 10

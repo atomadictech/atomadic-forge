@@ -1,6 +1,47 @@
 # Changelog
 
-## Unreleased — _Codex-6 + Lane D W8/W11/W12 sidecar arc complete_
+## 0.3.1 — Golden Path lanes B/C/D/F/G ship
+
+783 tests passing, 2 skipped. `forge wire src/atomadic_forge` PASS,
+`forge certify .` = **100/100**.
+
+### Added — Golden Path lanes shipped
+
+- **Lane B (Studio)** — Tauri + React + TypeScript visual sandbox:
+  Project Scan Dashboard, Architecture Graph (Cytoscape), Cognitive
+  Heatmap, Real-Time Debt Counter, Agent Topology Map. `forge-studio/`.
+- **Lane C W3 (Badge worker)** — Cloudflare Worker emitting
+  shields.io-compatible SVG badges from Receipts in a `FORGE_RECEIPTS`
+  KV namespace. `cloudflare-workers/badge/`.
+- **Lane D W8 (Sidecar grammar)** — `.forge` v1.0 spec + parser. Per-
+  symbol effect / compose_with / proves declarations.
+  `a1.sidecar_parser`, `docs/SIDECAR.md`.
+- **Lane D W11 (Sidecar validator)** — AST cross-check of `.forge`
+  against source. 7 drift classes (S0000–S0006) promoted into the
+  F-code namespace as F0100–F0106. `a1.sidecar_validator`,
+  `forge sidecar parse / validate`.
+- **Lane D W12 (LSP)** — `forge lsp serve` Content-Length framed JSON-
+  RPC server. Live diagnostics, hover, goto-source for `.forge` files.
+- **Lane D W14 (VS Code extension)** — `vscode-forge-extension/`.
+  Language client wired to `forge lsp serve`.
+- **Lane F W16-W18 (CS-1 + compliance)** — CS-1 Conformity Statement
+  renderer + EU AI Act Annex IV / SR 11-7 / FDA PCCP / CMMC-AI / NIST
+  AI RMF mappings. `a1.cs1_renderer`, `forge cs1`.
+- **Lane G (Signing + SBOM + policy templates)** — Ed25519 local
+  signer (soft-fail without `cryptography`), CycloneDX 1.5 SBOM
+  emitter, three policy stances (strict / permissive / regulated),
+  `--seed-determinism` on `forge auto`. `a1.local_signer`,
+  `a1.sbom_emitter`, `forge sbom`, `--local-sign` on certify.
+
+### Codex "Copilot's Copilot" — completed
+
+All 12 items closed: compact summaries, action cards, context_pack,
+preflight_change, score_patch, plan persistence (`plan-list / plan-
+show / plan-step / plan-apply`), MCP `auto_plan` tool, `--version`,
+`--score` field on summaries, agent_summary/v1 + agent_plan/v1
+schemas, repo_explainer, tool_composer.
+
+## Unreleased — _Pre-audit lanes + Golden Path Lane A W0_
 
 Five commits since `v0.3.0`. Trajectory: 643 → **702 passing**, 2
 skipped (+59). `forge wire src/atomadic_forge` PASS at every commit.
