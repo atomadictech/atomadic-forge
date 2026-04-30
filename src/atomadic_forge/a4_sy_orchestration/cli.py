@@ -47,6 +47,7 @@ from ..a1_at_functions.sidecar_parser import (
 )
 from ..a1_at_functions.sidecar_validator import validate_sidecar
 from ..a1_at_functions.receipt_emitter import build_receipt, receipt_to_json
+from ..a1_at_functions.compliance_checker import check_compliance
 from ..a1_at_functions.local_signer import sign_receipt_local
 from ..a1_at_functions.sbom_emitter import emit_sbom
 from ..a1_at_functions.scout_walk import harvest_repo
@@ -928,6 +929,7 @@ def certify_cmd(
         # so signatures.aaaa_nexus can carry the lineage_path the
         # Vanguard endpoint sees. Skip on --no-lineage (future flag).
         receipt = LineageChainStore(project_root).link_and_append(receipt)
+        receipt["compliance_mappings"] = check_compliance(receipt)
         if sign:
             receipt = sign_receipt(receipt)
         if local_sign:
@@ -1186,6 +1188,8 @@ def cs1_cmd(
     except (OSError, json.JSONDecodeError) as exc:
         typer.secho(f"Failed to load receipt: {exc}", fg="red", err=True)
         raise typer.Exit(code=1)
+    if not receipt_data.get("compliance_mappings"):
+        receipt_data["compliance_mappings"] = check_compliance(receipt_data)
     try:
         cs1 = render_cs1(receipt_data)
     except ValueError as exc:
@@ -1200,6 +1204,47 @@ def cs1_cmd(
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(md, encoding="utf-8")
     typer.secho(f"\nForge CS-1 — Conformity Statement written to {out}", fg="green")
+
+
+
+
+@app.command("report")
+def report_cmd(
+    project: Annotated[str, typer.Argument(help="Project root path.")] = ".",
+    receipt: Annotated[Path | None, typer.Option("--receipt", help="Path to receipt.json.")] = None,
+    out: Annotated[Path | None, typer.Option("--out", help="Output path for NSQR report.")] = None,
+    json_out: Annotated[bool, typer.Option("--json", help="Emit NSQR as JSON.")] = False,
+    rate: Annotated[float, typer.Option("--rate", help="Team hourly rate USD.")] = 150.0,
+) -> None:
+    """Generate a National Software Quality Report (CISQ-referenced, publishable Markdown)."""
+    from ..a1_at_functions.nsqr_renderer import render_nsqr, render_nsqr_markdown
+    from ..a1_at_functions.roi_calculator import calculate_roi
+    project_path = Path(project).resolve()
+    if receipt is None:
+        receipt = project_path / ".atomadic-forge" / "receipt.json"
+    if not receipt.exists():
+        typer.secho(f"Receipt not found at {receipt}. Run 'forge auto' first.", fg="red", err=True)
+        raise typer.Exit(code=1)
+    try:
+        receipt_data = json.loads(receipt.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        typer.secho(f"Failed to load receipt: {exc}", fg="red", err=True)
+        raise typer.Exit(code=1)
+    if not receipt_data.get("compliance_mappings"):
+        receipt_data["compliance_mappings"] = check_compliance(receipt_data)
+    roi = calculate_roi(receipt_data, team_hourly_rate=rate)
+    nsqr = render_nsqr(receipt_data, roi, compliance=receipt_data.get("compliance_mappings"))
+    if json_out:
+        typer.echo(json.dumps(nsqr, indent=2, default=str))
+        return
+    md = render_nsqr_markdown(nsqr)
+    if out is None:
+        out = project_path / ".atomadic-forge" / "national-quality-report.md"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(md, encoding="utf-8")
+    typer.secho(f"\nNational Software Quality Report written to {out}", fg="green")
+    bp = nsqr.get("crisis_basis_points", 0.0)
+    typer.secho(f"Crisis contribution: {bp:.4f} basis points of the $2.41T CISQ benchmark", fg="cyan")
 
 
 # Specialty sub-apps — registered lazily so any import error in one doesn't
