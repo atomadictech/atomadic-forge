@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "atomadic-forge"
-version = "0.3.0"
+version = "0.3.1"
 description = "Atomadic Forge — absorb, enforce, emerge. Polyglot (Python + JavaScript/TypeScript) architecture guardian for AI-generated code."
 readme = "README.md"
 requires-python = ">=3.10"
