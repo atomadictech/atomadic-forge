@@ -44,6 +44,8 @@ For deeper paths once you have done the 10-minute path:
 - [docs/CI_CD.md](docs/CI_CD.md) — GitHub Actions, GitLab CI, pre-commit.
 - [docs/AIR_GAPPED.md](docs/AIR_GAPPED.md) — offline / on-prem install.
 - [docs/SHOWCASE.md](docs/SHOWCASE.md) — live trajectories of real runs.
+- [docs/MARKET_POSITIONING.md](docs/MARKET_POSITIONING.md) — why Forge matters in the AI coding market.
+- [docs/RELEASE_MESSAGING.md](docs/RELEASE_MESSAGING.md) — launch copy, HN post, outreach, and demo script.
 
 ### Polyglot recon (JS/TS in a single pass)
 
@@ -103,6 +105,11 @@ AI agents produce 30–50% of new code in many teams. The output is **fast and o
 
 Forge is **not a style checker**. It's an **architecture rebuilder**. It absorbs your code (including AI-generated code), re-tiers it, enforces the 5-tier monadic law, and emits a clean, verifiable structure with certification scores.
 
+Release positioning: **AI coding agents create implementation velocity.
+Forge adds architectural gravity.** See
+[docs/MARKET_POSITIONING.md](docs/MARKET_POSITIONING.md) for the
+market frame and source-backed claims.
+
 ## The 5-tier monadic law
 
 Every source file (Python `.py`, JavaScript `.js`/`.mjs`/`.cjs`/`.jsx`, or
@@ -145,7 +152,7 @@ Each tier is a layer of **verified building blocks**. Higher tiers never invent 
 
 ```bash
 pip install atomadic-forge
-forge --version   # atomadic-forge 0.3.1
+forge --version   # atomadic-forge 0.3.2
 forge doctor      # environment check
 ```
 
@@ -378,7 +385,7 @@ Forge ships with named limits. No overpromise.
 | Product | What it is | Status |
 |---------|------------|--------|
 | **AAAA-Nexus** | Trust/safety/payments substrate for autonomous agents | Live at [atomadic.tech](https://atomadic.tech) |
-| **Atomadic Forge** | Absorb-and-emerge engine for developers (this repo) | **0.3.1** — on PyPI, 783 tests, MCP server, desktop GUI |
+| **Atomadic Forge** | Absorb-and-emerge engine for developers (this repo) | **0.3.2** — on PyPI, 841 tests, MCP server, desktop GUI |
 | **Atomadic Assistant** | Sovereign AI assistant with cognitive loop on Cloudflare | In development |
 
 ## License
@@ -424,7 +431,7 @@ forge commandsmith smoke             # Smoke-test all 36+ registered verbs
 
 **Production-ready for architecture enforcement. Working, honest, self-eating.**
 
-- ✓ **783 tests** passing (2 skipped)
+- ✓ **841 tests** passing (2 skipped)
 - ✓ **100/100 certify** — forge scores itself on every CI run
 - ✓ **0 wire violations** — forge passes its own import-law scan
 - ✓ **On PyPI** — `pip install atomadic-forge`

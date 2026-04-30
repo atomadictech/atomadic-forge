@@ -1,18 +1,19 @@
 """Tier verification -- Lane F W3 ROI calculator."""
 from __future__ import annotations
+
 import json
+
 import pytest
+
 from atomadic_forge.a0_qk_constants.roi_constants import (
     CISQ_REFERENCE_YEAR,
-    COST_PER_STRUCTURAL_DEFECT_USD,
     DEFAULT_TEAM_HOURLY_RATE_USD,
 )
 from atomadic_forge.a1_at_functions.roi_calculator import (
+    _grade,
     calculate_roi,
     render_roi_markdown,
-    _grade,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

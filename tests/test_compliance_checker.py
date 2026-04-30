@@ -1,12 +1,13 @@
 """Tier verification -- Lane F W2 compliance checker."""
 from __future__ import annotations
-import json, copy
-import pytest
+
+import json
+
 from atomadic_forge.a1_at_functions.compliance_checker import (
+    _VALID_STATUSES,
     COMPLIANCE_FRAMEWORK_KEYS,
     check_compliance,
     check_compliance_framework,
-    _VALID_STATUSES,
 )
 
 # ---------------------------------------------------------------------------

@@ -30,7 +30,6 @@ from atomadic_forge.a0_qk_constants.roi_constants import (
     SYMBOLS_PER_KLOC,
 )
 
-
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
@@ -215,16 +214,16 @@ def render_roi_markdown(roi: dict, project_name: str = "Project") -> str:
         "",
         "## Findings",
         "",
-        f"| Metric | Count |",
-        f"|---|---|",
+        "| Metric | Count |",
+        "|---|---|",
         f"| Wire violations (structural defects) | {violations} |",
         f"| Certify axes failing | {axes_fail} |",
         f"| Estimated total structural defects | {defects:.1f} |",
         "",
-        "## Financial impact (CISQ {year} cost model)".format(year=year),
+        f"## Financial impact (CISQ {year} cost model)",
         "",
-        f"| Item | USD |",
-        f"|---|---|",
+        "| Item | USD |",
+        "|---|---|",
         f"| Avoided production-defect cost | ${avoided:,.0f} |",
         f"| Annual technical-debt carry eliminated | ${carry:,.0f} |",
         f"| Fix effort ({fix_h:.0f} h × ${rate:,.0f}/h) | ${fix_cost:,.0f} |",

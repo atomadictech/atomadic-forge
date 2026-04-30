@@ -52,6 +52,22 @@ Shippability gates for local development, demos, and release candidates:
 - Local Ollama low-load and idle-machine profiles
 - Documentation and release-note review points
 
+### [Market Positioning](MARKET_POSITIONING.md)
+Release narrative and gap analysis:
+- AI coding market signal
+- Competitive frame
+- Claims to make and claims to avoid
+- Source-backed positioning for launch copy
+
+### [Release Messaging](RELEASE_MESSAGING.md)
+Copy blocks for launch:
+- One-liners and product descriptions
+- HN post draft
+- X thread
+- LinkedIn launch post
+- Developer / journalist outreach templates
+- Demo script
+
 ## ❓ FAQ & Troubleshooting
 
 **[FAQ](05-faq.md)** — Common questions:
@@ -85,6 +101,7 @@ See [CONTRIBUTING.md](../CONTRIBUTING.md) for:
 - **GitHub:** https://github.com/atomadictech/atomadic-forge
 - **License:** [BSL-1.1](../LICENSE) (free for non-production, commercial license for production, converts to Apache 2.0 in 2030)
 - **Status:** Experimental, working, honest (0.2.2)
+- **Launch positioning:** [Market Positioning](MARKET_POSITIONING.md) and [Release Messaging](RELEASE_MESSAGING.md)
 
 ## 📊 Versions
 
