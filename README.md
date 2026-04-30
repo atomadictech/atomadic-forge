@@ -4,6 +4,7 @@
 
 # Atomadic Forge
 
+[![PyPI](https://img.shields.io/pypi/v/atomadic-forge.svg)](https://pypi.org/project/atomadic-forge/)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: BSL-1.1](https://img.shields.io/badge/License-BSL--1.1-yellow.svg)](LICENSE)
 [![CI](https://github.com/atomadictech/atomadic-forge/actions/workflows/ci.yml/badge.svg)](https://github.com/atomadictech/atomadic-forge/actions/workflows/ci.yml)
@@ -142,18 +143,59 @@ Each tier is a layer of **verified building blocks**. Higher tiers never invent 
 
 ## Installation
 
-PyPI is **coming soon**. Until then, install editable from source:
-
 ```bash
-git clone https://github.com/atomadictech/atomadic-forge && cd atomadic-forge
-pip install -e ".[dev]"
-python -m pytest               # Verify the full local suite
-python -m atomadic_forge --help
+pip install atomadic-forge
+forge --version   # atomadic-forge 0.3.1
+forge doctor      # environment check
 ```
 
 Then follow [docs/FIRST_10_MINUTES.md](docs/FIRST_10_MINUTES.md) for
 the canonical first-run path (offline demo, free recon, then absorb or
 generate).
+
+**From source (contributors):**
+
+```bash
+git clone https://github.com/atomadictech/atomadic-forge && cd atomadic-forge
+pip install -e ".[dev]"
+python -m pytest               # 783 passing, 2 skipped
+```
+
+## AI Agent integration (MCP)
+
+Forge ships a **Model Context Protocol server** — add it to Cursor, Claude Code, Aider, Devin, or any MCP-compatible agent and they can drive forge without touching the CLI:
+
+```json
+{
+  "mcpServers": {
+    "atomadic-forge": {
+      "command": "forge",
+      "args": ["mcp", "serve", "--project", "/path/to/your/repo"]
+    }
+  }
+}
+```
+
+**21 tools exposed:** `recon` · `wire` · `certify` · `enforce` · `audit_list` · `auto_plan` · `auto_step` · `auto_apply` · `context_pack` · `preflight_change` · `score_patch` · `select_tests` · `rollback_plan` · `explain_repo` · `adapt_plan` · `compose_tools` · `load_policy` · `why_did_this_change` · `what_failed_last_time` · `list_recipes` · `get_recipe`
+
+**5 resources:** Receipt schema · formalization docs · lineage chain · blocker summary · verdicts
+
+```bash
+forge mcp serve --help   # full tool + resource listing with examples
+```
+
+## Forge Studio — desktop GUI
+
+A native Tauri 2 + React desktop app that connects to your project via the MCP server:
+
+```bash
+cd forge-studio
+npm install
+npm run tauri dev    # development
+npm run tauri build  # native binary
+```
+
+**Panels:** Architecture Graph (5-tier Cytoscape) · Complexity Heatmap · Real-Time Debt Counter · Wire violations · Lineage log
 
 ## Code-from-intent (LLM-driven, with Forge as the architectural backbone)
 
@@ -232,9 +274,11 @@ quality. `FORGE_OLLAMA_NUM_PREDICT` caps each generation; lower it if
 Ollama starts paging or crashing. `FORGE_OLLAMA_TIMEOUT` controls how long
 Forge waits before returning a clear provider error.
 
-## Commands: The absorb pipeline
+## Commands
 
 **Flagship:** `forge auto` does everything in one shot.
+
+### Absorb pipeline
 
 | Command | Purpose | Typical use |
 |---------|---------|-------------|
@@ -243,18 +287,42 @@ Forge waits before returning a clear provider error.
 | `forge cherry` | Build a cherry-pick manifest. Select specific symbols or `--pick all`. | `forge cherry ./repo --pick all` |
 | `forge finalize` | Materialize, wire, certify. Run separately if needed. | `forge finalize ./repo ./out --apply` |
 | `forge wire` | Scan a tier tree for upward-import violations. | `forge wire ./out/src/package` |
-| `forge certify` | Score: documentation, tests, tier layout, import discipline. Use `--fail-under` for CI gates. | `forge certify ./out --package my_pkg --fail-under 90` |
+| `forge certify` | Score: documentation, tests, tier layout, import discipline. | `forge certify ./out --fail-under 90` |
+| `forge enforce` | Apply F-code-routed mechanical fixes (rollback-safe). | `forge enforce ./out/src/package` |
+| `forge status` | Wire + certify in one call. The quick health check. | `forge status .` |
 
-### Specialty commands (LLM loops & composition)
+### Observability & compliance
 
 | Command | Purpose |
 |---------|---------|
+| `forge audit list / show / log` | Browse `.atomadic-forge/lineage.jsonl` — run history, saved manifests. |
+| `forge doctor` | Environment check — Python, optional deps (complexipy, cryptography). |
+| `forge sbom` | Emit a CycloneDX 1.5 SBOM from the scout report. |
+| `forge cs1` | Render a Conformity Statement (EU AI Act / SR 11-7 / FDA PCCP / CMMC-AI). |
+| `forge diff` | Schema-aware compare of two scout or certify manifests. |
+| `forge sidecar parse / validate` | Parse + cross-check `.forge` v1.0 sidecar grammar. |
+
+### Agent & LLM loops
+
+| Command | Purpose |
+|---------|---------|
+| `forge mcp serve` | Stdio JSON-RPC MCP server — 21 tools for Cursor / Claude Code / Aider / Devin. |
+| `forge plan / plan-list / plan-show / plan-step / plan-apply` | Agent plan persistence and step-by-step apply. |
 | `forge iterate` | LLM loop: intent → code → absorb → wire → score → iterate. Single shot. |
-| `forge evolve` | Recursive improvement: N rounds of iterate, catalog grows each round. |
-| `forge chat` | Terminal copilot over Forge docs/source using the same AI provider layer. |
-| `forge emergent` | Symbol-level composition discovery (find hidden wiring patterns). |
+| `forge evolve` | Recursive improvement: N rounds, catalog grows each round. |
+| `forge chat` | Terminal copilot over forge docs/source using the same AI provider layer. |
+| `forge context-pack` | Pack bounded repo context for agent first-call orientation. |
+| `forge preflight` | Pre-edit guardrail — forbidden imports, tier checks. |
+| `forge recipes` | List and fetch golden-path recipe templates. |
+
+### Composition & tooling
+
+| Command | Purpose |
+|---------|---------|
+| `forge emergent` | Symbol-level composition discovery. |
 | `forge synergy` | Feature-pair detection + auto-generate adapters. |
-| `forge commandsmith` | Auto-register CLI commands, regenerate `_registry.py`. |
+| `forge commandsmith` | Auto-register CLI commands, regenerate `_registry.py`, smoke-test all verbs. |
+| `forge lsp serve` | Stdio LSP server for `.forge` files (live diagnostics, hover, goto). |
 
 ## Targeted workflows
 
@@ -291,7 +359,7 @@ Forge ships with named limits. No overpromise.
 
 5. **Auto-generated adapters are scaffolding.** The `synergy` pipeline emits adapters marked with `# REVIEW:` blocks. Read them. Refine them. They're templates, not production code.
 
-6. **Certificates are not yet signed.** The conformance schema is finalized. Cryptographic signing remains on the 0.3 roadmap.
+6. **Certificates are locally signed only.** Ed25519 signing via `forge certify --local-sign` is available (requires `pip install cryptography`). Chain-of-custody / notarization infrastructure is a future milestone.
 
 ## Design philosophy
 
@@ -310,7 +378,7 @@ Forge ships with named limits. No overpromise.
 | Product | What it is | Status |
 |---------|------------|--------|
 | **AAAA-Nexus** | Trust/safety/payments substrate for autonomous agents | Live at [atomadic.tech](https://atomadic.tech) |
-| **Atomadic Forge** | Absorb-and-emerge engine for developers (this repo) | 0.2.2 (100/100 certify + GitHub-ready) |
+| **Atomadic Forge** | Absorb-and-emerge engine for developers (this repo) | **0.3.1** — on PyPI, 783 tests, MCP server, desktop GUI |
 | **Atomadic Assistant** | Sovereign AI assistant with cognitive loop on Cloudflare | In development |
 
 ## License
@@ -338,10 +406,12 @@ Apache 2.0.
 **Forge itself is monadic.** Every source file belongs to one tier. The repo is a worked example:
 
 ```bash
-python -m pytest tests/          # 308 passing, 2 skipped
-python -m atomadic_forge doctor  # Environment check
-python -m atomadic_forge wire src/atomadic_forge  # Scan for violations
-python -m atomadic_forge certify . --fail-under 100  # Score and gate the repo
+python -m pytest                     # 783 passing, 2 skipped
+forge doctor                         # Environment check
+forge wire src/atomadic_forge        # Scan for violations (PASS)
+forge certify . --fail-under 100     # Score and gate the repo (100/100)
+forge status .                       # Quick health snapshot
+forge commandsmith smoke             # Smoke-test all 36+ registered verbs
 ```
 
 **Before submitting a PR:**
@@ -352,12 +422,18 @@ python -m atomadic_forge certify . --fail-under 100  # Score and gate the repo
 
 ## Status
 
-**Experimental, working, honest.**
+**Production-ready for architecture enforcement. Working, honest, self-eating.**
 
-- ✓ Tested end-to-end on its own codebase
-- ✓ Tested on reference Python and JavaScript / TypeScript repos
-- ✓ 308 tests, all passing (2 skipped)
-- ✓ Schema finalized (conformance, lineage, scaffold)
-- ✓ Polyglot — Python + JavaScript + TypeScript classified by the same 5-tier law (0.2)
-- ✗ Not yet on PyPI (coming soon)
-- ✗ Cryptographic signing (0.3)
+- ✓ **783 tests** passing (2 skipped)
+- ✓ **100/100 certify** — forge scores itself on every CI run
+- ✓ **0 wire violations** — forge passes its own import-law scan
+- ✓ **On PyPI** — `pip install atomadic-forge`
+- ✓ **MCP server** — 21 tools, 5 resources; works with Cursor, Claude Code, Aider, Devin
+- ✓ **Desktop GUI** — Forge Studio (Tauri 2 + React)
+- ✓ **Ed25519 signing** — `forge certify --local-sign`
+- ✓ **CycloneDX SBOM** — `forge sbom`
+- ✓ **Compliance mappings** — EU AI Act · NIST SR 11-7 · FDA PCCP · CMMC-AI
+- ✓ **Polyglot** — Python + JavaScript + TypeScript, same 5-tier law
+- ✓ **Cloudflare badge worker** — live certify score in any README
+- ✗ Chain-of-custody notarization (future)
+- ✗ Rust / Go tier classification (roadmap)
