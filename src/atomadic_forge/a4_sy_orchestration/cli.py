@@ -1143,12 +1143,12 @@ def cs1_cmd(
         receipt_data = json.loads(receipt.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         typer.secho(f"Failed to load receipt: {exc}", fg="red", err=True)
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from exc
     try:
         cs1 = render_cs1(receipt_data)
     except ValueError as exc:
         typer.secho(f"Receipt validation failed: {exc}", fg="red", err=True)
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from exc
     if json_out:
         typer.echo(json.dumps(cs1, indent=2, default=str))
         return
