@@ -1,0 +1,32 @@
+# Atomadic Forge — badge Cloudflare Worker.
+#
+# Golden Path Lane C W3. Returns shields.io-compatible SVG badges
+# for any repo that has uploaded a Forge Receipt to the KV store.
+#
+# Deploy:
+#   wrangler login
+#   wrangler kv namespace create FORGE_RECEIPTS
+#   # Copy the printed id into [[kv_namespaces]] below.
+#   wrangler deploy
+#
+# The CI side (forge-action) PUTs receipts here under the key
+# pattern:  receipt:<owner>:<repo>:<branch>
+#
+# Usage from any consuming repo's README:
+#   ![Forge certify](https://forge.atomadic.dev/badge/atomadictech/atomadic-forge.svg)
+
+name = "forge-badge"
+main = "src/index.ts"
+compatibility_date = "2025-04-01"
+
+[observability]
+enabled = true
+
+# KV namespace bound at runtime as `env.FORGE_RECEIPTS`.
+# Replace `id` after creating the namespace via `wrangler kv namespace create`.
+[[kv_namespaces]]
+binding = "FORGE_RECEIPTS"
+id = "b0d9380f6dbb42a1936e037627e6e7ff"
+
+[vars]
+DEFAULT_BRANCH = "main"

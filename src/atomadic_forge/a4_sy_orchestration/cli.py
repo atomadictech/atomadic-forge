@@ -47,6 +47,9 @@ from ..a1_at_functions.sidecar_parser import (
 )
 from ..a1_at_functions.sidecar_validator import validate_sidecar
 from ..a1_at_functions.receipt_emitter import build_receipt, receipt_to_json
+from ..a1_at_functions.compliance_checker import check_compliance
+from ..a1_at_functions.local_signer import sign_receipt_local
+from ..a1_at_functions.sbom_emitter import emit_sbom
 from ..a1_at_functions.scout_walk import harvest_repo
 from ..a1_at_functions.wire_check import scan_violations
 from ..a2_mo_composites.lineage_chain_store import LineageChainStore
@@ -126,6 +129,10 @@ def auto_cmd(
         "--progress/--no-progress",
         help="Emit per-file scout progress to stderr. Default: auto "
              "(on when stderr is a TTY, off in CI / pipes / --json).")] = None,
+    seed_determinism: Annotated[int | None, typer.Option(
+        "--seed-determinism",
+        help="Record a fixed RNG seed in the receipt for reproducibility audits (Lane G).",
+    )] = None,
 ) -> None:
     """Flagship: scout → cherry-pick → assimilate → wire → certify in one shot."""
     output.mkdir(parents=True, exist_ok=True)
@@ -134,6 +141,8 @@ def auto_cmd(
     report = run_auto(target=target, output=output, package=package,
                       apply=apply, on_conflict=on_conflict,
                       progress=reporter)
+    if seed_determinism is not None:
+        report.setdefault("extra", {})["seed_determinism"] = seed_determinism
     if json_out:
         typer.echo(json.dumps(report, indent=2, default=str))
         return
@@ -849,6 +858,14 @@ def certify_cmd(
              "for Sigstore + AAAA-Nexus signing before emitting / "
              "rendering. Soft-fails if the endpoint is unavailable; the "
              "unsigned receipt is still emitted with a notes entry.")] = False,
+    local_sign: Annotated[bool, typer.Option(
+        "--local-sign/--no-local-sign",
+        help="Sign the receipt with a local Ed25519 key (Lane G W5). "
+             "Soft-fails if the key is absent or cryptography not installed.")] = False,
+    local_sign_key: Annotated[Path | None, typer.Option(
+        "--local-sign-key",
+        help="Path to the Ed25519 PEM private key used by --local-sign. "
+             "Defaults to forge-signing.pem in the project root.")] = None,
     summary: Annotated[bool, typer.Option(
         "--summary",
         help="Emit ONLY the compact agent-native blocker summary (top "
@@ -892,7 +909,7 @@ def certify_cmd(
     typer.echo(f"  wire:  {'PASS' if report['no_upward_imports'] else 'FAIL'}")
     for issue in report["issues"]:
         typer.echo(f"    - {issue}")
-    if emit_receipt is not None or print_card or sign:
+    if emit_receipt is not None or print_card or sign or local_sign:
         # The Receipt needs a scout summary; if scout didn't already
         # run via forge auto, harvest a cheap one now (no symbol dump
         # written; we only need counts + tier_distribution).
@@ -912,8 +929,12 @@ def certify_cmd(
         # so signatures.aaaa_nexus can carry the lineage_path the
         # Vanguard endpoint sees. Skip on --no-lineage (future flag).
         receipt = LineageChainStore(project_root).link_and_append(receipt)
+        receipt["compliance_mappings"] = check_compliance(receipt)
         if sign:
             receipt = sign_receipt(receipt)
+        if local_sign:
+            key = local_sign_key or (project_root / "forge-signing.pem")
+            receipt = sign_receipt_local(receipt, key_path=key)
         if emit_receipt is not None:
             emit_receipt.parent.mkdir(parents=True, exist_ok=True)
             emit_receipt.write_text(receipt_to_json(receipt), encoding="utf-8")
@@ -931,6 +952,38 @@ def certify_cmd(
             err=True,
         )
         raise typer.Exit(code=1)
+
+
+@app.command("sbom")
+def sbom_cmd(
+    project: Annotated[Path, typer.Argument(
+        exists=True, file_okay=False, dir_okay=True, resolve_path=True,
+        help="Project root (must contain pyproject.toml).")] = Path("."),
+    out: Annotated[Path | None, typer.Option(
+        "--out",
+        help="Write the SBOM JSON to this path instead of stdout.")] = None,
+    json_out: Annotated[bool, typer.Option(
+        "--json", help="Pretty-print the SBOM JSON to stdout.")] = False,
+) -> None:
+    """Generate a CycloneDX 1.5 SBOM from pyproject.toml (Lane G G3)."""
+    try:
+        scout = harvest_repo(project)
+    except Exception:  # noqa: BLE001
+        scout = None
+    sbom = emit_sbom(project_root=project, scout_report=scout)
+    sbom_json = json.dumps(sbom, indent=2, default=str)
+    if out is not None:
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(sbom_json, encoding="utf-8")
+        typer.echo(f"SBOM written to {out}")
+    elif json_out:
+        typer.echo(sbom_json)
+    else:
+        typer.echo(f"SBOM: {project.name}")
+        typer.echo(f"  format:     CycloneDX {sbom.get('specVersion', '1.5')}")
+        typer.echo(f"  components: {len(sbom.get('components', []))}")
+        typer.echo(f"  schema:     {sbom.get('schema_version', '')}")
+        typer.echo("  (use --json or --out to emit the full CycloneDX JSON)")
 
 
 @app.command("diff")
@@ -1112,6 +1165,128 @@ def doctor_cmd(
     typer.echo("\nAtomadic Forge — doctor")
     for k, v in info.items():
         typer.echo(f"  {k:24s} {v}")
+
+
+@app.command("cs1")
+def cs1_cmd(
+    project: Annotated[str, typer.Argument(help="Project root path.")] = ".",
+    receipt: Annotated[Path | None, typer.Option("--receipt", help="Path to receipt.json.")] = None,
+    out: Annotated[Path | None, typer.Option("--out", help="Output path for CS-1.md.")] = None,
+    json_out: Annotated[bool, typer.Option("--json", help="Emit CS-1 as JSON instead of Markdown.")] = False,
+) -> None:
+    """Generate a Conformity Statement CS-1 v1 (EU AI Act / SR 11-7 / FDA PCCP / CMMC-AI)."""
+    from ..a1_at_functions.cs1_renderer import render_cs1, render_cs1_markdown
+
+    project_path = Path(project).resolve()
+    if receipt is None:
+        receipt = project_path / ".atomadic-forge" / "receipt.json"
+    if not receipt.exists():
+        typer.secho(f"Receipt not found at {receipt}. Run 'forge auto' first.", fg="red", err=True)
+        raise typer.Exit(code=1)
+    try:
+        receipt_data = json.loads(receipt.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        typer.secho(f"Failed to load receipt: {exc}", fg="red", err=True)
+        raise typer.Exit(code=1)
+    if not receipt_data.get("compliance_mappings"):
+        receipt_data["compliance_mappings"] = check_compliance(receipt_data)
+    try:
+        cs1 = render_cs1(receipt_data)
+    except ValueError as exc:
+        typer.secho(f"Receipt validation failed: {exc}", fg="red", err=True)
+        raise typer.Exit(code=1)
+    if json_out:
+        typer.echo(json.dumps(cs1, indent=2, default=str))
+        return
+    md = render_cs1_markdown(cs1)
+    if out is None:
+        out = project_path / ".atomadic-forge" / "CS-1.md"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(md, encoding="utf-8")
+    typer.secho(f"\nForge CS-1 — Conformity Statement written to {out}", fg="green")
+
+
+
+
+@app.command("report")
+def report_cmd(
+    project: Annotated[str, typer.Argument(help="Project root path.")] = ".",
+    receipt: Annotated[Path | None, typer.Option("--receipt", help="Path to receipt.json.")] = None,
+    out: Annotated[Path | None, typer.Option("--out", help="Output path for NSQR report.")] = None,
+    json_out: Annotated[bool, typer.Option("--json", help="Emit NSQR as JSON.")] = False,
+    rate: Annotated[float, typer.Option("--rate", help="Team hourly rate USD.")] = 150.0,
+) -> None:
+    """Generate a National Software Quality Report (CISQ-referenced, publishable Markdown)."""
+    from ..a1_at_functions.nsqr_renderer import render_nsqr, render_nsqr_markdown
+    from ..a1_at_functions.roi_calculator import calculate_roi
+    project_path = Path(project).resolve()
+    if receipt is None:
+        receipt = project_path / ".atomadic-forge" / "receipt.json"
+    if not receipt.exists():
+        typer.secho(f"Receipt not found at {receipt}. Run 'forge auto' first.", fg="red", err=True)
+        raise typer.Exit(code=1)
+    try:
+        receipt_data = json.loads(receipt.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        typer.secho(f"Failed to load receipt: {exc}", fg="red", err=True)
+        raise typer.Exit(code=1)
+    if not receipt_data.get("compliance_mappings"):
+        receipt_data["compliance_mappings"] = check_compliance(receipt_data)
+    roi = calculate_roi(receipt_data, team_hourly_rate=rate)
+    nsqr = render_nsqr(receipt_data, roi, compliance=receipt_data.get("compliance_mappings"))
+    if json_out:
+        typer.echo(json.dumps(nsqr, indent=2, default=str))
+        return
+    md = render_nsqr_markdown(nsqr)
+    if out is None:
+        out = project_path / ".atomadic-forge" / "national-quality-report.md"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(md, encoding="utf-8")
+    typer.secho(f"\nNational Software Quality Report written to {out}", fg="green")
+    bp = nsqr.get("crisis_basis_points", 0.0)
+    typer.secho(f"Crisis contribution: {bp:.4f} basis points of the $2.41T CISQ benchmark", fg="cyan")
+
+
+
+
+@app.command("roi")
+def roi_cmd(
+    project: Annotated[str, typer.Argument(help="Project root path.")] = ".",
+    receipt: Annotated[Path | None, typer.Option("--receipt", help="Path to receipt.json.")] = None,
+    out: Annotated[Path | None, typer.Option("--out", help="Output path for ROI report.")] = None,
+    json_out: Annotated[bool, typer.Option("--json", help="Emit ROI as JSON.")] = False,
+    rate: Annotated[float, typer.Option("--rate", help="Team hourly rate USD.")] = 150.0,
+) -> None:
+    """Generate a CISQ-based ROI report (TD-principal reduction in USD)."""
+    from ..a1_at_functions.roi_calculator import calculate_roi, render_roi_markdown
+    project_path = Path(project).resolve()
+    if receipt is None:
+        receipt = project_path / ".atomadic-forge" / "receipt.json"
+    if not receipt.exists():
+        typer.secho(f"Receipt not found at {receipt}. Run 'forge auto' first.", fg="red", err=True)
+        raise typer.Exit(code=1)
+    try:
+        receipt_data = json.loads(receipt.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        typer.secho(f"Failed to load receipt: {exc}", fg="red", err=True)
+        raise typer.Exit(code=1)
+    roi = calculate_roi(receipt_data, team_hourly_rate=rate)
+    if json_out:
+        typer.echo(json.dumps(roi, indent=2))
+        return
+    md = render_roi_markdown(roi, project_name=project_path.name)
+    if out is None:
+        out = project_path / ".atomadic-forge" / "roi-report.md"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(md, encoding="utf-8")
+    mult = roi["roi_multiplier"]
+    grade = roi["grade"]
+    avoided = roi["avoided_remediation_cost_usd"] + roi["annual_carry_reduction_usd"]
+    typer.secho(
+        f"\nForge ROI -- {grade} | {mult:.1f}x ROI | ${avoided:,.0f} avoided cost",
+        fg="green",
+    )
+    typer.secho(f"Report written to {out}", fg="green")
 
 
 # Specialty sub-apps — registered lazily so any import error in one doesn't

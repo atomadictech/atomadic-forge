@@ -1,0 +1,60 @@
+﻿name: forge-studio CI
+
+on:
+  push:
+    paths:
+      - "forge-studio/**"
+      - ".github/workflows/forge-studio-ci.yml"
+  pull_request:
+    paths:
+      - "forge-studio/**"
+      - ".github/workflows/forge-studio-ci.yml"
+
+defaults:
+  run:
+    working-directory: forge-studio
+
+jobs:
+  typecheck-lint-bundle:
+    name: Type-check + Lint + Bundle
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+          cache-dependency-path: forge-studio/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - name: TypeScript type-check
+        run: pnpm typecheck
+      - name: Unit tests (Vitest)
+        run: pnpm test
+      - name: Production bundle
+        run: pnpm build
+      - name: Bundle size gate (< 8 MB JS)
+        run: |
+          TOTAL=$(find dist/assets -name "*.js" -exec wc -c {} + | tail -1 | awk '\''{print $1}'\'')
+          echo "Total JS: $TOTAL bytes"
+          if [ "$TOTAL" -gt 8388608 ]; then echo "Exceeds 8 MB ($TOTAL)"; exit 1; fi
+
+  rust-check:
+    name: Rust check (src-tauri)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "forge-studio/src-tauri -> target"
+      - name: Install Tauri system deps
+        run: |
+          sudo apt-get update && sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev build-essential curl wget file \
+            libssl-dev libayatana-appindicator3-dev librsvg2-dev
+      - name: cargo check
+        working-directory: forge-studio/src-tauri
+        run: cargo check --release
