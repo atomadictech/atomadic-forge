@@ -191,6 +191,30 @@ Forge ships a **Model Context Protocol server** — add it to Cursor, Claude Cod
 forge mcp serve --help   # full tool + resource listing with examples
 ```
 
+### Subscription required for `forge mcp serve`
+
+Every `tools/call` against the MCP server is gated behind a paid Forge
+subscription. Get a key at [https://atomadic.tech/forge](https://atomadic.tech/forge),
+then run:
+
+```bash
+forge login                          # interactive: paste your fk_live_* key
+export FORGE_API_KEY=fk_live_xxxxx   # or set the env var directly
+forge mcp serve --project .
+```
+
+Read-only handshake methods (`initialize`, `ping`, `tools/list`,
+`resources/list`) work without a key so MCP clients can complete the
+connect handshake; `tools/call` and `resources/read` require an active
+subscription. The verify endpoint at
+`https://forge-auth.atomadic.tech/v1/forge/auth/verify` is contacted
+on first call and the result is cached for 5 minutes; offline grace
+keeps you running for 24 hours after the last successful verify.
+
+Without a key (or with a revoked one), `tools/call` returns the
+JSON-RPC error code `-32001` with `message="Forge subscription
+required"` and an `upgrade_url` pointing back to the dashboard.
+
 ## Forge Studio — desktop GUI
 
 A native Tauri 2 + React desktop app that connects to your project via the MCP server:

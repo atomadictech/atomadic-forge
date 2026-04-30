@@ -1,6 +1,7 @@
 """Tier a3 — stdio JSON-RPC loop wrapping the pure MCP dispatcher.
 
-Golden Path Lane C W4 deliverable. The pure dispatcher lives in
+Golden Path Lane C W4 deliverable, with the W5 subscription gate
+layered on top. The pure dispatcher lives in
 ``a1_at_functions.mcp_protocol``; this module owns the I/O concerns:
 read a line from stdin, parse it as JSON, hand to dispatch, write the
 response to stdout. No SSE / HTTP transport today — that's a future
@@ -12,15 +13,38 @@ or it receives a ``shutdown`` JSON-RPC method (per MCP spec). Errors
 in JSON parsing or method dispatch never kill the loop — they're
 surfaced as JSON-RPC error responses and the next request is
 processed normally.
+
+**Subscription requirement (Lane C W5).** Every ``tools/call`` is
+gated behind a paid Forge subscription. The server reads the user's
+``fk_live_*`` API key from the ``FORGE_API_KEY`` env variable, asks
+the remote verify endpoint at ``forge-auth.atomadic.tech`` whether
+the key is still active, and caches the answer for 5 minutes.
+
+  * No key / wrong shape / verified-bad     → JSON-RPC error -32001
+    with ``message="Forge subscription required"`` and an upgrade URL.
+  * Read-only metadata methods (``initialize``, ``ping``,
+    ``tools/list``, ``resources/list``, ``notifications/initialized``,
+    ``shutdown``) bypass the gate so MCP clients can complete the
+    handshake even before the user has logged in. Actual ``tools/call``
+    and ``resources/read`` traffic require the gate to be open.
+
+Use ``forge login`` to capture and store a key. See
+``a4_sy_orchestration/login_cmd.py`` and ``docs/04-llm-loops.md`` for
+the activation flow.
 """
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 from pathlib import Path as _Path
 from typing import IO
 
+from ..a1_at_functions.forge_auth import (
+    hash_project_path,
+    read_api_key_from_env,
+)
 from ..a1_at_functions.mcp_protocol import (
     dispatch_request,
     register_auto_apply_handler,
@@ -28,6 +52,7 @@ from ..a1_at_functions.mcp_protocol import (
     register_auto_step_handler,
     register_enforce_handler,
 )
+from ..a2_mo_composites.forge_auth_client import ForgeAuthClient
 from ..a2_mo_composites.plan_store import PlanStore as _PlanStore
 from .forge_enforce import run_enforce as _run_enforce
 from .forge_pipeline import run_auto_plan as _run_auto_plan
@@ -103,12 +128,71 @@ register_auto_step_handler(_bound_auto_step)
 register_auto_apply_handler(_bound_auto_apply)
 
 
+# ---- Lane C W5: subscription gate -------------------------------------
+
+_AUTH_REQUIRED_METHODS = frozenset({"tools/call", "resources/read"})
+"""JSON-RPC methods that require a paid subscription.
+
+Everything else (``initialize``, ``ping``, ``tools/list``,
+``resources/list``, ``notifications/initialized``, ``shutdown``) is
+read-only metadata and stays open so MCP clients can finish their
+handshake before the user has logged in.
+"""
+
+_AUTH_ERROR_CODE = -32001
+_UPGRADE_URL = "https://atomadic.tech/forge"
+
+
+def _auth_check(
+    env: dict[str, str],
+    *,
+    client: ForgeAuthClient,
+) -> tuple[bool, str, str]:
+    """Return (ok, reason, api_key).
+
+    ``ok`` is True when the gate should let the call through. ``reason``
+    is the human-readable explanation (used to populate the JSON-RPC
+    error ``details`` field on rejection). ``api_key`` is the raw key
+    when present (so the caller can fire usage-log telemetry); empty
+    string when no key was configured.
+    """
+    api_key = read_api_key_from_env(env)
+    if not api_key:
+        return False, "FORGE_API_KEY not set or wrong prefix", ""
+    result = client.verify(api_key)
+    if result.get("ok"):
+        return True, str(result.get("reason", "")), api_key
+    return False, str(result.get("reason", "verify failed")), api_key
+
+
+def _auth_error_response(
+    msg_id: object, *, reason: str,
+) -> dict[str, object]:
+    """Build the canonical -32001 error response."""
+    return {
+        "jsonrpc": "2.0",
+        "id": msg_id,
+        "error": {
+            "code": _AUTH_ERROR_CODE,
+            "message": "Forge subscription required",
+            "data": {
+                "upgrade_url": _UPGRADE_URL,
+                "details": reason,
+                "env": "FORGE_API_KEY",
+                "login_command": "forge login",
+            },
+        },
+    }
+
+
 def serve_stdio(
     *,
     project_root: Path,
     stdin: IO[str] | None = None,
     stdout: IO[str] | None = None,
     stderr: IO[str] | None = None,
+    auth_client: ForgeAuthClient | None = None,
+    env: dict[str, str] | None = None,
 ) -> int:
     """Run the MCP stdio loop until stdin closes.
 
@@ -119,6 +203,9 @@ def serve_stdio(
     src_in = stdin or sys.stdin
     src_out = stdout or sys.stdout
     src_err = stderr or sys.stderr
+    eff_env: dict[str, str] = dict(env if env is not None else os.environ)
+    client = auth_client or ForgeAuthClient()
+    project_hash = hash_project_path(project_root)
 
     project_root = Path(project_root).resolve()
     if not project_root.exists():
@@ -149,6 +236,28 @@ def serve_stdio(
             _write(src_out, {"jsonrpc": "2.0",
                               "id": request.get("id"), "result": {}})
             break
+        # Lane C W5: subscription gate. Read-only metadata methods
+        # bypass the check so initialize/tools/list still succeed
+        # before login; tools/call and resources/read are gated.
+        method = request.get("method") if isinstance(request, dict) else None
+        if method in _AUTH_REQUIRED_METHODS:
+            ok, reason, api_key = _auth_check(eff_env, client=client)
+            if not ok:
+                _write(src_out, _auth_error_response(
+                    request.get("id") if isinstance(request, dict) else None,
+                    reason=reason,
+                ))
+                continue
+            # Fire-and-forget usage telemetry for tools/call only.
+            if method == "tools/call" and api_key:
+                params = request.get("params") or {}
+                tool_name = (
+                    params.get("name") if isinstance(params, dict) else None
+                ) or "?"
+                try:
+                    client.log_usage(api_key, str(tool_name), project_hash)
+                except Exception:  # noqa: BLE001 — telemetry MUST NOT block
+                    pass
         response = dispatch_request(request, project_root=project_root)
         if response is not None:
             _write(src_out, response)

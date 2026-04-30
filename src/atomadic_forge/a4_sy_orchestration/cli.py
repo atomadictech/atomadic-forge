@@ -64,6 +64,7 @@ from ..a3_og_features.forge_pipeline import (
 )
 from ..a3_og_features.forge_plan_apply import apply_all_applyable, apply_card
 from ..a3_og_features.mcp_server import serve_stdio as mcp_serve_stdio
+from .login_cmd import app as _login_app
 
 # Suppress SyntaxWarnings from third-party code in seed/forged directories.
 warnings.filterwarnings("ignore", category=SyntaxWarning)
@@ -1145,6 +1146,12 @@ def mcp_serve_cmd(
 
 app.add_typer(mcp_app, name="mcp",
                help="MCP server surface — speak Forge to coding agents.")
+
+# Lane C W5 — `forge login` captures a paid Forge subscription key
+# and stores it in ~/.atomadic-forge/credentials.toml. The MCP server
+# at a3 gates `tools/call` on this key.
+app.add_typer(_login_app, name="login",
+               help="Capture a Forge subscription key (required by `forge mcp serve`).")
 
 
 def _check_optional_dep(module: str) -> str:
