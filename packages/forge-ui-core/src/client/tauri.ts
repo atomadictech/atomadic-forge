@@ -9,6 +9,7 @@
  * MCP tool name. This way we don't need to change the Rust side as we add verbs.
  */
 import { ForgeClientError, type ForgeClient } from "./index";
+import { normalizeDoctorResult, normalizeScoutReport } from "../types";
 import type {
   AgentPlan,
   CertifyResult,
@@ -61,8 +62,9 @@ export class TauriForgeClient implements ForgeClient {
     return this.cmd<T>("forge_call_tool", { name, arguments: args });
   }
 
-  recon(target: string) {
-    return this.callTool<ScoutReport>("recon", { target });
+  async recon(target: string): Promise<ScoutReport> {
+    const raw = await this.callTool<Record<string, unknown>>("recon", { target });
+    return normalizeScoutReport(raw);
   }
   cherry(args: { target: string; pick?: string[]; onlyTier?: string }) {
     return this.callTool("cherry", { ...args, only_tier: args.onlyTier });
@@ -145,8 +147,9 @@ export class TauriForgeClient implements ForgeClient {
   cs1(receiptPath: string, out?: string) {
     return this.callTool("cs1", { receipt: receiptPath, out });
   }
-  doctor() {
-    return this.callTool<DoctorResult>("doctor", {});
+  async doctor(): Promise<DoctorResult> {
+    const raw = await this.callTool<Record<string, unknown>>("doctor", {});
+    return normalizeDoctorResult(raw);
   }
   configShow() {
     return this.callTool<ForgeConfig>("config_show", {});

@@ -9,6 +9,7 @@
  * Otherwise we fall through to /api/forge/call with { name, args }.
  */
 import { ForgeClientError, type ForgeClient } from "./index";
+import { normalizeDoctorResult, normalizeScoutReport } from "../types";
 import type {
   AgentPlan,
   CertifyResult,
@@ -82,8 +83,9 @@ export class HttpForgeClient implements ForgeClient {
     return this.request<T>("/call", { name, args });
   }
 
-  recon(target: string) {
-    return this.request<ScoutReport>("/recon", { target });
+  async recon(target: string): Promise<ScoutReport> {
+    const raw = await this.request<Record<string, unknown>>("/recon", { target });
+    return normalizeScoutReport(raw);
   }
   cherry(args: { target: string; pick?: string[]; onlyTier?: string }) {
     return this.request<unknown>("/cherry", args);
@@ -165,8 +167,9 @@ export class HttpForgeClient implements ForgeClient {
   cs1(receiptPath: string, out?: string) {
     return this.request<unknown>("/cs1", { receipt: receiptPath, out });
   }
-  doctor() {
-    return this.request<DoctorResult>("/doctor", undefined, "GET");
+  async doctor(): Promise<DoctorResult> {
+    const raw = await this.request<Record<string, unknown>>("/doctor", undefined, "GET");
+    return normalizeDoctorResult(raw);
   }
   configShow() {
     return this.request<ForgeConfig>("/config", undefined, "GET");

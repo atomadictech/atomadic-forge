@@ -231,6 +231,67 @@ export interface ForgeConfig {
 
 export type ConnectionStatus = "disconnected" | "connecting" | "connected" | "error";
 
+// ─── Scout report normalizer ─────────────────────────────────────────────────
+// The CLI emits long-form tier keys (a0_qk_constants) and long-form symbol
+// tier_guess / lineno fields. Normalize everything to the canonical short form.
+const TIER_LONG: Record<string, Tier> = {
+  a0_qk_constants: "a0",
+  a1_at_functions: "a1",
+  a2_mo_composites: "a2",
+  a3_og_features: "a3",
+  a4_sy_orchestration: "a4",
+};
+
+function shortTier(t: unknown): TierOrUnknown {
+  if (typeof t !== "string") return "unknown";
+  return TIER_LONG[t] ?? (/^a[0-4]$/.test(t) ? (t as Tier) : "unknown");
+}
+
+export function normalizeDoctorResult(raw: Record<string, unknown>): DoctorResult {
+  const rawDeps = (raw.optional_deps ?? {}) as Record<string, unknown>;
+  const optional_deps: Record<string, { installed: boolean; version?: string }> = {};
+  for (const [name, val] of Object.entries(rawDeps)) {
+    if (typeof val === "object" && val !== null && "installed" in val) {
+      optional_deps[name] = val as { installed: boolean; version?: string };
+    } else {
+      const s = String(val);
+      optional_deps[name] = s === "missing" ? { installed: false } : { installed: true, version: s === "ok" ? undefined : s };
+    }
+  }
+  return {
+    schema_version: String(raw.schema_version ?? ""),
+    forge_version: String(raw.forge_version ?? raw.atomadic_forge_version ?? ""),
+    python_version: String(raw.python_version ?? raw.python ?? ""),
+    optional_deps,
+    warnings: Array.isArray(raw.warnings) ? (raw.warnings as string[]) : [],
+  };
+}
+
+export function normalizeScoutReport(raw: Record<string, unknown>): ScoutReport {
+  const rawDist = (raw.tier_distribution ?? {}) as Record<string, number>;
+  const dist: TierDistribution = { a0: 0, a1: 0, a2: 0, a3: 0, a4: 0, unknown: 0 };
+  for (const [k, v] of Object.entries(rawDist)) {
+    const s = shortTier(k);
+    dist[s] = (dist[s] ?? 0) + (v ?? 0);
+  }
+  const rawSyms = (raw.symbols ?? []) as Record<string, unknown>[];
+  const symbols: ScoutSymbol[] = rawSyms.map((s) => ({
+    name: String(s.name ?? ""),
+    kind: String(s.kind ?? ""),
+    tier: shortTier(s.tier_guess ?? s.tier),
+    file: String(s.file ?? ""),
+    line: Number(s.lineno ?? s.line ?? 0),
+    qualname: s.qualname as string | undefined,
+    effect: (Array.isArray(s.effects) ? s.effects[0] : s.effect) as ScoutSymbol["effect"],
+  }));
+  return {
+    ...(raw as unknown as ScoutReport),
+    project_root: String(raw.project_root ?? raw.repo ?? ""),
+    tier_distribution: dist,
+    symbols,
+  };
+}
+
 // ─── Severity scoring ────────────────────────────────────────────────────
 export const SEVERITY_WEIGHTS: Record<ViolationSeverity, number> = {
   error: 4,
