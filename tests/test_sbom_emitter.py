@@ -15,8 +15,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
-
 from atomadic_forge.a1_at_functions.sbom_emitter import (
     SCHEMA_VERSION_SBOM_V1,
     emit_sbom,

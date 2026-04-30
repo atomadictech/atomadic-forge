@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+import { useState } from "react";
 import { useForgeStore } from "@/store";
 import * as mcp from "@/lib/mcp";
 import type { Tier } from "@/lib/types";

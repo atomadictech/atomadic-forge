@@ -13,10 +13,9 @@ Copilot' 12-item enumeration. One file per concern, kept tight:
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
-import pytest
-
+# Importing a3.mcp_server wires every a1↔a3 injected handler.
+import atomadic_forge.a3_og_features.mcp_server  # noqa: F401
 from atomadic_forge.a0_qk_constants.policy_schema import (
     SCHEMA_VERSION_POLICY_V1,
 )
@@ -26,10 +25,7 @@ from atomadic_forge.a1_at_functions.agent_memory import (
     what_failed_last_time,
     why_did_this_change,
 )
-# Importing a3.mcp_server wires every a1↔a3 injected handler.
-import atomadic_forge.a3_og_features.mcp_server  # noqa: F401
 from atomadic_forge.a1_at_functions.mcp_protocol import (
-    TOOLS,
     dispatch_request,
 )
 from atomadic_forge.a1_at_functions.plan_adapter import (
@@ -63,7 +59,6 @@ from atomadic_forge.a1_at_functions.tool_composer import (
     SCHEMA_VERSION_COMPOSE_V1,
     compose_tools,
 )
-
 
 # ============================================================
 # select_tests (#7)
@@ -407,6 +402,7 @@ def test_mcp_list_and_get_recipe(tmp_path):
 def test_forge_version_flag_works():
     """Codex production-hardening: forge --version should not error."""
     import typer.testing
+
     from atomadic_forge import __version__
     from atomadic_forge.a4_sy_orchestration.cli import app
     runner = typer.testing.CliRunner()

@@ -1,4 +1,4 @@
-﻿import { useForgeStore } from "@/store";
+import { useForgeStore } from "@/store";
 export function ErrorBanner() {
   const { error, setError } = useForgeStore();
   if (!error) return null;

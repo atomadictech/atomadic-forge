@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import cytoscape, { type Core } from "cytoscape";
 import { useForgeStore } from "@/store";
 import type { Tier } from "@/lib/types";

@@ -9,9 +9,6 @@ from __future__ import annotations
 import io
 import json
 import textwrap
-from pathlib import Path
-
-import pytest
 
 from atomadic_forge.a1_at_functions.lsp_protocol import (
     SERVER_NAME,
@@ -23,7 +20,6 @@ from atomadic_forge.a1_at_functions.lsp_protocol import (
     uri_to_path,
 )
 from atomadic_forge.a3_og_features.lsp_server import serve_stdio
-
 
 _GOOD_SOURCE = textwrap.dedent('''
     def login(username: str, password: str) -> str:

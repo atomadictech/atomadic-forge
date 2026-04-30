@@ -23,7 +23,6 @@ from pathlib import Path
 
 import pytest
 
-
 _REPO = Path(__file__).resolve().parents[1]
 _WORKER = _REPO / "cloudflare-workers" / "badge"
 

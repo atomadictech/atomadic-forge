@@ -26,9 +26,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: "pnpm"
-          cache-dependency-path: forge-studio/pnpm-lock.yaml
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --no-frozen-lockfile
       - name: TypeScript type-check
         run: pnpm typecheck
       - name: Unit tests (Vitest)

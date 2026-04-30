@@ -7,7 +7,6 @@ import json
 import textwrap
 from pathlib import Path
 
-import pytest
 import typer.testing
 
 from atomadic_forge.a1_at_functions.patch_scorer import score_patch

@@ -7,12 +7,10 @@ recipe so consuming repos copy-paste-clean.
 """
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 import pytest
 import yaml
-
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 HOOKS_YAML = REPO_ROOT / ".pre-commit-hooks.yaml"

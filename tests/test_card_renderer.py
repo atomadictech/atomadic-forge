@@ -13,7 +13,6 @@ import pytest
 from atomadic_forge.a1_at_functions.card_renderer import render_receipt_card
 from atomadic_forge.a1_at_functions.receipt_emitter import build_receipt
 
-
 _CERTIFY_PASS = {
     "score": 100.0,
     "documentation_complete": True,

@@ -16,9 +16,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
-
-
 _REPO = Path(__file__).resolve().parents[1]
 _EXTENSION = _REPO / "vscode-forge-extension"
 _MANIFEST = _EXTENSION / "package.json"

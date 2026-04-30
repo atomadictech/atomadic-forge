@@ -1,4 +1,4 @@
-﻿export type Tier = "a0"|"a1"|"a2"|"a3"|"a4";
+export type Tier = "a0"|"a1"|"a2"|"a3"|"a4";
 export interface TierDistribution { a0:number;a1:number;a2:number;a3:number;a4:number;unknown:number; }
 export interface ScoutSymbol { name:string;kind:string;tier:Tier|"unknown";file:string;line:number;loc?:number; }
 export interface ScoutReport { schema_version:string;project_root:string;tier_distribution:TierDistribution;symbols:ScoutSymbol[];file_count:number;symbol_count:number;scanned_at?:string; }

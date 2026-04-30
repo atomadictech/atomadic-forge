@@ -1,4 +1,4 @@
-﻿import { test, expect } from "@playwright/test";
+import { test, expect } from "@playwright/test";
 
 test.describe("Forge Studio smoke", () => {
   test.beforeEach(async ({ page }) => { await page.goto("http://localhost:1420"); });

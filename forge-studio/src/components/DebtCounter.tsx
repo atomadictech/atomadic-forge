@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForgeStore } from "@/store";
 import * as mcp from "@/lib/mcp";
 import { SEVERITY_WEIGHTS } from "@/lib/types";

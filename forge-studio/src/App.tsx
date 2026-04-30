@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+import { useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { ProjectScanDashboard } from "@/components/ProjectScanDashboard";

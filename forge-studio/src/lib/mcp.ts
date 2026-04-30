@@ -1,4 +1,4 @@
-﻿import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "@tauri-apps/api/core";
 import type { ScoutReport, WireReport, MctTool, McpResource } from "./types";
 export async function connect(projectRoot:string):Promise<void> { await invoke<string>("forge_connect",{projectRoot}); }
 export async function disconnect():Promise<void> { await invoke<void>("forge_disconnect"); }

@@ -21,10 +21,7 @@ from __future__ import annotations
 
 import io
 import json
-import tempfile
 from pathlib import Path
-
-import pytest
 
 from atomadic_forge.a1_at_functions.mcp_protocol import (
     PROTOCOL_VERSION,
@@ -34,7 +31,6 @@ from atomadic_forge.a1_at_functions.mcp_protocol import (
     dispatch_request,
 )
 from atomadic_forge.a3_og_features.mcp_server import serve_stdio
-
 
 # ---- handshake ---------------------------------------------------------
 

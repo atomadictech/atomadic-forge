@@ -10,9 +10,7 @@ Pins the seven drift-class detection codes:
 from __future__ import annotations
 
 import textwrap
-from pathlib import Path
 
-import pytest
 import typer.testing
 
 from atomadic_forge.a1_at_functions.sidecar_parser import parse_sidecar_text

@@ -1,4 +1,4 @@
-﻿import { create } from "zustand";
+import { create } from "zustand";
 import type { ConnectionStatus,DebtConfig,ScoutReport,WireReport,MctTool,McpResource,Tier } from "@/lib/types";
 interface ForgeState {
   status:ConnectionStatus;projectRoot:string|null;error:string|null;

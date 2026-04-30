@@ -21,7 +21,6 @@ from pathlib import Path
 import pytest
 import yaml
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ACTION_YML = REPO_ROOT / ".github" / "actions" / "forge-action" / "action.yml"
 ACTION_README = REPO_ROOT / ".github" / "actions" / "forge-action" / "README.md"
