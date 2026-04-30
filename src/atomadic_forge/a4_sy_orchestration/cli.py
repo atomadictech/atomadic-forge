@@ -1247,6 +1247,48 @@ def report_cmd(
     typer.secho(f"Crisis contribution: {bp:.4f} basis points of the $2.41T CISQ benchmark", fg="cyan")
 
 
+
+
+@app.command("roi")
+def roi_cmd(
+    project: Annotated[str, typer.Argument(help="Project root path.")] = ".",
+    receipt: Annotated[Path | None, typer.Option("--receipt", help="Path to receipt.json.")] = None,
+    out: Annotated[Path | None, typer.Option("--out", help="Output path for ROI report.")] = None,
+    json_out: Annotated[bool, typer.Option("--json", help="Emit ROI as JSON.")] = False,
+    rate: Annotated[float, typer.Option("--rate", help="Team hourly rate USD.")] = 150.0,
+) -> None:
+    """Generate a CISQ-based ROI report (TD-principal reduction in USD)."""
+    from ..a1_at_functions.roi_calculator import calculate_roi, render_roi_markdown
+    project_path = Path(project).resolve()
+    if receipt is None:
+        receipt = project_path / ".atomadic-forge" / "receipt.json"
+    if not receipt.exists():
+        typer.secho(f"Receipt not found at {receipt}. Run 'forge auto' first.", fg="red", err=True)
+        raise typer.Exit(code=1)
+    try:
+        receipt_data = json.loads(receipt.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        typer.secho(f"Failed to load receipt: {exc}", fg="red", err=True)
+        raise typer.Exit(code=1)
+    roi = calculate_roi(receipt_data, team_hourly_rate=rate)
+    if json_out:
+        typer.echo(json.dumps(roi, indent=2))
+        return
+    md = render_roi_markdown(roi, project_name=project_path.name)
+    if out is None:
+        out = project_path / ".atomadic-forge" / "roi-report.md"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(md, encoding="utf-8")
+    mult = roi["roi_multiplier"]
+    grade = roi["grade"]
+    avoided = roi["avoided_remediation_cost_usd"] + roi["annual_carry_reduction_usd"]
+    typer.secho(
+        f"\nForge ROI -- {grade} | {mult:.1f}x ROI | ${avoided:,.0f} avoided cost",
+        fg="green",
+    )
+    typer.secho(f"Report written to {out}", fg="green")
+
+
 # Specialty sub-apps — registered lazily so any import error in one doesn't
 # break the others.
 def _register_specialty_apps() -> None:
