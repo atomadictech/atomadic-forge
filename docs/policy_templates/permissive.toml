@@ -1,0 +1,20 @@
+# Atomadic Forge — permissive policy preset
+# Lane G G7 / Golden Path enterprise-readiness templates.
+#
+# Lenient defaults for exploration and rapid prototyping.
+# Runs always succeed; no hard gates.
+#
+# IMPORTANT: Do not use in production or regulated environments.
+# See also: strict.toml, regulated.toml
+
+[tool.forge.agent]
+certify_threshold = 0
+require_wire_pass = false
+require_local_sign = false
+require_remote_sign = false
+emit_sbom = false
+seed_determinism = 0
+emit_receipt = false
+fail_on_new_violations = false
+max_auto_fixable_violations = 50
+append_lineage = false

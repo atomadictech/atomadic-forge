@@ -153,16 +153,33 @@ class ReceiptAAAANexusSignature(TypedDict, total=False):
     verify_endpoint: str            # e.g. "/v1/verify/forge-receipt"
 
 
+class ReceiptLocalSignSignature(TypedDict, total=False):
+    """Ed25519 local signing block (Lane G W5).
+
+    Populated by ``a1_at_functions.local_signer.sign_receipt_local`` when
+    the caller passes ``--local-sign``. The signature covers the canonical
+    receipt hash (same content-addressed bytes used by the lineage chain),
+    so re-signing after a notes append does not change the signed payload.
+    """
+    alg: str            # always "Ed25519"
+    signature: str      # base64-encoded 64-byte Ed25519 signature
+    public_key: str     # base64-encoded 32-byte raw public key
+    key_id: str         # first 16 hex chars of SHA-256(raw_public_key)
+    signed_at_utc: str  # YYYY-MM-DDTHH:MM:SSZ
+
+
 class ReceiptSignatures(TypedDict, total=False):
     """All signature claims attached to this Receipt.
 
-    Receipts can ship unsigned (both fields ``None``) — ``--emit-receipt``
+    Receipts can ship unsigned (all fields ``None``) — ``--emit-receipt``
     without ``--sign`` produces a structurally-valid but unattested
     Receipt suitable for local development. Lane A W2's signer fills
-    these fields in for production use.
+    ``sigstore`` and ``aaaa_nexus``; Lane G W5's local signer fills
+    ``local_sign``.
     """
     sigstore: ReceiptSigstoreSignature | None
     aaaa_nexus: ReceiptAAAANexusSignature | None
+    local_sign: ReceiptLocalSignSignature | None  # Lane G W5
 
 
 class ReceiptLean4Corpus(TypedDict, total=False):
