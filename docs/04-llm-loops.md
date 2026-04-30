@@ -25,9 +25,11 @@ Forge supports multiple LLM providers. Choose based on cost, privacy, quality:
 
 | Provider | Cost | Quality | Privacy | Notes |
 |----------|------|---------|---------|-------|
-| **Gemini** | Free tier | High | No | Best free option; requires API key |
+| **Gemini** | Free tier | High | No | Best free cloud option; requires API key |
+| **AAAA-Nexus** (`nexus`) | Paid | High | No | Most reliable for long iterative runs; `AAAA_NEXUS_API_KEY` |
 | **Anthropic (Claude)** | Paid ($) | Highest | No | Highest code quality; requires API key |
 | **OpenAI (GPT)** | Paid ($$) | High | No | Fast and capable; requires API key |
+| **OpenRouter** | Free tier available | Medium–High | No | 200+ models via one API key; good fallback when Gemini quota is exhausted; `OPENROUTER_API_KEY` |
 | **Ollama** | Free | Medium | Yes | Fully local; runs on your machine |
 | **Stub** | Free | Low | Yes | Offline testing; no actual LLM calls |
 
@@ -81,6 +83,27 @@ forge iterate run "Build a file backup tool" ./output \
     --package backup --provider ollama
 ```
 
+When your machine is busy, use the small local profile:
+
+```bash
+export FORGE_OLLAMA=1
+export FORGE_OLLAMA_MODEL=qwen2.5-coder:1.5b
+export FORGE_OLLAMA_NUM_PREDICT=768
+export FORGE_OLLAMA_TIMEOUT=180
+```
+
+When the machine is idle, `qwen2.5-coder:7b` is the better coding baseline:
+
+```bash
+export FORGE_OLLAMA_MODEL=qwen2.5-coder:7b
+export FORGE_OLLAMA_NUM_PREDICT=1536
+export FORGE_OLLAMA_TIMEOUT=420
+```
+
+`FORGE_OLLAMA_NUM_PREDICT` limits local generation length per call.
+Lower it to reduce memory pressure. `FORGE_OLLAMA_TIMEOUT` controls the
+read timeout and now produces a normal CLI provider error when exceeded.
+
 ### Stub (for testing, offline)
 
 ```bash
@@ -90,6 +113,38 @@ forge iterate run "Build a file backup tool" ./output \
 forge iterate run "Build anything" ./output \
     --provider stub --max-iterations 1
 ```
+
+### AAAA-Nexus (sovereign AI, recommended for long runs)
+
+```bash
+export AAAA_NEXUS_API_KEY=an_your-key-here
+
+forge iterate run "Build a tool-use agent" ./output \
+    --package tool_agent --provider nexus --max-iterations 4
+```
+
+AAAA-Nexus is the most reliable provider for multi-round `evolve` runs —
+it handles large catalogs and long prompts without hitting free-tier quota
+limits.
+
+### OpenRouter (free tier with 200+ models)
+
+```bash
+export OPENROUTER_API_KEY=sk-or-your-key-here
+
+# Default model: google/gemma-3-27b-it:free
+forge iterate run "Build a web scraper" ./output \
+    --package scraper --provider openrouter
+
+# Override the model
+export FORGE_OPENROUTER_MODEL=mistralai/mistral-7b-instruct:free
+forge iterate run "..." ./output --provider openrouter
+```
+
+OpenRouter is a good fallback when Gemini's free-tier quota is exhausted.
+Note: some models (e.g., `gemma-3-27b-it`) do not support the `system` role
+— Forge automatically retries by folding the system prompt into the user
+message when it receives a 400 error for this reason.
 
 ## forge iterate: Single-shot generation
 
@@ -101,8 +156,9 @@ forge iterate run "INTENT" OUTPUT [OPTIONS]
 
 **Options:**
 - `--package NAME` — Python package name (default: `generated`)
-- `--provider PROVIDER` — LLM provider (default: `auto` which tries gemini→anthropic→openai→ollama)
+- `--provider PROVIDER` — LLM provider (default: `auto` which tries gemini→nexus→anthropic→openai→openrouter→ollama)
 - `--max-iterations N` — Max rounds (default: 4)
+- `--seed PATH` — Absorb a repo's symbol catalog as building-block hints for the LLM. Repeat for multiple seeds.
 
 ### Example 1: Simple CLI tool
 
@@ -131,6 +187,30 @@ forge iterate run \
   ./output --package web_scraper --provider anthropic --max-iterations 5
 ```
 
+### Example 3: Multi-seed — bootstrap from absorbed frameworks
+
+After running `forge auto` on langchain and mem0, use their symbol catalogs
+as building-block hints for the LLM:
+
+```bash
+# Absorb two frameworks first
+forge auto ./langchain-repo ./forged/langchain-picks --apply
+forge auto ./mem0-repo     ./forged/mem0-picks     --apply
+
+# Then iterate using both as seeds
+forge iterate run \
+  "Build a tool-use agent with semantic memory and API calling" \
+  ./output \
+  --package tool_agent \
+  --seed ./forged/langchain-picks \
+  --seed ./forged/mem0-picks \
+  --provider nexus --max-iterations 4
+```
+
+The LLM sees a deduplicated catalog of up to 30 unique top-level symbols from
+all provided seed repos, giving it concrete building blocks to compose from
+rather than inventing everything from scratch.
+
 ### Preflight (dry-run, no LLM call)
 
 See what prompts Forge will send to the LLM without actually calling it:
@@ -151,6 +231,23 @@ First user message:
 
 (no API call made)
 ```
+
+### Post-generation quality phases
+
+After the LLM turn loop, Python generation runs a deterministic quality
+pass before the final `certify` report:
+
+1. **Docstring phase** — adds conservative module, class, function, and
+   method docstrings where the model left them blank.
+2. **Docs phase** — writes generated `docs/API.md` and `docs/TESTING.md`
+   unless a human-authored file already exists at that path.
+3. **Test phase** — writes `tests/test_generated_smoke.py`, a stdlib-only
+   import-smoke test that imports the package and generated modules.
+
+The phase report is written to `.atomadic-forge/quality.json` and copied
+into `iterate.json` under `quality_phases`. The generated smoke test proves
+importability, not business behavior, so keep adding focused tests for
+real inputs and edge cases.
 
 ## forge evolve: Recursive improvement
 

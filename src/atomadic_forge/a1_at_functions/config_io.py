@@ -58,7 +58,7 @@ def validate_config(config: dict) -> list[str]:
         )
 
     score = config.get("default_target_score", 75.0)
-    if not isinstance(score, (int, float)) or not (0 <= float(score) <= 100):
+    if not isinstance(score, int | float) or not (0 <= float(score) <= 100):
         issues.append("default_target_score must be a number between 0 and 100")
 
     ollama_url = config.get("ollama_url", "")

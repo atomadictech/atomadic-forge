@@ -1,5 +1,296 @@
 # Changelog
 
+## 0.3.1 — Golden Path lanes B/C/D/F/G ship
+
+783 tests passing, 2 skipped. `forge wire src/atomadic_forge` PASS,
+`forge certify .` = **100/100**.
+
+### Added — Golden Path lanes shipped
+
+- **Lane B (Studio)** — Tauri + React + TypeScript visual sandbox:
+  Project Scan Dashboard, Architecture Graph (Cytoscape), Cognitive
+  Heatmap, Real-Time Debt Counter, Agent Topology Map. `forge-studio/`.
+- **Lane C W3 (Badge worker)** — Cloudflare Worker emitting
+  shields.io-compatible SVG badges from Receipts in a `FORGE_RECEIPTS`
+  KV namespace. `cloudflare-workers/badge/`.
+- **Lane D W8 (Sidecar grammar)** — `.forge` v1.0 spec + parser. Per-
+  symbol effect / compose_with / proves declarations.
+  `a1.sidecar_parser`, `docs/SIDECAR.md`.
+- **Lane D W11 (Sidecar validator)** — AST cross-check of `.forge`
+  against source. 7 drift classes (S0000–S0006) promoted into the
+  F-code namespace as F0100–F0106. `a1.sidecar_validator`,
+  `forge sidecar parse / validate`.
+- **Lane D W12 (LSP)** — `forge lsp serve` Content-Length framed JSON-
+  RPC server. Live diagnostics, hover, goto-source for `.forge` files.
+- **Lane D W14 (VS Code extension)** — `vscode-forge-extension/`.
+  Language client wired to `forge lsp serve`.
+- **Lane F W16-W18 (CS-1 + compliance)** — CS-1 Conformity Statement
+  renderer + EU AI Act Annex IV / SR 11-7 / FDA PCCP / CMMC-AI / NIST
+  AI RMF mappings. `a1.cs1_renderer`, `forge cs1`.
+- **Lane G (Signing + SBOM + policy templates)** — Ed25519 local
+  signer (soft-fail without `cryptography`), CycloneDX 1.5 SBOM
+  emitter, three policy stances (strict / permissive / regulated),
+  `--seed-determinism` on `forge auto`. `a1.local_signer`,
+  `a1.sbom_emitter`, `forge sbom`, `--local-sign` on certify.
+
+### Codex "Copilot's Copilot" — completed
+
+All 12 items closed: compact summaries, action cards, context_pack,
+preflight_change, score_patch, plan persistence (`plan-list / plan-
+show / plan-step / plan-apply`), MCP `auto_plan` tool, `--version`,
+`--score` field on summaries, agent_summary/v1 + agent_plan/v1
+schemas, repo_explainer, tool_composer.
+
+## Unreleased — _Pre-audit lanes + Golden Path Lane A W0_
+
+10 commits accumulated since `0.2.2` ship, mapped onto the lanes in
+`launch/forge/GOLDEN_PATH-20260428.md`. Test trajectory: **301 → 363
+passing, 2 skipped**. `forge wire src/atomadic_forge` PASS at every
+commit. `forge certify .` = **100/100** held.
+
+### Added — pre-audit operational scaffolding
+
+- **`forge audit list / show / log`** (`7cd840a`, audit-D1) — surfaces
+  the Vanguard lineage chain as a verb. Reads
+  `.atomadic-forge/lineage.jsonl`; populates Receipt's
+  `lineage.lineage_path` field at GP Lane A W4. New module:
+  `a1_at_functions/lineage_reader.py`.
+- **`forge wire --suggest-repairs`** (`4786836`, audit-D2) — emits a
+  per-violation repair hint and an `auto_fixable` count; populates
+  Receipt's `wire.auto_fixable` field. Prerequisite for `forge enforce`
+  at GP Lane A W6.
+- **`forge wire --fail-on-violations`** (`8385cea`, audit-G1) — exits
+  non-zero when any upward import is detected. Drop-in CI gate
+  consumed by `forge-action` at GP Lane C W1.
+- **`forge diff MANIFEST_A MANIFEST_B`** (`6249e74`, audit-D4) —
+  schema-aware compare of two scout/certify manifests. Powers Lane B's
+  "Shadow Merge" view (W8) and Lane E's PR-comment delta.
+- **`--progress` on `forge recon` / `forge auto`** (`ec59a75`, audit-B2)
+  — per-file stderr progress line. New module:
+  `a1_at_functions/progress_reporter.py`. Feeds Lane B Forge Studio's
+  progress pane.
+- **F-coded error hints in CLI errors** (`375fe85`, audit-B4) —
+  recovery-template hints attached to common CLI failure modes.
+  Scaffolding for Lane A W5's full F0001–F0099 catalog. New module:
+  `a1_at_functions/error_hints.py`.
+- **Pre-audit smoke test** (`b4c8579`, audit-H1) — pins file:line
+  claims so `lane-plan.md` cannot drift from the source.
+- **`docs/FIRST_10_MINUTES.md` consolidation** (`109e857`, audit-F) —
+  unifies onboarding; `docs/CI_CD.md`, `docs/MULTI_REPO.md`,
+  `docs/AIR_GAPPED.md` are the deeper paths.
+
+### Added — Golden Path Lane A W0 (critical-path)
+
+- **Forge Receipt JSON v1 wire-format schema** (`f6c487a`, GP-A W0) at
+  `a0_qk_constants/receipt_schema.py` (278 LOC) + `docs/RECEIPT.md`
+  (305 lines) + `tests/test_receipt_schema.py` (206 LOC). Versioning
+  roadmap explicit (v1.0 → v1.1 W8 polyglot_breakdown → v1.2 W12
+  slsa_attestation → v2.0 W24 bao_rompf_witnesses). Both Lean4 corpora
+  cited (`aethel-nexus-proofs` — 29 theorems, 0 sorry, 0 axioms — and
+  `mhed-toe-codex-v22` — 538 theorems, 0 sorry). All signing / lineage
+  / attestation fields default to `None` so unsigned dev Receipts
+  remain structurally valid. Tier-pure a0 (imports limited to
+  `__future__` and `typing`).
+
+### Fixed
+
+- **`datetime.utcnow()` deprecation sweep** (`3359fb6`, audit-A1) —
+  replaced with `datetime.now(timezone.utc)` across a3 features.
+  Prerequisite for the GP P1 self-certify gate.
+
+### Documentation
+
+- `docs/COMMANDS.md` updated with the 5 new user-facing surfaces:
+  `forge audit list/show/log`, `forge diff`, `forge wire
+  --fail-on-violations`, `forge wire --suggest-repairs`,
+  `forge recon --progress`.
+
+### Notes for downstream consumers
+
+- The Receipt schema is **forward-compatible by design** — every new
+  field defaults to `None` or `[]` / `{}`. Adding a *required* field is
+  a major version bump; reserved field names are documented in the
+  schema docstring.
+- `forge wire --fail-on-violations` is the load-bearing primitive for
+  the planned `atomadictech/forge-action` GitHub Action (GP Lane C W1).
+- 9 audit-lane commits + 1 GP-A W0 commit currently sit on a feature
+  branch. Cut as `0.3.0-rc1` when GP-A W1 (`receipt_emitter` +
+  `card_renderer`) lands.
+
+## 0.2.2 — _Operational axis + 100/100 self-certify_
+
+`forge certify` now scores the full 0–100 range.  The v1 rubric topped
+out at 90 (35 structural + 25 runtime + 30 behavioural) with 10 points
+of reserved headroom that no axis credited.  This release closes the
+gap with a new **operational axis** worth 10 points total:
+
+| Axis | Points | Check |
+|---|---|---|
+| CI workflow present | 5 | `.github/workflows/*.yml` (or `.yaml`) — at least one non-empty file |
+| Changelog / release notes | 5 | `CHANGELOG.md` (or `.rst`, `RELEASE_NOTES.md`, `HISTORY.md`, `NEWS.md`) ≥ 200 bytes at root |
+
+Both checks are pure structural file-existence — no API calls, no slow
+runtime paths.  The CI axis credits intent (a workflow exists); the
+behavioural axis already credits actual test-pass behaviour, so there's
+no double-counting.
+
+### Added
+
+- `check_ci_workflow(root)` — pure helper at `a1_at_functions/certify_checks.py`
+- `check_changelog(root)` — pure helper at the same module
+- `score_components.operational` — new key in the certify result dict
+- `ci_workflow_present` and `changelog_present` — new top-level booleans
+  in the certify result dict
+- `detail.ci` and `detail.changelog` — new entries in the detail dict
+- 22 new tests in `tests/test_certify_operational_axis.py` covering both
+  helpers, the integrated 100/100 path, partial-credit (CI-only,
+  changelog-only), and the issue/recommendation surfacing on misses
+- README badge updated from 90/100 → 100/100
+
+### Fixed
+
+- The `# Score weights (sum to 100):` comment in `certify_checks.py` now
+  actually sums to 100 (was 90 in v0.2.1; the reserved headroom is now
+  spoken for).
+- Forge's own self-certify: **90 → 100**.  299 passing tests, 1
+  skipped (was 274 + 1).  Wire scan: PASS, 0 violations.
+- `forge demo run` now exits non-zero when the generated CLI demo fails,
+  while still writing the artifact for debugging.
+- `commandsmith sync` now regenerates a Ruff-clean command registry.
+- `forge certify --fail-under <score>` gives CI an explicit score gate.
+- Certification scans ignore `.pytest_tmp*` scratch trees and generated
+  smoke tests are Ruff-clean, so local verification does not depend on
+  manual cleanup order.
+
+### Notes for downstream certify consumers
+
+If your tooling asserts on a specific score value (e.g. `assert
+result["score"] == 90`), audit it: a project with `.github/workflows/`
+and `CHANGELOG.md` will now legitimately score higher than before.
+The fixture-based tests in `tests/test_stub_detector.py` were
+unaffected because their temp roots don't include the operational-axis
+files.
+
+## 0.2.1 — _Provider resilience + forge stress-test fixes_
+
+Discovered and fixed during a live stress-test: using Forge itself to
+absorb 23,487 symbols from five major agent frameworks (langchain,
+autogen, instructor, mem0, browser-use) while running `iterate`, `evolve`,
+`emergent`, `synergy`, and `commandsmith` end-to-end.  All fixes are in the
+forge source; the evolution run produced `generated/tool-agent` (60/100) and
+`generated/sovereign` (74/100) plus 12 registered CLI commands (12/12 smoke PASS).
+
+### Added
+
+- `forge chat ask` and `forge chat repl` — a Forge-aware chat copilot that
+  uses the same provider layer as `iterate` / `evolve`, supports `nexus`,
+  `openrouter`, `gemini`, `anthropic`, `openai`, `ollama`, and `stub`, and
+  packs bounded repo context while skipping `.env` and obvious secret files.
+- Deterministic Python quality phases after generation: missing docstrings
+  are filled, `docs/API.md` and `docs/TESTING.md` are created, and
+  `tests/test_generated_smoke.py` is added before final certification.
+- `.atomadic-forge/quality.json` records the docstring/docs/tests phase
+  results for every Python `iterate` / `evolve` output.
+- GitHub readiness assets: CI and release workflows, Dependabot config,
+  bug/feature issue forms, PR template, security policy, and source
+  distribution manifest.
+- Shared provider resolver used by `chat`, `demo`, `iterate`, and `evolve`
+  so aliases and help text no longer drift between commands.
+- CLI UX docs for chat, offline demo expectations, corrected certify scoring,
+  and the actual `--provider auto` resolution order.
+
+### Bug fixes
+
+**Bug 1 — `forge iterate` missing `nexus` provider**
+`commands/iterate.py` had no `nexus`/`aaaa-nexus` case in `_resolve_provider()`
+even though `forge evolve` already supported it.  Added
+`if name in ("nexus", "aaaa-nexus", "aaaa_nexus", "helix"): return AAAANexusClient()`.
+
+**Bug 2 — `forge iterate` missing `openrouter` provider**
+No OpenRouter support existed anywhere in forge.  Added `OpenRouterClient` to
+`a1_at_functions/llm_client.py` (OpenRouter's OpenAI-compatible endpoint,
+default model `google/gemma-3-27b-it:free`).  Added `openrouter`/`router`
+cases to both `iterate` and `evolve` provider resolvers.
+
+**Bug 3 — `forge iterate` only accepted a single `--seed`**
+`seed_repo: Path | None` rejected multiple seeds.  Changed to
+`seed_repo: list[Path] | None` in both `commands/iterate.py` and
+`a3_og_features/forge_loop.py`.  The seed catalog is now accumulated
+from all provided `--seed` paths.
+
+**Bug 4 — OpenRouter 400 on models without system-role support**
+`gemma-3-27b-it` (and similar models) return HTTP 400
+`"Developer instruction is not enabled"` when a `system` role message is
+sent.  `OpenRouterClient.call()` now retries with the system prompt folded
+into the user message on the first such failure.
+
+**Bug 5 — `parse_files_from_response` failed on truncated JSON arrays**
+When an LLM response was cut off mid-array the balanced-bracket scanner
+returned `[]`, writing 0 files.  Added a third strategy: regex-based
+extraction of complete `{"path", "content"}` objects from a partial array.
+Also fixed the fence regex from non-greedy to greedy capture.
+
+**Bug 6 — Seed catalog flooded the prompt with 460 K+ symbols**
+Multiple large seeds (langchain + mem0) pushed 460 K+ symbols into the
+prompt, confusing the LLM.  `pack_initial_intent()` now deduplicates
+method-level entries to base class names and caps the display at 30 unique
+top-level symbols.
+
+**Bug 7 — SyntaxWarning noise from third-party forged files**
+mem0's regex strings used invalid escapes (`\.`), causing Python
+`SyntaxWarning` on every forge command that loaded the seed catalog.  Added
+`warnings.filterwarnings("ignore", category=SyntaxWarning)` at CLI import
+time in `a4_sy_orchestration/cli.py`.
+
+**Bug 8 — `commandsmith smoke` referenced non-existent `unified_cli` module**
+The smoke test invoked
+`atomadic_forge.a4_sy_orchestration.unified_cli` which doesn't exist.
+Changed to `atomadic_forge.a4_sy_orchestration.cli`.  The current command
+surface now passes smoke test (12/12 PASS).
+
+**Bug 9 — Generated synergy adapters referenced `unified_cli`**
+The synergy-implement template hardcoded `unified_cli` in subprocess calls.
+Replaced with `cli` in all three generated adapter files
+(`emergent_then_synergy.py`, `synergy_then_emergent.py`,
+`evolve_then_iterate.py`) and registered them in `cli.py`.
+
+**Bug 10 — `forge certify` stub scan recursed into `forged/` directories**
+When certifying a project root without a `src/` directory,
+`detect_stubs` ran `rglob("*.py")` on the full tree — including 17 727
+stub skeletons in `forged/*/src/` — dragging the score from 60 → 20/100.
+`certify_checks.py` now sets `src_for_stubs = None` and skips stub
+detection entirely when there is no `src/` layout.
+
+### New / changed modules
+
+| File | Tier | Change |
+|------|------|--------|
+| `a1_at_functions/llm_client.py` | a1 | `OpenRouterClient` added; `resolve_default_client()` includes openrouter in auto-chain |
+| `commands/iterate.py` | a4 | nexus + openrouter providers; multi-seed `list[Path]` |
+| `commands/evolve.py` | a4 | nexus + openrouter providers |
+| `a3_og_features/forge_loop.py` | a3 | multi-seed accumulation loop |
+| `a1_at_functions/forge_feedback.py` | a1 | 3-strategy tolerant JSON parser; seed dedup + 30-symbol cap |
+| `a4_sy_orchestration/cli.py` | a4 | SyntaxWarning suppressor; 3 new synergy adapters registered |
+| `a3_og_features/commandsmith_feature.py` | a3 | smoke test CLI path fixed |
+| `a1_at_functions/certify_checks.py` | a1 | stub scan scoped to `src/` only; no-src fallback skips scan |
+| `commands/emergent_then_synergy.py` | a4 | new — emergent → synergy pipeline adapter |
+| `commands/synergy_then_emergent.py` | a4 | new — synergy → emergent pipeline adapter |
+| `commands/evolve_then_iterate.py` | a4 | new — evolve → iterate pipeline adapter |
+
+### Provider matrix (updated)
+
+| Provider | Cost | Env var | Default model |
+|----------|------|---------|---------------|
+| `gemini` | free tier | `GEMINI_API_KEY` / `GOOGLE_AI_STUDIO_KEY` | `gemini-2.5-flash` |
+| `nexus` / `aaaa-nexus` | paid | `AAAA_NEXUS_API_KEY` | (Nexus default) |
+| `anthropic` | paid | `ANTHROPIC_API_KEY` | `claude-3-5-sonnet-latest` |
+| `openai` | paid | `OPENAI_API_KEY` | `gpt-4o-mini` |
+| `openrouter` | free tier available | `OPENROUTER_API_KEY` | `google/gemma-3-27b-it:free` |
+| `ollama` | free, local | `FORGE_OLLAMA=1` | `qwen2.5-coder:7b` |
+| `stub` | free, offline | n/a | n/a |
+
+---
+
 ## 0.2.0 — _Polyglot (JavaScript / TypeScript) support_
 
 Forge is no longer Python-only. `recon`, `wire`, and `certify` now classify

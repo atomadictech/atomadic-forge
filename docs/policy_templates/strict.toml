@@ -1,0 +1,19 @@
+# Atomadic Forge — strict policy preset
+# Lane G G7 / Golden Path enterprise-readiness templates.
+#
+# Conservative defaults for production codebases. All thresholds
+# at maximum; all optional safety features enabled.
+#
+# See also: permissive.toml, regulated.toml
+
+[tool.forge.agent]
+certify_threshold = 100
+require_wire_pass = true
+require_local_sign = true
+require_remote_sign = false
+emit_sbom = true
+seed_determinism = 0
+emit_receipt = true
+fail_on_new_violations = true
+max_auto_fixable_violations = 0
+append_lineage = true

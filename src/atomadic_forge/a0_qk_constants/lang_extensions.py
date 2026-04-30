@@ -21,7 +21,6 @@ from __future__ import annotations
 
 from typing import Final
 
-
 # Extensions Forge classifies as Python source.
 PYTHON_EXTS: Final[frozenset[str]] = frozenset({".py"})
 
@@ -88,6 +87,16 @@ IGNORED_DIRS: Final[frozenset[str]] = frozenset({
 })
 
 
+def is_ignored_dir_name(name: str) -> bool:
+    """Return True for directory names Forge should never recurse into."""
+    return name in IGNORED_DIRS or name.startswith(".pytest_tmp")
+
+
+def path_parts_contain_ignored_dir(parts: tuple[str, ...]) -> bool:
+    """Return True when any path segment is an ignored directory name."""
+    return any(is_ignored_dir_name(part) for part in parts)
+
+
 def lang_for_path(path: str) -> str | None:
     """Return ``"python"`` / ``"javascript"`` / ``"typescript"`` or ``None``.
 
@@ -135,10 +144,7 @@ def file_class_for_path(path: str) -> str:
 def is_ignored_segment(segment: str) -> bool:
     """Return True if a path segment matches an ignored directory name.
 
-    Segment matching is exact (case-insensitive on the dotfile prefix); a
-    file or directory anywhere in the tree named ``"node_modules"`` or
-    ``".github"`` skips Forge's recursion.
+    Kept for callers that still ask about one segment at a time; delegates
+    to the same predicate used by full-path ignore checks.
     """
-    return segment in IGNORED_DIRS or (
-        segment.startswith(".") and segment in IGNORED_DIRS
-    )
+    return is_ignored_dir_name(segment)

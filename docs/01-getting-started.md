@@ -1,5 +1,7 @@
 # Getting Started with Atomadic Forge
 
+> **Looking for the canonical first-10-minutes path?** See [FIRST_10_MINUTES.md](FIRST_10_MINUTES.md). This document covers a deeper specific topic.
+
 ## What is Forge?
 
 Forge absorbs Python or JavaScript / TypeScript repositories and rebuilds

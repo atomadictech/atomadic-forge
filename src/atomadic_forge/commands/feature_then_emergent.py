@@ -26,7 +26,6 @@ from atomadic_forge.a3_og_features.emergent_pipeline_integration import (
     emergent_overlay_for_path,
 )
 
-
 COMMAND_NAME = "feature-then-emergent"
 COMMAND_HELP = ("Run any feature, then fan its JSON output into emergent "
                 "scan to surface novel compositions.")

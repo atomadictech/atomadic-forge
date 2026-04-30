@@ -1,5 +1,7 @@
 # Tutorial: Absorb a Real Repository
 
+> **Looking for the canonical first-10-minutes path?** See [FIRST_10_MINUTES.md](FIRST_10_MINUTES.md). This document covers a deeper specific topic.
+
 In this tutorial, we'll absorb a small real Python repository into monadic structure, fix the violations, and certify the result.
 
 ## Setup

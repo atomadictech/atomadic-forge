@@ -1,0 +1,54 @@
+# Atomadic Forge — self-certify
+#
+# Runs the in-tree forge-action against the Forge repo itself on every
+# push and pull request. This is the dogfood gate: if Forge cannot pass
+# its own architecture conformance check, the offending change must be
+# fixed before merge.
+#
+# Golden Path Lane C W1 acceptance criterion: 'Marketplace-listed; one-
+# line install -> sticky PR comment with Receipt rendered'. The
+# Marketplace listing is W12 (separate repo); today's deliverable is
+# the action itself + the dogfood proof that it works on the Forge repo.
+
+name: forge self-certify
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write    # for the sticky comment
+
+concurrency:
+  group: forge-self-certify-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  forge:
+    name: forge wire + certify
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Atomadic Forge
+        id: forge
+        uses: ./.github/actions/forge-action
+        with:
+          package_root: src/atomadic_forge
+          package_name: atomadic_forge
+          # Forge holds its own bar at 100; if it slips below this we
+          # have ate our own dogfood with a side of regression.
+          fail_under: '100'
+          forge_ref: ${{ github.sha }}
+
+      - name: Echo outputs
+        if: always()
+        run: |
+          echo "wire verdict:    ${{ steps.forge.outputs.wire_verdict }}"
+          echo "certify score:   ${{ steps.forge.outputs.certify_score }}"
+          echo "receipt path:    ${{ steps.forge.outputs.receipt_path }}"

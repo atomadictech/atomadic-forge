@@ -6,7 +6,8 @@ import time
 from pathlib import Path
 
 from ..a0_qk_constants.lang_extensions import (
-    ALL_SOURCE_EXTS, IGNORED_DIRS, file_class_for_path,
+    ALL_SOURCE_EXTS,
+    path_parts_contain_ignored_dir,
 )
 from ..a0_qk_constants.tier_names import TIER_NAMES
 from .import_smoke import import_smoke
@@ -17,7 +18,7 @@ from .wire_check import scan_violations
 
 def _is_under_ignored(rel_parts: tuple[str, ...]) -> bool:
     """Path-segment check against IGNORED_DIRS (used by every walk)."""
-    return any(p in IGNORED_DIRS for p in rel_parts)
+    return path_parts_contain_ignored_dir(rel_parts)
 
 
 def check_documentation(root: Path) -> tuple[bool, dict]:
@@ -39,7 +40,7 @@ def check_documentation(root: Path) -> tuple[bool, dict]:
     # nested (./cognition/guides/) layouts.  IGNORED_DIRS still apply.
     DOC_DIR_NAMES = {"docs", "doc", "documentation", "guides", "guide"}
     doc_dirs_found: list[str] = []
-    doc_count = 0
+    doc_files: set[Path] = set()
     samples: list[str] = []
     seen_dirs: set[Path] = set()
     for d in root.rglob("*"):
@@ -59,10 +60,11 @@ def check_documentation(root: Path) -> tuple[bool, dict]:
             if _is_under_ignored(rel_parts_p):
                 continue
             if p.suffix.lower() in {".md", ".markdown", ".mdx", ".rst"}:
-                doc_count += 1
+                doc_files.add(p)
                 if len(samples) < 5:
                     samples.append(p.relative_to(root).as_posix())
 
+    doc_count = len(doc_files)
     ok = readme or doc_count >= 2
     return ok, {
         "readme":         readme,
@@ -80,26 +82,47 @@ def check_tests_present(root: Path) -> tuple[bool, dict]:
       JS/TS   — ``tests/*.test.{js,mjs,jsx,ts,tsx}`` or ``*.spec.{js,…}``,
                  plus the ``__tests__/`` directory convention.
     """
-    py_tests: list[Path] = []
-    js_tests: list[Path] = []
+    py_tests: set[Path] = set()
+    js_tests: set[Path] = set()
     seen_dirs: set[Path] = set()
     for d in root.rglob("tests"):
-        if "__pycache__" in d.parts or "node_modules" in d.parts or not d.is_dir():
+        if not d.is_dir():
+            continue
+        rel_parts = d.relative_to(root).parts
+        if _is_under_ignored(rel_parts):
             continue
         if d in seen_dirs:
             continue
         seen_dirs.add(d)
-        py_tests.extend(d.rglob("test_*.py"))
-        py_tests.extend(d.rglob("*_test.py"))
+        py_tests.update(
+            p for p in d.rglob("test_*.py")
+            if not _is_under_ignored(p.relative_to(root).parts)
+        )
+        py_tests.update(
+            p for p in d.rglob("*_test.py")
+            if not _is_under_ignored(p.relative_to(root).parts)
+        )
         for ext in (".js", ".mjs", ".jsx", ".cjs", ".ts", ".tsx"):
-            js_tests.extend(d.rglob(f"*.test{ext}"))
-            js_tests.extend(d.rglob(f"*.spec{ext}"))
+            js_tests.update(
+                p for p in d.rglob(f"*.test{ext}")
+                if not _is_under_ignored(p.relative_to(root).parts)
+            )
+            js_tests.update(
+                p for p in d.rglob(f"*.spec{ext}")
+                if not _is_under_ignored(p.relative_to(root).parts)
+            )
     # __tests__ convention (Jest etc.)
     for d in root.rglob("__tests__"):
-        if "node_modules" in d.parts or not d.is_dir():
+        if not d.is_dir():
+            continue
+        rel_parts = d.relative_to(root).parts
+        if _is_under_ignored(rel_parts):
             continue
         for ext in (".js", ".mjs", ".jsx", ".cjs", ".ts", ".tsx"):
-            js_tests.extend(d.rglob(f"*{ext}"))
+            js_tests.update(
+                p for p in d.rglob(f"*{ext}")
+                if not _is_under_ignored(p.relative_to(root).parts)
+            )
     total = len(py_tests) + len(js_tests)
     return total > 0, {
         "test_files_found": total,
@@ -196,20 +219,94 @@ def check_no_upward_imports(root: Path, package: str | None = None) -> tuple[boo
     }
 
 
+def check_ci_workflow(root: Path) -> tuple[bool, dict]:
+    """Continuous-integration evidence — ``.github/workflows/*.yml``.
+
+    Looks for at least one non-empty workflow file under
+    ``.github/workflows/`` (``.yml`` or ``.yaml``).  Presence of a
+    workflow is treated as evidence of automated quality gating; we
+    deliberately do NOT call out to the GitHub API to inspect run
+    history, so this remains a hermetic structural check.
+
+    A project that wires `pytest`, `forge wire`, and `forge certify`
+    into its CI pipeline gets the same 5 points as one that wires only
+    a smoke test — the axis rewards intent, not depth.  The behavioural
+    axis is what rewards actual test-pass behaviour.
+    """
+    wf_dir = root / ".github" / "workflows"
+    if not wf_dir.exists() or not wf_dir.is_dir():
+        return False, {
+            "workflow_dir_exists": False,
+            "workflow_files":      [],
+        }
+    files: list[str] = []
+    for p in sorted(wf_dir.iterdir()):
+        if not p.is_file():
+            continue
+        if p.suffix.lower() not in {".yml", ".yaml"}:
+            continue
+        try:
+            if p.stat().st_size > 0:
+                files.append(p.name)
+        except OSError:
+            continue
+    return len(files) > 0, {
+        "workflow_dir_exists": True,
+        "workflow_files":      files,
+    }
+
+
+def check_changelog(root: Path) -> tuple[bool, dict]:
+    """Release-discipline evidence — ``CHANGELOG.md`` or equivalent.
+
+    Looks for any of the canonical release-notes filenames at the
+    project root and credits the project iff the file is non-trivial
+    (≥ 200 bytes) — empty placeholders don't earn the points.
+
+    Recognised names: ``CHANGELOG.md``, ``CHANGELOG.rst``, ``CHANGELOG``,
+    ``RELEASE_NOTES.md``, ``HISTORY.md``, ``NEWS.md``.
+    """
+    candidates = (
+        "CHANGELOG.md", "CHANGELOG.rst", "CHANGELOG",
+        "RELEASE_NOTES.md", "HISTORY.md", "NEWS.md",
+    )
+    for name in candidates:
+        p = root / name
+        if not p.exists() or not p.is_file():
+            continue
+        try:
+            size = p.stat().st_size
+        except OSError:
+            continue
+        if size >= 200:
+            return True, {"changelog_file": name, "size_bytes": size}
+    return False, {"changelog_file": None, "size_bytes": 0}
+
+
 def certify(root: Path, *, project: str = "Atomadic project",
             package: str | None = None) -> dict:
     docs_ok, docs_d = check_documentation(root)
     tests_ok, tests_d = check_tests_present(root)
     layout_ok, layout_d = check_tier_layout(root, package)
     wire_ok, wire_d = check_no_upward_imports(root, package)
+    ci_ok, ci_d = check_ci_workflow(root)
+    changelog_ok, changelog_d = check_changelog(root)
 
-    # Stub-body detection: scan the package itself (where generated code lives)
+    # Stub-body detection: scan the package itself (where generated code lives).
+    # Only recurse when we have a well-defined src/ layout; falling back to the
+    # project root would include all nested forged/sources directories and produce
+    # tens of thousands of false positives from extracted-stub skeletons.
     src_for_stubs = root / "src"
     if package and (src_for_stubs / package).exists():
         src_for_stubs = src_for_stubs / package
-    elif not src_for_stubs.exists():
-        src_for_stubs = root
-    stub_findings = detect_stubs(package_root=src_for_stubs)
+    elif src_for_stubs.exists():
+        pass  # use root/src/ as-is
+    else:
+        # No src/ layout — don't recurse into the full tree; that risks picking
+        # up forged/ or sources/ directories.  Scan only Python files directly
+        # inside the project root (non-recursive).
+        src_for_stubs = None
+    stub_findings = detect_stubs(package_root=src_for_stubs) if src_for_stubs else []
     stub_pen = stub_penalty(stub_findings)
     no_stubs = stub_pen == 0
 
@@ -261,7 +358,7 @@ def certify(root: Path, *, project: str = "Atomadic project",
                     "(or run `forge auto` to scaffold them).")
     if not wire_ok:
         issues.append(f"Upward-import violations: {wire_d['violation_count']}")
-        recs.append("Run `forge wire --apply` to auto-fix where unambiguous.")
+        recs.append("Run `forge wire` to inspect violations, then move imports down-tier or split modules.")
     if not no_stubs:
         issues.append(f"Stub bodies detected: {len(stub_findings)} "
                        "function(s) with `pass`/NotImplementedError/TODO")
@@ -276,19 +373,30 @@ def certify(root: Path, *, project: str = "Atomadic project",
     if test_run is not None and test_run.get("ran") and test_run["failed"]:
         issues.append(
             f"Tests failed: {test_run['failed']} of {test_run['total']} "
-            f"(pass-ratio {test_pass_ratio:.0%})"
+            f"(pass-ratio {test_pass_ratio:.1%})"
         )
         for fid in (test_run.get("failure_excerpts") or [])[:5]:
             issues.append(f"  · {fid}")
         recs.append("Fix the failing tests — wire/import alone does not "
                      "prove behavior.")
+    if not ci_ok:
+        issues.append("No CI workflow found under .github/workflows/")
+        recs.append("Add a CI workflow (.github/workflows/ci.yml) that "
+                     "runs pytest + `forge wire` + `forge certify` on push.")
+    if not changelog_ok:
+        issues.append("No CHANGELOG / release-notes file at project root")
+        recs.append("Add CHANGELOG.md (Keep-a-Changelog format) so each "
+                     "release documents what changed and why.")
 
     # Score weights (sum to 100):
-    #   docs / layout / wire     — 10 each  (30 max — structural)
-    #   tests-present            — 5
-    #   importable runtime       — 25
-    #   tests-pass-ratio         — 30 max  (BREAKTHROUGH: rewards actual behavior)
+    #   docs / layout / wire     — 10 each   (30 max — structural axis)
+    #   tests-present            —  5         (structural axis)
+    #   importable runtime       — 25         (runtime axis)
+    #   tests-pass-ratio         — 30 max     (behavioural axis — rewards actual behaviour)
+    #   ci workflow              —  5         (operational axis)
+    #   changelog/release notes  —  5         (operational axis)
     #   stub-body penalty        — up to 40 deducted
+    # Total max: 35 + 25 + 30 + 10 = 100.
     structural = (
         (10 if docs_ok else 0)
         + (10 if layout_ok else 0)
@@ -296,8 +404,12 @@ def certify(root: Path, *, project: str = "Atomadic project",
         + (5 if tests_ok else 0)
     )
     runtime = (25 if importable else 0)
-    behavioral = int(round(30.0 * test_pass_ratio))
-    score = max(0.0, float(structural + runtime + behavioral) - stub_pen)
+    behavioral = 30 if test_pass_ratio == 1.0 else int(30.0 * test_pass_ratio)
+    operational = (
+        (5 if ci_ok else 0)
+        + (5 if changelog_ok else 0)
+    )
+    score = max(0.0, float(structural + runtime + behavioral + operational) - stub_pen)
     return {
         "schema_version": "atomadic-forge.certify/v1",
         "project": project,
@@ -309,17 +421,22 @@ def certify(root: Path, *, project: str = "Atomadic project",
         "no_stub_bodies": no_stubs,
         "package_importable": importable,
         "test_pass_ratio": test_pass_ratio,
+        "ci_workflow_present": ci_ok,
+        "changelog_present": changelog_ok,
         "score": score,
         "score_components": {
-            "structural": structural,
-            "runtime": runtime,
-            "behavioral": behavioral,
+            "structural":   structural,
+            "runtime":      runtime,
+            "behavioral":   behavioral,
+            "operational":  operational,
             "stub_penalty": -stub_pen,
         },
         "issues": issues,
         "recommendations": recs,
         "detail": {"docs": docs_d, "tests": tests_d, "layout": layout_d,
                    "wire": wire_d,
+                   "ci":  ci_d,
+                   "changelog": changelog_d,
                    "stubs": {"count": len(stub_findings),
                              "findings": stub_findings[:20]},
                    "import_smoke": smoke,

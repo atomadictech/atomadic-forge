@@ -31,7 +31,7 @@ def _collect_public_symbols(package_root: Path) -> dict[str, list[dict[str, str]
             except (SyntaxError, OSError):
                 continue
             for node in tree.body:
-                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
                     if node.name.startswith("_"):
                         continue
                     sig = _function_signature(node)
@@ -114,13 +114,13 @@ def render_showcase_readme(*, package: str, intent: str,
     if certify_report:
         score = certify_report.get("score", 0)
         comps = certify_report.get("score_components", {})
-        smoke = (certify_report.get("detail") or {}).get("import_smoke") or {}
+        (certify_report.get("detail") or {}).get("import_smoke") or {}
         test_run = (certify_report.get("detail") or {}).get("test_run") or {}
         lines.extend([
             "## Forge certification",
             "",
-            f"| Component | Result |",
-            f"|-----------|--------|",
+            "| Component | Result |",
+            "|-----------|--------|",
             f"| Documentation present | {'✅' if certify_report.get('documentation_complete') else '❌'} |",
             f"| Tests present         | {'✅' if certify_report.get('tests_present') else '❌'} |",
             f"| 5-tier layout         | {'✅' if certify_report.get('tier_layout_present') else '❌'} |",

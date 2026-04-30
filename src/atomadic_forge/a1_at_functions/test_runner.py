@@ -158,7 +158,8 @@ def run_pytest(*, output_root: Path, package: str | None = None,
     try:
         proc = subprocess.run(
             [sys.executable, "-m", "pytest", *pytest_targets,
-             "--tb=line", "-q", "--no-header", "-p", "no:cacheprovider"],
+             "-o", "addopts=", "--tb=line", "-q", "--no-header",
+             "-p", "no:cacheprovider"],
             cwd=str(output_root), env=env,
             capture_output=True, text=True, timeout=timeout_s,
             encoding="utf-8", errors="replace",

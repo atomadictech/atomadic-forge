@@ -39,7 +39,7 @@ def render_emergent_feature(card: EmergentCandidateCard) -> str:
     breakdown = ", ".join(f"{k}={v:g}" for k, v in card["score_breakdown"].items())
 
     lines: list[str] = [
-        f'"""',
+        '"""',
         f"Auto-synthesized by ``atomadic-forge emergent synthesize {card['candidate_id']}``.",
         "",
         f"Suggested name: {card['name']}",

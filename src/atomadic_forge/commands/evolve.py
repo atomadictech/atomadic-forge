@@ -26,18 +26,17 @@ Examples
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 from typing import Annotated
 
+import click
 import typer
 
-from atomadic_forge.a1_at_functions.llm_client import (
-    AAAANexusClient, AnthropicClient, GeminiClient, OllamaClient,
-    OpenAIClient, StubLLMClient, resolve_default_client,
+from atomadic_forge.a1_at_functions.provider_resolver import (
+    PROVIDER_HELP,
+    resolve_provider,
 )
 from atomadic_forge.a3_og_features.forge_evolve import run_evolve
-
 
 COMMAND_NAME = "evolve"
 COMMAND_HELP = ("Recursive self-improvement: run iterate N times, each "
@@ -48,27 +47,10 @@ app = typer.Typer(no_args_is_help=True, help=COMMAND_HELP)
 
 
 def _resolve_provider(name: str) -> object:
-    name = name.lower()
-    if name == "stub":
-        return StubLLMClient()
-    if name in ("anthropic", "claude"):
-        return AnthropicClient()
-    if name in ("openai", "gpt"):
-        return OpenAIClient()
-    if name in ("gemini", "google"):
-        return GeminiClient(model=os.environ.get("FORGE_GEMINI_MODEL",
-                                                   "gemini-2.5-flash"))
-    if name in ("nexus", "aaaa-nexus", "aaaa_nexus", "helix"):
-        # Default wrapper "helix-standard" — override with AAAA_NEXUS_WRAPPER.
-        return AAAANexusClient()
-    if name == "ollama":
-        return OllamaClient(
-            model=os.environ.get("FORGE_OLLAMA_MODEL", "qwen2.5-coder:7b"),
-            base_url=os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434"),
-        )
-    if name == "auto":
-        return resolve_default_client()
-    raise typer.BadParameter(f"unknown provider: {name!r}")
+    try:
+        return resolve_provider(name)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
 
 
 @app.command("run")
@@ -84,7 +66,7 @@ def run_cmd(
     seed_repo: Annotated[Path | None, typer.Option("--seed",
         exists=True, file_okay=False, dir_okay=True, resolve_path=True)] = None,
     provider: Annotated[str, typer.Option("--provider",
-        help="auto | nexus | gemini | anthropic | openai | ollama | stub")] = "auto",
+        help=PROVIDER_HELP)] = "auto",
     language: Annotated[str, typer.Option("--language", "-l",
         help="Output language: python | javascript | typescript")] = "python",
     stop_on_regression: Annotated[bool, typer.Option("--stop-on-regression")] = False,
@@ -93,18 +75,21 @@ def run_cmd(
     """Run the recursive evolve loop and watch the show."""
     output.mkdir(parents=True, exist_ok=True)
     llm = _resolve_provider(provider)
-    report = run_evolve(
-        intent,
-        output=output,
-        package=package,
-        seed_repo=seed_repo,
-        llm=llm,                       # type: ignore[arg-type]
-        rounds=auto,
-        iterations_per_round=iterations_per_round,
-        target_score=target_score,
-        stop_on_regression=stop_on_regression,
-        language=language,
-    )
+    try:
+        report = run_evolve(
+            intent,
+            output=output,
+            package=package,
+            seed_repo=seed_repo,
+            llm=llm,                       # type: ignore[arg-type]
+            rounds=auto,
+            iterations_per_round=iterations_per_round,
+            target_score=target_score,
+            stop_on_regression=stop_on_regression,
+            language=language,
+        )
+    except RuntimeError as exc:
+        raise click.ClickException(str(exc)) from exc
     if json_out:
         typer.echo(json.dumps(report, indent=2, default=str))
         return

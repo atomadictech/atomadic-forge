@@ -20,7 +20,6 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-
 _BANNER = "# Auto-managed by atomadic-forge — re-exports every public name in this tier."
 _INIT_TEMPLATE = (
     '"""Tier {tier} — re-exports."""\n'
@@ -40,7 +39,7 @@ def _public_names_in_module(py_file: Path) -> list[str]:
         return []
     names: list[str] = []
     for node in tree.body:
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef):
             if not node.name.startswith("_"):
                 names.append(node.name)
         elif isinstance(node, ast.Assign):

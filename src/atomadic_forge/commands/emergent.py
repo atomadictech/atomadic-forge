@@ -10,14 +10,12 @@ the top candidate as a new ``a3_og_features/<name>_emergent.py`` for review.
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
 from typing import Annotated
 
 import typer
 
 from atomadic_forge.a3_og_features.emergent_feature import EmergentScan
-
 
 COMMAND_NAME = "emergent"
 COMMAND_HELP = "Synthesise new feature candidates from existing components."

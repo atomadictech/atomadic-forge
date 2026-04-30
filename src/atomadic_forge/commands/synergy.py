@@ -16,7 +16,6 @@ import typer
 
 from atomadic_forge.a3_og_features.synergy_feature import SynergyScan
 
-
 COMMAND_NAME = "synergy"
 COMMAND_HELP = ("Find feature/CLI synergies (producer-consumer pairs that "
                 "aren't wired together) and optionally implement adapters.")

@@ -35,7 +35,6 @@ from ..a1_at_functions.commandsmith_render import (
     render_wrapper_module,
 )
 
-
 _REGISTRY_FILE = "_registry.py"
 _MANIFEST_FILE = "commandsmith_manifest.json"
 
@@ -97,7 +96,7 @@ class Commandsmith:
                        smoke_results: dict[str, bool] | None = None) -> Path:
         manifest = RegistryManifestCard(
             schema_version="atomadic-forge.commandsmith.registry/v1",
-            generated_at_utc=_dt.datetime.utcnow().isoformat(timespec="seconds") + "Z",
+            generated_at_utc=_dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             commands=cards,
             smoke_results=smoke_results or {},
         )
@@ -233,10 +232,9 @@ class Commandsmith:
         """
         import os
         if cli_invocation is None:
-            # Run the unified CLI (where Commandsmith-registered verbs live),
-            # not atomadic_forge.cli which is the engine surface only.
+            # Use the forge CLI entry point.
             cli_invocation = [sys.executable, "-m",
-                              "atomadic_forge.a4_sy_orchestration.unified_cli"]
+                              "atomadic_forge.a4_sy_orchestration.cli"]
         env = os.environ.copy()
         env["PYTHONIOENCODING"] = "utf-8"
         env["PYTHONUTF8"] = "1"
@@ -263,7 +261,7 @@ class Commandsmith:
         self.write_manifest(cards, smoke_results)
         return RegistryManifestCard(
             schema_version="atomadic-forge.commandsmith.registry/v1",
-            generated_at_utc=_dt.datetime.utcnow().isoformat(timespec="seconds") + "Z",
+            generated_at_utc=_dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             commands=cards,
             smoke_results=smoke_results,
         )

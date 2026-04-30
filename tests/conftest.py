@@ -7,7 +7,6 @@ from pathlib import Path
 
 import pytest
 
-
 # Make ``src/`` importable without an editable install (CI shortcut).
 ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "src"

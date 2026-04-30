@@ -1,0 +1,69 @@
+# Atomadic Forge — pre-commit hooks.
+#
+# Golden Path Lane C W2 deliverable. This file is what consuming repos
+# reference from their own .pre-commit-config.yaml:
+#
+#   repos:
+#     - repo: https://github.com/atomadictech/atomadic-forge
+#       rev: v0.2.x   # or any tag / sha
+#       hooks:
+#         - id: forge-wire           # runs on every commit
+#         - id: forge-certify        # runs on push (heavier)
+#         - id: forge-enforce-check  # dry-run; warns about auto-fixable violations
+#
+# All hooks invoke Forge's native fail flags (Lane G1 / Lane A W6); no
+# python -c JSON-parse fallbacks. The Forge package is auto-installed
+# in the pre-commit virtualenv via `language: python` + the
+# `additional_dependencies` field below.
+
+# ----- forge-wire ---------------------------------------------------------
+- id: forge-wire
+  name: forge wire (upward-import discipline)
+  description: >-
+    Scan a tier-organized package for upward-import violations. Fails
+    the hook when any violation is found. Carries an F-code on every
+    error (F0040–F0049 cover the canonical wire violations).
+  entry: forge wire
+  language: python
+  additional_dependencies: ['atomadic-forge']
+  pass_filenames: false
+  args: [src, --fail-on-violations]
+  stages: [pre-commit, pre-push]
+  types: [python]
+  require_serial: true
+
+# ----- forge-certify ------------------------------------------------------
+- id: forge-certify
+  name: forge certify (architecture conformance ≥ 75/100)
+  description: >-
+    Run forge certify against the repo root and gate at score ≥ 75/100
+    via the native --fail-under flag. Heavier than wire because it
+    walks the full tier tree and runs the import-smoke + behavioural
+    test components — recommended for pre-push only.
+  entry: forge certify
+  language: python
+  additional_dependencies: ['atomadic-forge']
+  pass_filenames: false
+  args: [., --fail-under, "75"]
+  stages: [pre-push]
+  types: [python]
+  require_serial: true
+
+# ----- forge-enforce-check ------------------------------------------------
+- id: forge-enforce-check
+  name: forge enforce (dry-run, warn on auto-fixable wire violations)
+  description: >-
+    Run forge enforce in dry-run mode and surface auto-fixable wire
+    violations (F0041–F0046). Does NOT fail the hook by itself — the
+    forge-wire hook owns the hard gate. This hook's value is the
+    'planned moves' summary, which the developer can resolve by
+    running `forge enforce src --apply` locally.
+  entry: forge enforce
+  language: python
+  additional_dependencies: ['atomadic-forge']
+  pass_filenames: false
+  args: [src]
+  stages: [manual]
+  types: [python]
+  verbose: true
+  require_serial: true

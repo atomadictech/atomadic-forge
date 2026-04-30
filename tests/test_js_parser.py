@@ -1,7 +1,10 @@
 """Tier-agnostic tests for the pure JS / TS surface parser."""
 
 from atomadic_forge.a1_at_functions.js_parser import (
-    classify_js_tier, detect_js_effects, parse_imports, parse_surface,
+    classify_js_tier,
+    detect_js_effects,
+    parse_imports,
+    parse_surface,
     strip_comments_and_strings,
 )
 

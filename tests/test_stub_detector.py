@@ -4,7 +4,8 @@ from pathlib import Path
 
 from atomadic_forge.a1_at_functions.certify_checks import certify
 from atomadic_forge.a1_at_functions.stub_detector import (
-    detect_stubs, detect_stubs_in_file, stub_penalty,
+    detect_stubs_in_file,
+    stub_penalty,
 )
 
 
@@ -50,6 +51,18 @@ def test_does_not_flag_real_function(tmp_path):
     assert findings == []
 
 
+def test_does_not_flag_todo_text_inside_docstrings(tmp_path):
+    _write(
+        tmp_path / "f.py",
+        '"""Mention # TODO in docs without creating a stub finding."""\n'
+        'def explain():\n'
+        '    """No # Implement me! penalty for prompt prose."""\n'
+        '    return "documented"\n',
+    )
+    findings = detect_stubs_in_file(tmp_path / "f.py", repo_root=tmp_path)
+    assert findings == []
+
+
 def test_does_not_flag_private_pass(tmp_path):
     """A private `_helper` legitimately passing should not count."""
     _write(tmp_path / "f.py",
@@ -81,12 +94,14 @@ def test_certify_deducts_for_stubs(tmp_path):
         "import demo\ndef test_one():\n    assert demo is not None\n",
         encoding="utf-8")
     result = certify(tmp_path, project="demo", package="demo")
-    # New score weights:
-    #   structural: docs(10)+layout(10)+wire(10)+tests-present(5) = 35
-    #   runtime: import(25)
-    #   behavioral: pass-ratio(1.0) * 30 = 30
+    # Score weights (rubric sums to 100; this fixture lacks the
+    # operational-axis files so the operational component is 0):
+    #   structural:  docs(10)+layout(10)+wire(10)+tests-present(5) = 35
+    #   runtime:     import(25)
+    #   behavioral:  pass-ratio(1.0) * 30                          = 30
+    #   operational: ci(0) + changelog(0)                          = 0
     #   stub penalty: -8 (one stub)
-    # Total: 35 + 25 + 30 - 8 = 82.
+    # Total: 35 + 25 + 30 + 0 - 8 = 82.
     assert result["score"] == 82
     assert result["no_stub_bodies"] is False
     assert result["package_importable"] is True
@@ -110,11 +125,15 @@ def test_certify_score_pristine_with_no_stubs(tmp_path):
         "import demo\ndef test_x():\n    assert demo is not None\n",
         encoding="utf-8")
     result = certify(tmp_path, project="demo", package="demo")
-    # 35 (structural) + 25 (runtime) + 30 (1/1 pass) = 90 — losing 10pts
-    # because tests-present is now 5pt and behavioral is 30pt.  No, wait:
-    # docs(10) + layout(10) + wire(10) + tests(5) = 35; import(25); behav(30) = 90.
-    # Hmm that's 90 not 100.  Let me re-do: structural max 35, runtime 25, behav 30 = 90 max.
-    # We removed 10 points from the structural side and added them to behavioral.
+    # Score weights (rubric sums to 100):
+    #   structural:  docs(10)+layout(10)+wire(10)+tests-present(5) = 35
+    #   runtime:     import(25)                                    = 25
+    #   behavioral:  pass-ratio(1.0) * 30                          = 30
+    #   operational: ci(0) + changelog(0)                          = 0
+    # Total: 35 + 25 + 30 + 0 = 90.  This fixture deliberately omits
+    # .github/workflows/ and CHANGELOG.md so it cannot earn the
+    # operational axis — see ``test_certify_operational_axis.py`` for
+    # the 100/100 path.
     assert result["score"] == 90
     assert result["test_pass_ratio"] == 1.0
     assert result["no_stub_bodies"] is True

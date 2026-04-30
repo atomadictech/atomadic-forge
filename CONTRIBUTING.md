@@ -5,7 +5,9 @@
 ```bash
 git clone <this-repo> atomadic-forge && cd atomadic-forge
 pip install -e ".[dev]"
-pytest -q
+python -m pytest --basetemp .pytest_tmp_run
+ruff check .
+lint-imports
 ```
 
 ## The 5-tier law applies to Forge itself
@@ -15,7 +17,7 @@ Every PR is gated by:
 ```bash
 forge wire src/atomadic_forge       # zero upward-import violations
 pytest tests/                        # all pass
-forge certify .                      # score ≥ 90
+forge certify . --fail-under 90      # gate score ≥ 90
 ```
 
 The `pyproject.toml` declares an `import-linter` contract that mirrors the
@@ -40,6 +42,22 @@ function, not by class hierarchy. Stubs that always pass are not allowed
 If you add a verb, update `README.md`'s verb table and add a one-line
 description to `CHANGELOG.md`. If the verb produces a JSON artifact, declare
 its `schema_version` in `a0_qk_constants/forge_types.py`.
+
+## Pull requests
+
+CI runs on Python 3.10, 3.11, and 3.12. Before opening a PR, run:
+
+```bash
+python -m pytest --basetemp .pytest_tmp_run
+ruff check .
+lint-imports
+python -m atomadic_forge.a4_sy_orchestration.cli wire src/atomadic_forge --json
+python -m atomadic_forge.a4_sy_orchestration.cli commandsmith smoke --json
+python -m atomadic_forge.a4_sy_orchestration.cli certify . --json --fail-under 100
+```
+
+Do not commit `.atomadic-forge/`, demo outputs, local Ollama transcripts,
+API keys, or generated scratch directories.
 
 ## Commit style
 

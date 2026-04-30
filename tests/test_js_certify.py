@@ -1,9 +1,10 @@
 """Certify scoring honours JS/TS layout and JS test conventions."""
 
-from pathlib import Path
 
 from atomadic_forge.a1_at_functions.certify_checks import (
-    certify, check_tests_present, check_tier_layout,
+    certify,
+    check_tests_present,
+    check_tier_layout,
 )
 
 

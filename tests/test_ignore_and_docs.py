@@ -13,22 +13,29 @@ mix of JS source.  Forge must:
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
-import pytest
-
 from atomadic_forge.a0_qk_constants.lang_extensions import (
-    ALL_SOURCE_EXTS, ASSET_EXTS, CONFIG_EXTS, DOC_EXTS,
-    IGNORED_DIRS, file_class_for_path,
+    ALL_SOURCE_EXTS,
+    ASSET_EXTS,
+    CONFIG_EXTS,
+    DOC_EXTS,
+    IGNORED_DIRS,
+    file_class_for_path,
+    is_ignored_segment,
+    path_parts_contain_ignored_dir,
 )
 from atomadic_forge.a1_at_functions.certify_checks import (
-    check_documentation, count_untiered_source_files,
+    check_documentation,
+    check_tests_present,
+    check_tier_layout,
+    count_untiered_source_files,
 )
 from atomadic_forge.a1_at_functions.scout_walk import (
-    _file_class_counts, _under_skip_dir, harvest_repo,
+    _file_class_counts,
+    _under_skip_dir,
+    harvest_repo,
 )
-
 
 # ── lang_extensions ────────────────────────────────────────────────────
 
@@ -62,6 +69,12 @@ def test_ignored_dirs_includes_common_tooling():
     for d in (".claude", ".github", "node_modules", "__pycache__",
               ".wrangler", "dist", "build", ".venv"):
         assert d in IGNORED_DIRS, f"{d} should be in IGNORED_DIRS"
+
+
+def test_pytest_basetemp_prefix_is_ignored_without_enumerating_every_name():
+    assert path_parts_contain_ignored_dir((".pytest_tmp_run", "tests", "test_x.py"))
+    assert path_parts_contain_ignored_dir(("nested", ".pytest_tmp_focus", "src"))
+    assert is_ignored_segment(".pytest_tmp_focus")
 
 
 def test_file_class_for_path_source():
@@ -161,6 +174,32 @@ def test_check_documentation_no_docs_fails(tmp_path: Path):
     assert ok is False
     assert detail["readme"] is False
     assert detail["docs_md_count"] == 0
+
+
+def test_certify_doc_test_layout_signals_ignore_pytest_basetemp(tmp_path: Path):
+    scratch = tmp_path / ".pytest_tmp_run"
+    (scratch / "docs").mkdir(parents=True)
+    (scratch / "docs" / "A.md").write_text("# a\n", encoding="utf-8")
+    (scratch / "docs" / "B.md").write_text("# b\n", encoding="utf-8")
+    (scratch / "tests").mkdir()
+    (scratch / "tests" / "test_fake.py").write_text("def test_fake(): pass\n", encoding="utf-8")
+    for tier in ("a0_qk_constants", "a1_at_functions", "a4_sy_orchestration"):
+        (scratch / "src" / "fake" / tier).mkdir(parents=True)
+    (scratch / "src" / "fake" / "a1_at_functions" / "fake.py").write_text(
+        "def fake(): return 1\n", encoding="utf-8")
+
+    docs_ok, docs_detail = check_documentation(tmp_path)
+    tests_ok, tests_detail = check_tests_present(tmp_path)
+    layout_ok, layout_detail = check_tier_layout(tmp_path)
+    untiered = count_untiered_source_files(tmp_path)
+
+    assert docs_ok is False
+    assert docs_detail["docs_md_count"] == 0
+    assert tests_ok is False
+    assert tests_detail["test_files_found"] == 0
+    assert layout_ok is False
+    assert layout_detail["tiers_present"] == []
+    assert untiered["untiered_source_count"] == 0
 
 
 # ── count_untiered_source_files: markdown does NOT count as untiered ───

@@ -19,14 +19,13 @@ sorted by descending score.
 from __future__ import annotations
 
 import hashlib
-from typing import Iterable
+from collections.abc import Iterable
 
 from ..a0_qk_constants.synergy_types import (
     FeatureSurfaceCard,
     SynergyCandidateCard,
     SynergyKind,
 )
-
 
 _PHASE_FLOW = [
     "recon", "ingest", "plan", "materialize", "certify", "emit", "register",
@@ -35,7 +34,7 @@ _PHASE_NEXT = {p: _PHASE_FLOW[i + 1] for i, p in enumerate(_PHASE_FLOW[:-1])}
 
 
 def _candidate_id(producer: str, consumer: str, kind: str) -> str:
-    h = hashlib.sha256(f"{producer}->{consumer}|{kind}".encode("utf-8")).hexdigest()
+    h = hashlib.sha256(f"{producer}->{consumer}|{kind}".encode()).hexdigest()
     return f"syn-{h[:8]}"
 
 

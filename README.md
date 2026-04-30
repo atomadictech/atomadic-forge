@@ -6,7 +6,7 @@
 
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: BSL-1.1](https://img.shields.io/badge/License-BSL--1.1-yellow.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-passing-green.svg)](tests/)
+[![CI](https://github.com/atomadictech/atomadic-forge/actions/workflows/ci.yml/badge.svg)](https://github.com/atomadictech/atomadic-forge/actions/workflows/ci.yml)
 [![Forge certify](https://img.shields.io/badge/forge_certify-100%2F100-brightgreen)](docs/SHOWCASE.md)
 
 > **Absorb. Enforce. Emerge.** The architecture substrate for AI-generated code — now polyglot (Python, JavaScript, TypeScript).
@@ -29,35 +29,20 @@ TypeScript (`.ts` / `.tsx`). Cloudflare Workers, Node back-ends, and mixed
 Python+JS repositories all classify in a single pass — no Node dependency,
 `node_modules/` skipped automatically.
 
-## 90-second demo
+## Get started in 10 minutes
 
-```bash
-pip install -e ".[dev]"
-export GEMINI_API_KEY=$(your-free-key)   # https://aistudio.google.com/apikey
+**Read [docs/FIRST_10_MINUTES.md](docs/FIRST_10_MINUTES.md).** It is
+the canonical onboarding path: install, a 30-second offline demo, a
+10-second free recon on your own repo, then a fork into either
+"absorb existing code" or "generate from intent" with explicit cost,
+privacy, and wallclock numbers.
 
-# LLM-driven Python packages (need an API key or local Ollama):
-forge demo run --preset calc --provider gemini   # 30s, score 90/100
-forge demo run --preset kv   --provider gemini   # ~70s, KvStore + tests + CLI
-forge demo run --preset slug --provider gemini   # ~22s, regex slugifier
+For deeper paths once you have done the 10-minute path:
 
-# Static polyglot showcases (no LLM key required — runs offline):
-forge demo run --preset js-counter   # clean a0..a4 JS package; wire PASS, certify 60/100*
-forge demo run --preset js-bad-wire  # JS package with an upward import — wire flags it
-forge demo run --preset mixed-py-js  # Python tier + JS tier in the same root
-```
-
-The LLM presets produce real, importable, pip-installable Python packages
-with auto-generated README, passing tests, and a logged transcript of
-every LLM exchange. The polyglot showcase presets ship as pre-built
-source — they exercise `recon → wire → certify` on existing code so you
-can read the reports without spending a token. Live trajectories in
-[`docs/SHOWCASE.md`](docs/SHOWCASE.md).
-
-\* 60/100 is the honest ceiling for a JS-only package today. The +30
-behavioural pytest axis remains Python-only; wiring `npm test` / Vitest
-into that gate is on the 0.3 roadmap. The four polyglot-aware structural
-checks (docs / tests-present / tier-layout / upward-import-discipline)
-all PASS on `js-counter`. We're not going to fake the missing 30 points.
+- [docs/MULTI_REPO.md](docs/MULTI_REPO.md) — absorb more than one repo at once.
+- [docs/CI_CD.md](docs/CI_CD.md) — GitHub Actions, GitLab CI, pre-commit.
+- [docs/AIR_GAPPED.md](docs/AIR_GAPPED.md) — offline / on-prem install.
+- [docs/SHOWCASE.md](docs/SHOWCASE.md) — live trajectories of real runs.
 
 ### Polyglot recon (JS/TS in a single pass)
 
@@ -85,6 +70,7 @@ Recon: ./my-cloudflare-worker
 forge auto ./messy-repo ./out --apply       # Absorb a flat repo into 5-tier layout
 forge evolve run "<intent>" ./out --auto 5  # LLM-driven recursive generation
 forge demo run --preset NAME                # Click-to-launch-video preset
+forge chat ask "what should I fix next?" --context .
 ```
 
 **What Forge does:**
@@ -95,7 +81,9 @@ forge demo run --preset NAME                # Click-to-launch-video preset
 - Works with AI-generated code — absorbs it, fixes the architecture, ships it
 
 **What Forge does NOT do:**
-- Write code from scratch (it absorbs and reorganizes existing code)
+- Pretend `forge auto` magically finished your product; absorption creates a
+  tiered starter skeleton. `iterate` / `evolve` can generate code through your
+  configured LLM, but Forge still gates it with wire/certify feedback.
 - Create semantic unification (two `User` classes stay two `User` classes)
 - Bypass the 5-tier law (Forge itself passes its own `wire` scan 100%)
 - Store secrets or credentials
@@ -154,46 +142,18 @@ Each tier is a layer of **verified building blocks**. Higher tiers never invent 
 
 ## Installation
 
-```bash
-pip install atomadic-forge
-```
-
-Or, for development:
+PyPI is **coming soon**. Until then, install editable from source:
 
 ```bash
 git clone https://github.com/atomadictech/atomadic-forge && cd atomadic-forge
 pip install -e ".[dev]"
-python -m pytest tests/        # Verify: 90 tests pass
+python -m pytest               # Verify the full local suite
 python -m atomadic_forge --help
 ```
 
-## Quick start (3 minutes)
-
-```bash
-# 1. Dry-run: what would Forge do to this repo?
-forge auto /path/to/messy-repo ./output
-
-# 2. Look at the analysis
-forge recon /path/to/messy-repo
-
-# 3. Actually apply the transformation
-forge auto /path/to/messy-repo ./output --apply --package my_project
-
-# 4. Check for import violations
-forge wire ./output/src/my_project
-
-# 5. Score the result (docs, tests, layout, imports)
-forge certify ./output --package my_project
-```
-
-**What you get back:**
-- `output/src/my_project/a0_qk_constants/` — Constants, enums, types
-- `output/src/my_project/a1_at_functions/` — Pure helpers
-- `output/src/my_project/a2_mo_composites/` — Stateful classes
-- `output/src/my_project/a3_og_features/` — Features combining a2
-- `output/src/my_project/a4_sy_orchestration/` — CLI entry points
-- `output/STATUS.md` — What still needs work (tests, integration, config)
-- `.atomadic-forge/` — Provenance: scout, cherry, assimilate, certify reports
+Then follow [docs/FIRST_10_MINUTES.md](docs/FIRST_10_MINUTES.md) for
+the canonical first-run path (offline demo, free recon, then absorb or
+generate).
 
 ## Code-from-intent (LLM-driven, with Forge as the architectural backbone)
 
@@ -216,19 +176,61 @@ forge evolve run "build a markdown-to-PDF service" ./out \
 forge iterate preflight "..." --package whatever
 ```
 
+Every Python `iterate` / `evolve` run now ends with a deterministic quality
+phase: Forge adds conservative missing docstrings, writes `docs/API.md` and
+`docs/TESTING.md`, and creates `tests/test_generated_smoke.py` so the
+package has import-smoke coverage even when the model forgets tests. These
+generated tests are a floor; add behavior tests for real inputs before
+shipping.
+
+### Chat copilot
+
+Use your configured AI agent as a Forge-aware terminal copilot. The chat
+surface uses the same provider layer as `iterate` and `evolve`, and can pack
+bounded repo context without sending `.env` or obvious secret files.
+
+```bash
+# One-shot question with repo context
+forge chat ask "what should I run before release?" --context .
+
+# Interactive session against your AAAA-Nexus agent
+export AAAA_NEXUS_API_KEY=...
+forge chat repl --provider nexus --context src --context docs
+
+# Offline smoke test for scripts / CI
+forge chat ask "hello" --provider stub --no-cwd-context --json
+```
+
 ### LLM provider matrix
 
 | Provider | Cost | Env var | Default model | When to use |
 |----------|------|---------|---------------|-------------|
-| `gemini` | **free tier** | `GEMINI_API_KEY` | `gemini-2.5-flash` | Best free option; override with `FORGE_GEMINI_MODEL` |
+| `gemini` | **free tier** | `GEMINI_API_KEY` / `GOOGLE_API_KEY` | `gemini-2.5-flash` | Best free cloud option; override with `FORGE_GEMINI_MODEL` |
+| `nexus` / `aaaa-nexus` | paid | `AAAA_NEXUS_API_KEY` | (Nexus default) | AAAA-Nexus sovereign AI; most reliable for long runs |
 | `anthropic` | paid | `ANTHROPIC_API_KEY` | `claude-3-5-sonnet-latest` | Highest code quality |
 | `openai` | paid | `OPENAI_API_KEY` | `gpt-4o-mini` | Cheap GPT path |
+| `openrouter` | **free tier available** | `OPENROUTER_API_KEY` | `google/gemma-3-27b-it:free` | Access 200+ models; good fallback when Gemini quota exhausted; override with `FORGE_OPENROUTER_MODEL` |
 | `ollama` | free, local | `FORGE_OLLAMA=1` | `qwen2.5-coder:7b` | Offline; fully private |
 | `stub` | free, offline | n/a | n/a | Tests, CI, dry-runs |
 
-`forge iterate` and `forge evolve` resolve providers in the order above when
-`--provider auto` (the default) is used.  Explicit `--provider gemini` always
-wins.
+`--provider auto` resolves in the code-defined order:
+AAAA-Nexus, Anthropic, Gemini, OpenAI, OpenRouter, Ollama, then `stub`.
+Explicit `--provider gemini` (or any other provider name) always wins.
+
+For busy laptops or desktops, run Ollama with the small local profile:
+
+```bash
+export FORGE_OLLAMA=1
+export FORGE_OLLAMA_MODEL=qwen2.5-coder:1.5b
+export FORGE_OLLAMA_NUM_PREDICT=768
+export FORGE_OLLAMA_TIMEOUT=180
+forge chat ask "what should I fix next?" --provider ollama --context src
+```
+
+Use `qwen2.5-coder:7b` when the machine is idle and you want better code
+quality. `FORGE_OLLAMA_NUM_PREDICT` caps each generation; lower it if
+Ollama starts paging or crashing. `FORGE_OLLAMA_TIMEOUT` controls how long
+Forge waits before returning a clear provider error.
 
 ## Commands: The absorb pipeline
 
@@ -241,7 +243,7 @@ wins.
 | `forge cherry` | Build a cherry-pick manifest. Select specific symbols or `--pick all`. | `forge cherry ./repo --pick all` |
 | `forge finalize` | Materialize, wire, certify. Run separately if needed. | `forge finalize ./repo ./out --apply` |
 | `forge wire` | Scan a tier tree for upward-import violations. | `forge wire ./out/src/package` |
-| `forge certify` | Score: documentation, tests, tier layout, import discipline. | `forge certify ./out --package my_pkg` |
+| `forge certify` | Score: documentation, tests, tier layout, import discipline. Use `--fail-under` for CI gates. | `forge certify ./out --package my_pkg --fail-under 90` |
 
 ### Specialty commands (LLM loops & composition)
 
@@ -249,6 +251,7 @@ wins.
 |---------|---------|
 | `forge iterate` | LLM loop: intent → code → absorb → wire → score → iterate. Single shot. |
 | `forge evolve` | Recursive improvement: N rounds of iterate, catalog grows each round. |
+| `forge chat` | Terminal copilot over Forge docs/source using the same AI provider layer. |
 | `forge emergent` | Symbol-level composition discovery (find hidden wiring patterns). |
 | `forge synergy` | Feature-pair detection + auto-generate adapters. |
 | `forge commandsmith` | Auto-register CLI commands, regenerate `_registry.py`. |
@@ -307,7 +310,7 @@ Forge ships with named limits. No overpromise.
 | Product | What it is | Status |
 |---------|------------|--------|
 | **AAAA-Nexus** | Trust/safety/payments substrate for autonomous agents | Live at [atomadic.tech](https://atomadic.tech) |
-| **Atomadic Forge** | Absorb-and-emerge engine for developers (this repo) | 0.2.0 (polyglot — Python + JS/TS) |
+| **Atomadic Forge** | Absorb-and-emerge engine for developers (this repo) | 0.2.2 (100/100 certify + GitHub-ready) |
 | **Atomadic Assistant** | Sovereign AI assistant with cognitive loop on Cloudflare | In development |
 
 ## License
@@ -322,8 +325,10 @@ Apache 2.0.
 - **[Landscape](docs/LANDSCAPE.md)** — How Forge sits next to Cursor / Devin / Lovable / Copilot Workspace
 - **[Why now](docs/WHY_NOW.md)** — The urgency case for an architecture substrate
 - **[Commands](docs/COMMANDS.md)** — Full reference for all 13+ verbs
+- **[Release checklist](docs/RELEASE_CHECKLIST.md)** — Shippability gates, CLI scenarios, local-model smoke checks
 - **[Roadmap](docs/ROADMAP.md)** — 0.2 / 0.3 / 1.0 milestones
 - **[Architecture guide](ARCHITECTURE.md)** — How Forge itself is built (monadic tiers, data flows, design)
+- **[Security policy](SECURITY.md)** — Private vulnerability reporting and secret-handling expectations
 - **[Tutorials](docs/tutorials/)** — Quickstart, your-first-package, the 5-tier law, plug-in-LLMs, multi-repo absorb
 - **[Contributing guide](CONTRIBUTING.md)** — How to extend Forge
 - **[Changelog](CHANGELOG.md)** — Version history and roadmap
@@ -333,10 +338,10 @@ Apache 2.0.
 **Forge itself is monadic.** Every source file belongs to one tier. The repo is a worked example:
 
 ```bash
-python -m pytest tests/          # 212 tests, all passing
+python -m pytest tests/          # 308 passing, 2 skipped
 python -m atomadic_forge doctor  # Environment check
 python -m atomadic_forge wire src/atomadic_forge  # Scan for violations
-python -m atomadic_forge certify .  # Score the repo
+python -m atomadic_forge certify . --fail-under 100  # Score and gate the repo
 ```
 
 **Before submitting a PR:**
@@ -351,7 +356,7 @@ python -m atomadic_forge certify .  # Score the repo
 
 - ✓ Tested end-to-end on its own codebase
 - ✓ Tested on reference Python and JavaScript / TypeScript repos
-- ✓ 212 tests, all passing
+- ✓ 308 tests, all passing (2 skipped)
 - ✓ Schema finalized (conformance, lineage, scaffold)
 - ✓ Polyglot — Python + JavaScript + TypeScript classified by the same 5-tier law (0.2)
 - ✗ Not yet on PyPI (coming soon)

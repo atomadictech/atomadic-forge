@@ -21,14 +21,13 @@ import os
 import urllib.error
 import urllib.request
 from io import BytesIO
-from unittest.mock import patch
 
 import pytest
 
 from atomadic_forge.a1_at_functions.llm_client import (
-    AAAANexusClient, resolve_default_client,
+    AAAANexusClient,
+    resolve_default_client,
 )
-
 
 # ── construction + configuration ─────────────────────────────────────────
 

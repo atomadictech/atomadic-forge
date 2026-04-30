@@ -11,7 +11,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-
 _DEFAULT_DIRNAME = ".atomadic-forge"
 
 

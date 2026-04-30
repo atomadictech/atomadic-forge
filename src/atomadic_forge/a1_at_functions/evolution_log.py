@@ -13,7 +13,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-
 _TABLE_HEADER = (
     "| When (UTC) | Preset / Intent | Package | LLM | Rounds | Trajectory | Final | Verdict |\n"
     "|------------|-----------------|---------|-----|-------:|------------|------:|---------|"

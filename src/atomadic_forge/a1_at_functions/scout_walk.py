@@ -8,18 +8,21 @@ languages so downstream stages (cherry, finalize, certify) work polyglot.
 from __future__ import annotations
 
 import ast
+from collections.abc import Callable, Iterable
 from pathlib import Path
-from typing import Iterable
 
 from ..a0_qk_constants.lang_extensions import (
-    ALL_SOURCE_EXTS, ASSET_EXTS, CONFIG_EXTS, DOC_EXTS,
-    IGNORED_DIRS, JAVASCRIPT_EXTS, PYTHON_EXTS, TYPESCRIPT_EXTS,
-    file_class_for_path, lang_for_path,
+    ALL_SOURCE_EXTS,
+    IGNORED_DIRS,
+    JAVASCRIPT_EXTS,
+    PYTHON_EXTS,
+    TYPESCRIPT_EXTS,
+    file_class_for_path,
+    path_parts_contain_ignored_dir,
 )
 from .body_extractor import _detect_state_markers
 from .classify_tier import classify_tier, detect_effects
 from .js_parser import classify_js_tier, detect_js_effects, parse_surface
-
 
 # Backwards-compatible alias — keep _SKIP_DIRS available for any third-party
 # code that imports it.  The canonical list lives in lang_extensions.IGNORED_DIRS.
@@ -35,10 +38,7 @@ def _under_skip_dir(rel_parts: tuple[str, ...]) -> bool:
     the door open) won't be skipped just for the leading dot — only for
     being on the explicit list.
     """
-    for part in rel_parts:
-        if part in IGNORED_DIRS:
-            return True
-    return False
+    return path_parts_contain_ignored_dir(rel_parts)
 
 
 def iter_python_files(root: Path) -> Iterable[Path]:
@@ -82,7 +82,7 @@ def _harvest_python_file(f: Path, rel: str, *, symbols: list[dict],
     except (SyntaxError, OSError):
         return
     for node in tree.body:
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
             _collect_symbol(symbols, node, rel, kind="function",
                             qualname=node.name, tier_dist=tier_dist,
                             effect_dist=effect_dist)
@@ -96,7 +96,7 @@ def _harvest_python_file(f: Path, rel: str, *, symbols: list[dict],
                                 "has_class_attr_collections": class_collect,
                             })
             for sub in node.body:
-                if isinstance(sub, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                if isinstance(sub, ast.FunctionDef | ast.AsyncFunctionDef):
                     if sub.name.startswith("_") and sub.name != "__init__":
                         continue
                     _collect_symbol(symbols, sub, rel, kind="method",
@@ -192,10 +192,21 @@ def _file_class_counts(root: Path) -> dict[str, int]:
     return counts
 
 
-def harvest_repo(root: Path) -> dict:
-    """Walk a repo, classify every public symbol, return a scout-shaped dict."""
+def harvest_repo(
+    root: Path,
+    *,
+    progress: Callable[[int, int, str], None] | None = None,
+) -> dict:
+    """Walk a repo, classify every public symbol, return a scout-shaped dict.
+
+    ``progress`` (optional): a callback invoked once per source file as
+    ``progress(processed_count, total_count, relative_path)``. Pure
+    function — no I/O of its own. The CLI layer wires this to a stderr
+    reporter; tests can pass a list-appender.
+    """
     root = Path(root).resolve()
     src_files = list(iter_source_files(root))
+    total = len(src_files)
     file_class_counts = _file_class_counts(root)
     symbols: list[dict] = []
     tier_dist: dict[str, int] = {}
@@ -205,7 +216,7 @@ def harvest_repo(root: Path) -> dict:
     js_count = 0
     ts_count = 0
 
-    for f in src_files:
+    for idx, f in enumerate(src_files, start=1):
         rel = f.relative_to(root).as_posix()
         suffix = f.suffix.lower()
         if suffix in PYTHON_EXTS:
@@ -223,6 +234,8 @@ def harvest_repo(root: Path) -> dict:
             _harvest_js_file(f, rel, "typescript", symbols=symbols,
                               tier_dist=tier_dist,
                               effect_dist=effect_dist)
+        if progress is not None:
+            progress(idx, total, rel)
 
     languages = {
         "python": py_count,

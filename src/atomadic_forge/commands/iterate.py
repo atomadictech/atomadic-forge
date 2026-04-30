@@ -24,18 +24,17 @@ Examples
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 from typing import Annotated
 
+import click
 import typer
 
-from atomadic_forge.a1_at_functions.llm_client import (
-    AnthropicClient, GeminiClient, OllamaClient, OpenAIClient,
-    StubLLMClient, resolve_default_client,
+from atomadic_forge.a1_at_functions.provider_resolver import (
+    PROVIDER_HELP,
+    resolve_provider,
 )
 from atomadic_forge.a3_og_features.forge_loop import run_iterate
-
 
 COMMAND_NAME = "iterate"
 COMMAND_HELP = ("Architecturally-coherent code generation: LLM emits, "
@@ -46,24 +45,10 @@ app = typer.Typer(no_args_is_help=True, help=COMMAND_HELP)
 
 
 def _resolve_provider(name: str) -> object:
-    name = name.lower()
-    if name == "stub":
-        return StubLLMClient()
-    if name in ("anthropic", "claude"):
-        return AnthropicClient()
-    if name in ("openai", "gpt"):
-        return OpenAIClient()
-    if name in ("gemini", "google"):
-        return GeminiClient(model=os.environ.get("FORGE_GEMINI_MODEL",
-                                                   "gemini-2.5-flash"))
-    if name == "ollama":
-        return OllamaClient(
-            model=os.environ.get("FORGE_OLLAMA_MODEL", "qwen2.5-coder:7b"),
-            base_url=os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434"),
-        )
-    if name == "auto":
-        return resolve_default_client()
-    raise typer.BadParameter(f"unknown provider: {name!r}")
+    try:
+        return resolve_provider(name)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
 
 
 @app.command("run")
@@ -73,12 +58,19 @@ def run_cmd(
     output: Annotated[Path, typer.Argument(
         file_okay=False, dir_okay=True, resolve_path=True)],
     package: Annotated[str, typer.Option("--package")] = "generated",
-    seed_repo: Annotated[Path | None, typer.Option("--seed",
+    seed_repo: Annotated[list[Path] | None, typer.Option("--seed",
         exists=True, file_okay=False, dir_okay=True, resolve_path=True,
-        help="Sibling repo whose catalog is offered to the LLM as building blocks.")] = None,
+        help="Sibling repo(s) whose catalog is offered to the LLM as building blocks. Repeatable.")] = None,
     provider: Annotated[str, typer.Option("--provider",
-        help="auto | gemini | anthropic | openai | ollama | stub")] = "auto",
+        help=PROVIDER_HELP)] = "auto",
     max_iterations: Annotated[int, typer.Option("--max-iterations")] = 5,
+    max_fix_rounds: Annotated[int, typer.Option(
+        "--max-fix-rounds",
+        help="Per-turn budget for compiler-feedback fix rounds (Lane A W3). "
+             "When the just-emitted package fails import_smoke, the loop "
+             "sends the LLM the error trace and asks for a minimal patch, "
+             "up to N times before continuing to the next iterate turn. "
+             "Default 0 = disabled.")] = 0,
     target_score: Annotated[float, typer.Option("--target-score")] = 75.0,
     apply: Annotated[bool, typer.Option("--apply/--no-apply")] = True,
     json_out: Annotated[bool, typer.Option("--json")] = False,
@@ -86,16 +78,20 @@ def run_cmd(
     """Run the iterate loop."""
     output.mkdir(parents=True, exist_ok=True)
     llm = _resolve_provider(provider)
-    report = run_iterate(
-        intent,
-        output=output,
-        package=package,
-        seed_repo=seed_repo,
-        llm=llm,                       # type: ignore[arg-type]
-        max_iterations=max_iterations,
-        target_score=target_score,
-        apply=apply,
-    )
+    try:
+        report = run_iterate(
+            intent,
+            output=output,
+            package=package,
+            seed_repo=seed_repo,
+            llm=llm,                       # type: ignore[arg-type]
+            max_iterations=max_iterations,
+            max_fix_rounds=max_fix_rounds,
+            target_score=target_score,
+            apply=apply,
+        )
+    except RuntimeError as exc:
+        raise click.ClickException(str(exc)) from exc
     if json_out:
         typer.echo(json.dumps(report, indent=2, default=str))
         return
@@ -104,7 +100,7 @@ def run_cmd(
     typer.echo(f"  llm:           {report.get('llm')}")
     typer.echo(f"  package:       {report.get('package')}")
     if not apply:
-        typer.echo(f"  output_root:   (none — pre-flight)")
+        typer.echo("  output_root:   (none — pre-flight)")
         typer.echo(f"  first_prompt:  {len(report.get('first_prompt', ''))} chars")
         typer.echo(f"  system_prompt: {len(report.get('system_prompt', ''))} chars")
         return
@@ -131,7 +127,8 @@ def preflight_cmd(
 ) -> None:
     """Print the system prompt + first user prompt without calling any LLM."""
     from atomadic_forge.a1_at_functions.forge_feedback import (
-        pack_initial_intent, system_prompt,
+        pack_initial_intent,
+        system_prompt,
     )
     from atomadic_forge.a1_at_functions.scout_walk import harvest_repo
 

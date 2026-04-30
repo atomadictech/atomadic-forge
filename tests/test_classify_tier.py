@@ -1,7 +1,9 @@
 """Test the word-boundary tier classifier."""
 
 from atomadic_forge.a1_at_functions.classify_tier import (
-    classify_tier, detect_effects, word_tokens,
+    classify_tier,
+    detect_effects,
+    word_tokens,
 )
 
 

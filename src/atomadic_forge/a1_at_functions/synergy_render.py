@@ -210,7 +210,6 @@ def _render_phase_omission(card: SynergyCandidateCard) -> str:
 def _render_shared_schema(card: SynergyCandidateCard) -> str:
     """Like json_artifact but validates the producer JSON before piping."""
     body = _header_lines(card)
-    schemas = ", ".join(f"'{s}'" for s in (card.get("why") or []))
     body.extend([
         "@app.callback(invoke_without_command=True)",
         "def run(",
@@ -236,7 +235,7 @@ def _render_shared_schema(card: SynergyCandidateCard) -> str:
         "            raise typer.Exit(2) from exc",
         "        schema_id = payload.get('schema_version') or payload.get('schema')",
         "        if not schema_id:",
-        f"            typer.secho('producer payload missing schema_version field', fg='yellow', err=True)",
+        "            typer.secho('producer payload missing schema_version field', fg='yellow', err=True)",
         "        cmd_b = [sys.executable, '-m', 'atomadic_forge.a4_sy_orchestration.unified_cli',",
         f"                 {card['consumer']!r}, str(artifact)]",
         "        rc = subprocess.run(cmd_b, capture_output=False).returncode",

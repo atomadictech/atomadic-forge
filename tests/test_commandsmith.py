@@ -5,7 +5,6 @@ from pathlib import Path
 
 from atomadic_forge.a1_at_functions.commandsmith_discover import discover_command_modules
 from atomadic_forge.a1_at_functions.commandsmith_render import (
-    render_command_index,
     render_registry_module,
     render_wrapper_module,
 )
