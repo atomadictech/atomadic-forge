@@ -37,26 +37,24 @@ from ..a1_at_functions.agent_summary import (
 from ..a1_at_functions.card_renderer import render_receipt_card
 from ..a1_at_functions.certify_checks import certify as certify_checks
 from ..a1_at_functions.error_hints import format_hint
+from ..a1_at_functions.local_signer import sign_receipt_local
 from ..a1_at_functions.manifest_diff import diff_manifests
-from ..a1_at_functions.progress_reporter import make_stderr_reporter
 from ..a1_at_functions.preflight_change import preflight_change
+from ..a1_at_functions.progress_reporter import make_stderr_reporter
+from ..a1_at_functions.receipt_emitter import build_receipt, receipt_to_json
 from ..a1_at_functions.recipes import all_recipes, get_recipe, list_recipes
+from ..a1_at_functions.sbom_emitter import emit_sbom
+from ..a1_at_functions.scout_walk import harvest_repo
 from ..a1_at_functions.sidecar_parser import (
     find_sidecar_for,
     parse_sidecar_file,
 )
 from ..a1_at_functions.sidecar_validator import validate_sidecar
-from ..a1_at_functions.receipt_emitter import build_receipt, receipt_to_json
-from ..a1_at_functions.local_signer import sign_receipt_local
-from ..a1_at_functions.sbom_emitter import emit_sbom
-from ..a1_at_functions.scout_walk import harvest_repo
 from ..a1_at_functions.wire_check import scan_violations
 from ..a2_mo_composites.lineage_chain_store import LineageChainStore
 from ..a2_mo_composites.plan_store import PlanStore
 from ..a2_mo_composites.receipt_signer import sign_receipt
 from ..a3_og_features.forge_enforce import run_enforce
-from ..a3_og_features.forge_plan_apply import apply_all_applyable, apply_card
-from ..a3_og_features.mcp_server import serve_stdio as mcp_serve_stdio
 from ..a3_og_features.forge_pipeline import (
     run_auto,
     run_auto_plan,
@@ -64,6 +62,8 @@ from ..a3_og_features.forge_pipeline import (
     run_finalize,
     run_recon,
 )
+from ..a3_og_features.forge_plan_apply import apply_all_applyable, apply_card
+from ..a3_og_features.mcp_server import serve_stdio as mcp_serve_stdio
 
 # Suppress SyntaxWarnings from third-party code in seed/forged directories.
 warnings.filterwarnings("ignore", category=SyntaxWarning)
@@ -300,7 +300,7 @@ def wire_cmd(
                 f"→ {dest}"
             )
     if fail_on_violations and has_violations:
-        typer.echo(f"  gate:       FAIL (--fail-on-violations set)")
+        typer.echo("  gate:       FAIL (--fail-on-violations set)")
         raise typer.Exit(code=1)
     if has_violations and not suggest_repairs and not json_out:
         typer.echo(
@@ -553,7 +553,7 @@ def sidecar_validate_cmd(
     try:
         source_text = source_file.read_text(encoding="utf-8")
     except OSError as exc:
-        raise typer.BadParameter(f"could not read {source_file}: {exc}")
+        raise typer.BadParameter(f"could not read {source_file}: {exc}") from exc
     rep = validate_sidecar(
         parse["sidecar"], source_text=source_text, source_path=source_file,
     )
@@ -603,7 +603,7 @@ def recipes_cmd(
         typer.echo("-" * 60)
         for n in names:
             typer.echo(f"  {n:<22}  {catalogue[n]['description'][:60]}")
-        typer.echo(f"\n  forge recipes <name>  — show one recipe")
+        typer.echo("\n  forge recipes <name>  — show one recipe")
         return
     recipe = get_recipe(name)
     if recipe is None:
@@ -727,7 +727,7 @@ def plan_step_cmd(
     typer.echo(f"  status: {result['status']}")
     detail = result.get("detail") or {}
     for key, value in detail.items():
-        if isinstance(value, (dict, list)):
+        if isinstance(value, dict | list):
             value = json.dumps(value, default=str)[:120]
         typer.echo(f"  {key}: {value}")
     if result["status"] in {"failed", "rolled_back"}:
@@ -1026,7 +1026,7 @@ def diff_cmd(
     if diff["summary"]:
         typer.echo("  summary:")
         for k, v in diff["summary"].items():
-            if isinstance(v, (str, int, float, bool)) or v is None:
+            if isinstance(v, str | int | float | bool) or v is None:
                 typer.echo(f"    {k}: {v}")
             elif isinstance(v, dict):
                 typer.echo(f"    {k}: {v}")

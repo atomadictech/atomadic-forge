@@ -22,8 +22,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..a0_qk_constants.receipt_schema import ForgeReceiptV1, VALID_VERDICTS
-
+from ..a0_qk_constants.receipt_schema import VALID_VERDICTS, ForgeReceiptV1
 
 _VERDICT_GLYPH: dict[str, str] = {
     "PASS":       "✓",

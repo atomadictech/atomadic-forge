@@ -24,7 +24,6 @@ import hashlib
 import json
 from typing import Any
 
-
 CS1_SCHEMA_VERSION = "atomadic-forge.cs1/v1"
 
 _REQUIRED_RECEIPT_FIELDS = (
@@ -473,8 +472,8 @@ def render_cs1_markdown(cs1: dict[str, Any]) -> str:
     # Project
     a("## Project")
     a("")
-    a(f"| Field | Value |")
-    a(f"|-------|-------|")
+    a("| Field | Value |")
+    a("|-------|-------|")
     a(f"| Name | `{rs.get('project_name', '')}` |")
     a(f"| Primary language | {rs.get('project_language', 'python')} |")
     if proj.get("languages"):
@@ -499,8 +498,8 @@ def render_cs1_markdown(cs1: dict[str, Any]) -> str:
     )
     a(f"**{glyph} {verdict}**")
     a("")
-    a(f"| Check | Result |")
-    a(f"|-------|--------|")
+    a("| Check | Result |")
+    a("|-------|--------|")
     a(f"| Wire scan | {rs.get('wire_verdict', 'FAIL')} ({rs.get('wire_violation_count', 0)} violations) |")
     a(f"| Certify score | {rs.get('certify_score', 0.0):.1f} / 100 |")
     a(f"| Symbol count | {rs.get('symbol_count', 0)} |")

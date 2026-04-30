@@ -18,7 +18,6 @@ without touching every command. Adding a hint:
 """
 from __future__ import annotations
 
-
 HINT_TEMPLATES: dict[str, str] = {
     # ----- LLM provider errors -------------------------------------------
     "provider_missing_key": (

@@ -52,7 +52,6 @@ from ..a0_qk_constants.receipt_schema import (
     ReceiptWire,
 )
 
-
 _DEFAULT_THRESHOLD = 100.0
 _ARTIFACT_FILES = ("scout", "cherry", "wire", "certify", "assimilate")
 

@@ -62,7 +62,7 @@ def _bounded_list(items: list, depth: int) -> list:
 def _bound_value(v: Any, depth: int) -> Any:
     """Recursively cap depth + list size for safe inclusion in the diff."""
     if depth >= _MAX_DEPTH:
-        if isinstance(v, (dict, list)):
+        if isinstance(v, dict | list):
             return _TRUNCATED
         return v
     if isinstance(v, dict):
@@ -147,7 +147,7 @@ def _summary_certify(left: dict, right: dict) -> dict:
 
     l_ratio = left.get("test_pass_ratio")
     r_ratio = right.get("test_pass_ratio")
-    if isinstance(l_ratio, (int, float)) and isinstance(r_ratio, (int, float)):
+    if isinstance(l_ratio, int | float) and isinstance(r_ratio, int | float):
         summary["test_pass_ratio_delta"] = _format_delta(round(r_ratio - l_ratio, 4))
     return summary
 

@@ -35,8 +35,9 @@ responses; callers never see a Python traceback.
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from .. import __version__
 from ..a0_qk_constants.receipt_schema import SCHEMA_VERSION_V1
@@ -57,7 +58,6 @@ from .scout_walk import harvest_repo
 from .test_selector import select_tests as _select_tests
 from .tool_composer import compose_tools as _compose_tools
 from .wire_check import scan_violations
-
 
 PROTOCOL_VERSION = "2024-11-05"   # MCP spec rev the server advertises
 SERVER_NAME = "atomadic-forge"

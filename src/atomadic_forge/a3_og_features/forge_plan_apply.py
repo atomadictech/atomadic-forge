@@ -28,7 +28,6 @@ from ..a0_qk_constants.agent_plan_schema import AgentActionCard
 from ..a2_mo_composites.plan_store import PlanStore
 from .forge_enforce import run_enforce
 
-
 _ARCHITECTURAL_AUTO_FIX_FCODES: frozenset[str] = frozenset({
     "F0041", "F0042", "F0043", "F0044", "F0045", "F0046",
 })

@@ -14,7 +14,6 @@ from __future__ import annotations
 
 from typing import TypedDict
 
-
 SCHEMA_VERSION_RECIPE_V1 = "atomadic-forge.recipe/v1"
 
 

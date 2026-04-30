@@ -17,7 +17,6 @@ from typing import Any
 
 from .. import __version__
 
-
 SCHEMA_VERSION_SBOM_V1 = "atomadic-forge.sbom/v1"
 _CYCLONEDX_FORMAT = "CycloneDX"
 _CYCLONEDX_SPEC_VERSION = "1.5"
@@ -112,9 +111,9 @@ def _dep_to_component(dep: str) -> dict[str, Any]:
 
 def emit_sbom(
     *,
-    project_root: "Path | str",
-    scout_report: "dict[str, Any] | None" = None,
-) -> "dict[str, Any]":
+    project_root: Path | str,
+    scout_report: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Return an ``atomadic-forge.sbom/v1`` dict wrapping CycloneDX 1.5 JSON.
 
     Pulls deps from ``pyproject.toml`` ``[project].dependencies`` +

@@ -15,9 +15,7 @@ think about before applying the diff.
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable
-from typing import Any, TypedDict
-
+from typing import TypedDict
 
 SCHEMA_VERSION_PATCH_SCORE_V1 = "atomadic-forge.patch_score/v1"
 
@@ -126,10 +124,10 @@ def _check_added_imports_against_tier(
 
 
 def _file_score(path: str, diff_text: str) -> PatchFileScore:
-    added = sum(1 for l in diff_text.splitlines()
-                 if l.startswith("+") and not l.startswith("+++"))
-    removed = sum(1 for l in diff_text.splitlines()
-                   if l.startswith("-") and not l.startswith("---"))
+    added = sum(1 for line in diff_text.splitlines()
+                 if line.startswith("+") and not line.startswith("+++"))
+    removed = sum(1 for line in diff_text.splitlines()
+                   if line.startswith("-") and not line.startswith("---"))
     tier = _detect_tier(path)
     notes: list[str] = []
     arch_risk = False
@@ -223,6 +221,7 @@ def score_patch(diff: str, *, project_root: object | None = None) -> PatchScore:
     if project_root is not None:
         try:
             from pathlib import Path as _Path
+
             from .policy_loader import file_is_protected, load_policy
             policy = load_policy(_Path(str(project_root)))
             for f in files:

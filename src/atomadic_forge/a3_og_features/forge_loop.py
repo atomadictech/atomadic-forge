@@ -39,12 +39,12 @@ from ..a1_at_functions.forge_feedback import (
     parse_files_from_response,
     system_prompt,
 )
-from ..a1_at_functions.import_smoke import import_smoke
 from ..a1_at_functions.generation_quality import (
     apply_docs_phase,
     apply_docstring_phase,
     apply_test_phase,
 )
+from ..a1_at_functions.import_smoke import import_smoke
 from ..a1_at_functions.llm_client import LLMClient, resolve_default_client
 from ..a1_at_functions.scaffold_js import render_js_readme, render_package_json
 from ..a1_at_functions.scaffold_pyproject import render_pyproject

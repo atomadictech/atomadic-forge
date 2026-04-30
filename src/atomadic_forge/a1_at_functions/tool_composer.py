@@ -20,7 +20,6 @@ from __future__ import annotations
 
 from typing import TypedDict
 
-
 SCHEMA_VERSION_COMPOSE_V1 = "atomadic-forge.tool_compose/v1"
 
 

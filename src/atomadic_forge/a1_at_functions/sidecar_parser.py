@@ -12,7 +12,7 @@ the ``proves:`` clauses through the Lean4 obligation discharger.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, TypedDict
+from typing import TypedDict
 
 import yaml
 

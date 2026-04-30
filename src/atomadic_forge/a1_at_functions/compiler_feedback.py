@@ -23,7 +23,6 @@ owns when to invoke this.
 """
 from __future__ import annotations
 
-
 _FIX_ROUND_HEADER = (
     "FIX ROUND — your previous emission did not import. Do NOT add "
     "features; do NOT touch unrelated files. Output ONLY the minimum "

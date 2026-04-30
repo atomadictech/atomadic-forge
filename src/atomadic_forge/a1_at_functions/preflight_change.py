@@ -13,8 +13,7 @@ size hints. The classifier reads the proposed file paths only.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, TypedDict
-
+from typing import TypedDict
 
 SCHEMA_VERSION_PREFLIGHT_V1 = "atomadic-forge.preflight/v1"
 

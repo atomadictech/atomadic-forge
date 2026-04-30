@@ -30,7 +30,6 @@ from typing import Any
 
 from ..a0_qk_constants.receipt_schema import ForgeReceiptV1, ReceiptLineage
 
-
 _HASH_EXCLUDE_FIELDS: frozenset[str] = frozenset({
     "signatures",
     "lineage",

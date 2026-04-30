@@ -28,7 +28,7 @@ from .lineage_chain import canonical_receipt_hash
 def sign_receipt_local(
     receipt: ForgeReceiptV1,
     *,
-    key_path: "Path | str",
+    key_path: Path | str,
 ) -> ForgeReceiptV1:
     """Return a copy of ``receipt`` with ``signatures.local_sign`` populated.
 
@@ -39,13 +39,13 @@ def sign_receipt_local(
     out = deepcopy(receipt)
 
     try:
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import (  # noqa: PLC0415
+            Ed25519PrivateKey,
+        )
         from cryptography.hazmat.primitives.serialization import (  # noqa: PLC0415
             Encoding,
             PublicFormat,
             load_pem_private_key,
-        )
-        from cryptography.hazmat.primitives.asymmetric.ed25519 import (  # noqa: PLC0415
-            Ed25519PrivateKey,
         )
     except ImportError:
         _note(out, "local_sign skipped: 'cryptography' package not installed")
@@ -89,7 +89,7 @@ def sign_receipt_local(
     return out
 
 
-def verify_receipt_local(receipt: ForgeReceiptV1) -> "tuple[bool, list[str]]":
+def verify_receipt_local(receipt: ForgeReceiptV1) -> tuple[bool, list[str]]:
     """Verify the ``signatures.local_sign`` block in a Receipt.
 
     Returns ``(True, [])`` when valid. Returns ``(False, [problem...])``

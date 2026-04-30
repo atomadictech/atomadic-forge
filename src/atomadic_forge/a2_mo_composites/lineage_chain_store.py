@@ -36,7 +36,6 @@ from ..a1_at_functions.lineage_chain import (
     link_to_parent,
 )
 
-
 _DIRNAME = ".atomadic-forge"
 _FILENAME = "lineage_chain.jsonl"
 
