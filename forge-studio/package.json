@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "forge-studio", "version": "0.1.0", "private": true, "type": "module",
   "scripts": {
     "dev": "vite --port 1420 --strictPort",
