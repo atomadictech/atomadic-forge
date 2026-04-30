@@ -21,6 +21,7 @@ callable with the same shape as ``urllib.request.urlopen``.
 from __future__ import annotations
 
 import json
+import os
 import time
 import urllib.error
 import urllib.request
@@ -28,9 +29,11 @@ from collections.abc import Callable
 from typing import Any
 
 from ..a0_qk_constants.auth_constants import (
+    AUTH_URL_ENV,
     DEFAULT_AUTH_ENDPOINT,
     DEFAULT_USAGE_ENDPOINT,
     OFFLINE_GRACE_SECONDS,
+    USAGE_URL_ENV,
     VERIFY_CACHE_TTL_SECONDS,
     UsageLogResult,
     VerifyResult,
@@ -65,8 +68,16 @@ class ForgeAuthClient:
         cache_ttl_seconds: int = VERIFY_CACHE_TTL_SECONDS,
         offline_grace_seconds: int = OFFLINE_GRACE_SECONDS,
     ) -> None:
-        self.auth_endpoint = (auth_endpoint or DEFAULT_AUTH_ENDPOINT).strip()
-        self.usage_endpoint = (usage_endpoint or DEFAULT_USAGE_ENDPOINT).strip()
+        self.auth_endpoint = (
+            auth_endpoint
+            or os.environ.get(AUTH_URL_ENV)
+            or DEFAULT_AUTH_ENDPOINT
+        ).strip()
+        self.usage_endpoint = (
+            usage_endpoint
+            or os.environ.get(USAGE_URL_ENV)
+            or DEFAULT_USAGE_ENDPOINT
+        ).strip()
         self.timeout_seconds = (
             timeout_seconds
             if timeout_seconds is not None

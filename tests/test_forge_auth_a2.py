@@ -17,7 +17,9 @@ from typing import Any
 import pytest
 
 from atomadic_forge.a0_qk_constants.auth_constants import (
+    AUTH_URL_ENV,
     OFFLINE_GRACE_SECONDS,
+    USAGE_URL_ENV,
     VERIFY_CACHE_TTL_SECONDS,
 )
 from atomadic_forge.a2_mo_composites.forge_auth_client import ForgeAuthClient
@@ -121,6 +123,16 @@ def test_verify_success_populates_email_plan_and_caches():
     assert out2["ok"] is True
     assert out2["cached"] is True
     assert len(fake.captured) == 1  # type: ignore[attr-defined]
+
+
+def test_client_honors_endpoint_env_overrides(monkeypatch):
+    monkeypatch.setenv(AUTH_URL_ENV, "http://127.0.0.1:8799/auth")
+    monkeypatch.setenv(USAGE_URL_ENV, "http://127.0.0.1:8799/usage")
+
+    c = ForgeAuthClient(urlopen=_ok_urlopen({"ok": True}))
+
+    assert c.auth_endpoint == "http://127.0.0.1:8799/auth"
+    assert c.usage_endpoint == "http://127.0.0.1:8799/usage"
 
 
 def test_verify_cache_expires_after_ttl():
