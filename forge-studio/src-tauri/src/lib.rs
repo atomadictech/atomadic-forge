@@ -15,7 +15,7 @@ struct ForgeSession {
 impl ForgeSession {
     fn spawn(project_root: &str) -> Result<Self, String> {
         let mut child = Command::new("forge")
-            .args(["mcp", "serve", "--project-root", project_root])
+            .args(["mcp", "serve", "--project", project_root])
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::null())

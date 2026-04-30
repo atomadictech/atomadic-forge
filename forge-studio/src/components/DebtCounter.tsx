@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useForgeStore } from "@/store";
 import * as mcp from "@/lib/mcp";
-import { SEVERITY_WEIGHTS } from "@/lib/types";
+import { fCodeSeverity } from "@/lib/types";
 import type { WireReport } from "@/lib/types";
 function computeDebt(r: WireReport, rate: number): number {
-  return r.violations.reduce((t, v) => t + (SEVERITY_WEIGHTS[v.severity] ?? 1) * rate, 0);
+  return r.violations.reduce((t, v) => t + fCodeSeverity(v.f_code) * rate, 0);
 }
 function fmtUsd(n: number): string {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
@@ -43,12 +43,13 @@ export function DebtCounter() {
         {flash === "down" && <div style={{ color: "#4ade80", fontSize: 12, marginTop: 4 }}>▼ debt reduced</div>}
       </div>
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 16, fontSize: 13 }}>
-        {(["error", "warn", "info"] as const).map((sev) => {
-          const cnt = wireReport.violations.filter((v) => v.severity === sev).length;
-          const c = { error: "#f87171", warn: "#fbbf24", info: "#60a5fa" };
-          return (<div key={sev} style={{ background: "#0f172a", border: `1px solid ${c[sev]}33`, borderRadius: 6, padding: "6px 14px", display: "flex", gap: 8, alignItems: "center" }}>
-            <span style={{ color: c[sev], fontWeight: 700 }}>{cnt}</span>
-            <span style={{ color: "#64748b" }}>{sev}</span>
+        {([["F004x · structural", "#f87171", (fc: string) => fc.startsWith("F004")],
+           ["F003x · effect", "#fbbf24", (fc: string) => fc.startsWith("F003")],
+           ["other", "#60a5fa", (fc: string) => !fc.startsWith("F004") && !fc.startsWith("F003")]] as [string, string, (fc: string) => boolean][]).map(([label, color, pred]) => {
+          const cnt = wireReport.violations.filter((v) => pred(v.f_code ?? "")).length;
+          return (<div key={label} style={{ background: "#0f172a", border: `1px solid ${color}33`, borderRadius: 6, padding: "6px 14px", display: "flex", gap: 8, alignItems: "center" }}>
+            <span style={{ color, fontWeight: 700 }}>{cnt}</span>
+            <span style={{ color: "#64748b" }}>{label}</span>
           </div>);
         })}
       </div>

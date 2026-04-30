@@ -951,6 +951,50 @@ def certify_cmd(
         raise typer.Exit(code=1)
 
 
+@app.command("status")
+def status_cmd(
+    project_root: Annotated[Path, typer.Argument(
+        exists=True, file_okay=False, dir_okay=True, resolve_path=True,
+        help="Project root.")] = Path("."),
+    json_out: Annotated[bool, typer.Option("--json")] = False,
+    fail_under: Annotated[float | None, typer.Option(
+        "--fail-under",
+        help="Exit 1 when the certify score is below this threshold.")] = None,
+) -> None:
+    """Quick health snapshot: wire violations + certify score in one call.
+
+    The go-to command when you want a fast answer to 'is my project clean?'
+    without running the full auto pipeline.
+    """
+    wire_report = scan_violations(project_root)
+    certify_report = certify_checks(project_root, project=project_root.name)
+    violations = wire_report["violation_count"]
+    score = certify_report["score"]
+    overall = "PASS" if (violations == 0 and score >= (fail_under or 75)) else "FAIL"
+    if json_out:
+        typer.echo(json.dumps({
+            "schema_version": "atomadic-forge.status/v1",
+            "project": str(project_root),
+            "verdict": overall,
+            "wire": {"violations": violations, "verdict": wire_report.get("verdict")},
+            "certify": {"score": score, "issues": certify_report.get("issues", [])},
+        }, indent=2, default=str))
+        if overall == "FAIL" and fail_under is not None:
+            raise typer.Exit(code=1)
+        return
+    typer.echo(f"\nForge status: {project_root}")
+    typer.echo("-" * 60)
+    wire_ok = violations == 0
+    score_ok = score >= (fail_under or 75)
+    typer.echo(f"  wire:    {'PASS' if wire_ok else 'FAIL':5s}  {violations} violation(s)")
+    typer.echo(f"  certify: {'PASS' if score_ok else 'FAIL':5s}  {score}/100")
+    for issue in certify_report.get("issues", []):
+        typer.echo(f"    - {issue}")
+    typer.echo(f"\n  {'✓ CLEAN' if overall == 'PASS' else '✗ NEEDS WORK'}")
+    if overall == "FAIL" and fail_under is not None:
+        raise typer.Exit(code=1)
+
+
 @app.command("sbom")
 def sbom_cmd(
     project: Annotated[Path, typer.Argument(
@@ -1103,24 +1147,45 @@ app.add_typer(mcp_app, name="mcp",
                help="MCP server surface — speak Forge to coding agents.")
 
 
+def _check_optional_dep(module: str) -> str:
+    try:
+        __import__(module)
+        return "ok"
+    except ImportError:
+        return "missing"
+
+
 @app.command("doctor")
 def doctor_cmd(
     json_out: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
     """Environment diagnostic."""
+    optional = {
+        "complexipy": _check_optional_dep("complexipy"),
+        "cryptography": _check_optional_dep("cryptography"),
+        "tomli": _check_optional_dep("tomli"),
+    }
     info = {
         "atomadic_forge_version": __version__,
         "python": sys.version.split()[0],
         "executable": sys.executable,
         "platform": sys.platform,
         "stdout_encoding": getattr(sys.stdout, "encoding", "?"),
+        "optional_deps": optional,
     }
     if json_out:
         typer.echo(json.dumps(info, indent=2))
         return
     typer.echo("\nAtomadic Forge — doctor")
     for k, v in info.items():
+        if k == "optional_deps":
+            continue
         typer.echo(f"  {k:24s} {v}")
+    typer.echo("  optional dependencies:")
+    for dep, status in optional.items():
+        mark = "✓" if status == "ok" else "✗"
+        note = "" if status == "ok" else f"  (pip install {dep})"
+        typer.echo(f"    {mark} {dep}{note}")
 
 
 @app.command("cs1")
@@ -1137,7 +1202,12 @@ def cs1_cmd(
     if receipt is None:
         receipt = project_path / ".atomadic-forge" / "receipt.json"
     if not receipt.exists():
-        typer.secho(f"Receipt not found at {receipt}. Run 'forge auto' first.", fg="red", err=True)
+        typer.secho(
+            f"Receipt not found at {receipt}.\n"
+            f"Generate one first:\n"
+            f"  forge certify {project_path} --emit-receipt {receipt}",
+            fg="red", err=True,
+        )
         raise typer.Exit(code=1)
     try:
         receipt_data = json.loads(receipt.read_text(encoding="utf-8"))

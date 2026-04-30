@@ -13,7 +13,7 @@ export function ArchitectureGraph() {
     if(!cyRef.current)return;
     const tiers:Tier[]=["a0","a1","a2","a3","a4"];
     const counts=scoutReport?Object.fromEntries(tiers.map((t)=>[t,scoutReport.symbols.filter((s)=>s.tier===t).length])):Object.fromEntries(tiers.map((t)=>[t,0]));
-    const nodes=tiers.map((tier,i)=>({data:{id:tier,label:TL[tier],count:counts[tier]??0,color:TC[tier]},position:{x:200,y:i*100+60}}));
+    const nodes=tiers.map((tier,i)=>({data:{id:tier,label:TL[tier],count:counts[tier]??0,color:TC[tier]},position:{x:80+i*110,y:420-i*90}}));
     const edges=EDGES.map(([from,to])=>({data:{id:`${from}-${to}`,source:from,target:to}}));
     cyInstance.current?.destroy();
     const cy=cytoscape({container:cyRef.current,elements:{nodes,edges},
