@@ -47,6 +47,8 @@ from ..a1_at_functions.sidecar_parser import (
 )
 from ..a1_at_functions.sidecar_validator import validate_sidecar
 from ..a1_at_functions.receipt_emitter import build_receipt, receipt_to_json
+from ..a1_at_functions.local_signer import sign_receipt_local
+from ..a1_at_functions.sbom_emitter import emit_sbom
 from ..a1_at_functions.scout_walk import harvest_repo
 from ..a1_at_functions.wire_check import scan_violations
 from ..a2_mo_composites.lineage_chain_store import LineageChainStore
@@ -54,7 +56,6 @@ from ..a2_mo_composites.plan_store import PlanStore
 from ..a2_mo_composites.receipt_signer import sign_receipt
 from ..a3_og_features.forge_enforce import run_enforce
 from ..a3_og_features.forge_plan_apply import apply_all_applyable, apply_card
-from ..a3_og_features.lsp_server import serve_stdio as lsp_serve_stdio
 from ..a3_og_features.mcp_server import serve_stdio as mcp_serve_stdio
 from ..a3_og_features.forge_pipeline import (
     run_auto,
@@ -126,6 +127,10 @@ def auto_cmd(
         "--progress/--no-progress",
         help="Emit per-file scout progress to stderr. Default: auto "
              "(on when stderr is a TTY, off in CI / pipes / --json).")] = None,
+    seed_determinism: Annotated[int | None, typer.Option(
+        "--seed-determinism",
+        help="Record a fixed RNG seed in the receipt for reproducibility audits (Lane G).",
+    )] = None,
 ) -> None:
     """Flagship: scout → cherry-pick → assimilate → wire → certify in one shot."""
     output.mkdir(parents=True, exist_ok=True)
@@ -134,6 +139,8 @@ def auto_cmd(
     report = run_auto(target=target, output=output, package=package,
                       apply=apply, on_conflict=on_conflict,
                       progress=reporter)
+    if seed_determinism is not None:
+        report.setdefault("extra", {})["seed_determinism"] = seed_determinism
     if json_out:
         typer.echo(json.dumps(report, indent=2, default=str))
         return
@@ -849,6 +856,14 @@ def certify_cmd(
              "for Sigstore + AAAA-Nexus signing before emitting / "
              "rendering. Soft-fails if the endpoint is unavailable; the "
              "unsigned receipt is still emitted with a notes entry.")] = False,
+    local_sign: Annotated[bool, typer.Option(
+        "--local-sign/--no-local-sign",
+        help="Sign the receipt with a local Ed25519 key (Lane G W5). "
+             "Soft-fails if the key is absent or cryptography not installed.")] = False,
+    local_sign_key: Annotated[Path | None, typer.Option(
+        "--local-sign-key",
+        help="Path to the Ed25519 PEM private key used by --local-sign. "
+             "Defaults to forge-signing.pem in the project root.")] = None,
     summary: Annotated[bool, typer.Option(
         "--summary",
         help="Emit ONLY the compact agent-native blocker summary (top "
@@ -892,7 +907,7 @@ def certify_cmd(
     typer.echo(f"  wire:  {'PASS' if report['no_upward_imports'] else 'FAIL'}")
     for issue in report["issues"]:
         typer.echo(f"    - {issue}")
-    if emit_receipt is not None or print_card or sign:
+    if emit_receipt is not None or print_card or sign or local_sign:
         # The Receipt needs a scout summary; if scout didn't already
         # run via forge auto, harvest a cheap one now (no symbol dump
         # written; we only need counts + tier_distribution).
@@ -914,6 +929,9 @@ def certify_cmd(
         receipt = LineageChainStore(project_root).link_and_append(receipt)
         if sign:
             receipt = sign_receipt(receipt)
+        if local_sign:
+            key = local_sign_key or (project_root / "forge-signing.pem")
+            receipt = sign_receipt_local(receipt, key_path=key)
         if emit_receipt is not None:
             emit_receipt.parent.mkdir(parents=True, exist_ok=True)
             emit_receipt.write_text(receipt_to_json(receipt), encoding="utf-8")
@@ -931,6 +949,38 @@ def certify_cmd(
             err=True,
         )
         raise typer.Exit(code=1)
+
+
+@app.command("sbom")
+def sbom_cmd(
+    project: Annotated[Path, typer.Argument(
+        exists=True, file_okay=False, dir_okay=True, resolve_path=True,
+        help="Project root (must contain pyproject.toml).")] = Path("."),
+    out: Annotated[Path | None, typer.Option(
+        "--out",
+        help="Write the SBOM JSON to this path instead of stdout.")] = None,
+    json_out: Annotated[bool, typer.Option(
+        "--json", help="Pretty-print the SBOM JSON to stdout.")] = False,
+) -> None:
+    """Generate a CycloneDX 1.5 SBOM from pyproject.toml (Lane G G3)."""
+    try:
+        scout = harvest_repo(project)
+    except Exception:  # noqa: BLE001
+        scout = None
+    sbom = emit_sbom(project_root=project, scout_report=scout)
+    sbom_json = json.dumps(sbom, indent=2, default=str)
+    if out is not None:
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(sbom_json, encoding="utf-8")
+        typer.echo(f"SBOM written to {out}")
+    elif json_out:
+        typer.echo(sbom_json)
+    else:
+        typer.echo(f"SBOM: {project.name}")
+        typer.echo(f"  format:     CycloneDX {sbom.get('specVersion', '1.5')}")
+        typer.echo(f"  components: {len(sbom.get('components', []))}")
+        typer.echo(f"  schema:     {sbom.get('schema_version', '')}")
+        typer.echo("  (use --json or --out to emit the full CycloneDX JSON)")
 
 
 @app.command("diff")
@@ -1051,47 +1101,6 @@ def mcp_serve_cmd(
 
 app.add_typer(mcp_app, name="mcp",
                help="MCP server surface — speak Forge to coding agents.")
-
-
-lsp_app = typer.Typer(
-    no_args_is_help=True,
-    help="Forge LSP — diagnostics + hover for .forge sidecar files "
-         "(VS Code / Neovim / Helix / IntelliJ).",
-)
-
-
-@lsp_app.command("serve")
-def lsp_serve_cmd() -> None:
-    """Run the forge-lsp stdio JSON-RPC server.
-
-    Add to your editor's LSP config:
-
-      VS Code (settings.json or extension):
-        "files.associations": { "*.forge": "yaml" },
-        // launch forge-lsp with: command='forge', args=['lsp', 'serve']
-
-      Neovim (lspconfig):
-        require'lspconfig'.forge_lsp.setup{
-          cmd = {'forge', 'lsp', 'serve'},
-          filetypes = {'forge'},
-          root_dir = require'lspconfig'.util.find_git_ancestor,
-        }
-
-    Provides:
-      * publishDiagnostics (S0001 / S0003 / etc., F0100-coded) on
-        every didOpen / didChange / didSave
-      * textDocument/hover — markdown summary of the symbol's
-        effect, tier, compose_with, proves clauses
-      * textDocument/definition — goto-source from
-        `name: login` line in foo.py.forge → foo.py:login
-    """
-    rc = lsp_serve_stdio()
-    if rc != 0:
-        raise typer.Exit(code=rc)
-
-
-app.add_typer(lsp_app, name="lsp",
-               help="Forge LSP — diagnostics + hover for .forge sidecar files.")
 
 
 @app.command("doctor")
