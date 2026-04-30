@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.3.2 — Cyberpunk Forge Studio UI + recovery fixes
+
+841 tests passing, 2 skipped. `forge wire src/atomadic_forge` PASS,
+`forge certify .` = **100/100**.
+
+### Added
+
+- **Forge Studio cyberpunk UI reskin** — Full visual overhaul from
+  slate/blue inline-styles to the Atomadic cyber design system.
+  Tailwind v4 (`@tailwindcss/vite`), `motion` (Framer Motion v12),
+  `lucide-react`. New primitives: `NeonButton`, `ActionableCard`,
+  `ScoreGauge`, `PipelineStepper`. Collapsible sidebar with `layoutId`
+  animated active indicator, mobile bottom bar.
+- **ProjectScanDashboard** — animated stat cards, wire verdict banner,
+  motion tier bars, F-code violation list with severity colours.
+- **All panels reskinned** — ArchitectureGraph, ComplexityHeatmap,
+  DebtCounter, AgentTopologyMap, ErrorBanner all use cyber palette.
+- **`forge status` verb** — shows MCP connection status.
+
+### Fixed
+
+- **Wire scan phantom violations** — `.pytest_tmp_run/` test fixtures
+  no longer pollute wire results; `path_parts_contain_ignored_dir()`
+  now used throughout.
+- **`forge audit list` / `forge audit log`** — default to CWD
+  (`Path(".")`) instead of requiring explicit path argument.
+- **DebtCounter** — `fCodeSeverity(v.f_code)` replaces broken
+  `SEVERITY_WEIGHTS[v.severity]` (was always returning weight 1).
+- **WireViolation TypeScript interface** — aligned with actual JSON
+  schema (`f_code`, `from_tier`, `to_tier`).
+- **ArchitectureGraph** — staircase node layout instead of single column.
+- **`forge doctor`** — optional dep checks (complexipy, bandit, mypy).
+- **`commandsmith smoke`** — `--include-core` flag tests all 23 core verbs.
+
 ## 0.3.1 — Golden Path lanes B/C/D/F/G ship
 
 783 tests passing, 2 skipped. `forge wire src/atomadic_forge` PASS,

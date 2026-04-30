@@ -165,7 +165,7 @@ generate).
 ```bash
 git clone https://github.com/atomadictech/atomadic-forge && cd atomadic-forge
 pip install -e ".[dev]"
-python -m pytest               # 783 passing, 2 skipped
+python -m pytest               # 841 passing, 2 skipped
 ```
 
 ## AI Agent integration (MCP)
@@ -385,7 +385,7 @@ Forge ships with named limits. No overpromise.
 | Product | What it is | Status |
 |---------|------------|--------|
 | **AAAA-Nexus** | Trust/safety/payments substrate for autonomous agents | Live at [atomadic.tech](https://atomadic.tech) |
-| **Atomadic Forge** | Absorb-and-emerge engine for developers (this repo) | **0.3.2** — on PyPI, 841 tests, MCP server, desktop GUI |
+| **Atomadic Forge** | Absorb-and-emerge engine for developers (this repo) | **0.3.2** — on PyPI, 841 tests, 100/100, MCP server, desktop GUI |
 | **Atomadic Assistant** | Sovereign AI assistant with cognitive loop on Cloudflare | In development |
 
 ## License
@@ -413,7 +413,7 @@ Apache 2.0.
 **Forge itself is monadic.** Every source file belongs to one tier. The repo is a worked example:
 
 ```bash
-python -m pytest                     # 783 passing, 2 skipped
+python -m pytest                     # 841 passing, 2 skipped
 forge doctor                         # Environment check
 forge wire src/atomadic_forge        # Scan for violations (PASS)
 forge certify . --fail-under 100     # Score and gate the repo (100/100)
@@ -431,7 +431,7 @@ forge commandsmith smoke             # Smoke-test all 36+ registered verbs
 
 **Production-ready for architecture enforcement. Working, honest, self-eating.**
 
-- ✓ **841 tests** passing (2 skipped)
+- ✓ **841 tests** passing, 2 skipped
 - ✓ **100/100 certify** — forge scores itself on every CI run
 - ✓ **0 wire violations** — forge passes its own import-law scan
 - ✓ **On PyPI** — `pip install atomadic-forge`
