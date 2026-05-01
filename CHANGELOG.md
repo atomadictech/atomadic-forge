@@ -1,5 +1,60 @@
 # Changelog
 
+## 0.3.4 — `forge whoami` for agents and humans
+
+Adds the agent-empowerment QOL win that 0.3.3 was missing: when the
+MCP gate refuses with `subscription required`, agents (and humans)
+need a cheap way to ask **"who is the gate seeing me as, and from
+which source?"** without burning a real tool call. `forge whoami` is
+that command.
+
+### Added
+
+- **`forge whoami`** new top-level CLI verb (and `--json` for scripted
+  consumers). Returns:
+  ```json
+  {
+    "ok": true,
+    "source": "credentials_file" | "env" | "missing",
+    "key_prefix": "fk_live_b3502…",
+    "email": "tom@example.com",
+    "plan": "pro",
+    "verify_ok": true,
+    "verify_reason": "",
+    "credentials_path": "~/.atomadic-forge/credentials.toml",
+    "env_var": "FORGE_API_KEY"
+  }
+  ```
+  Resolution order matches the MCP gate exactly (env → credentials.toml).
+  `--no-verify` skips the network roundtrip for offline triage.
+- **6 new unit tests** for whoami covering missing-key, env-key,
+  credentials-file-key, env-wins-over-file, --no-verify, and
+  verify-rejection.
+
+### Why this matters for agents
+
+Before 0.3.4, an agent that hit `MCP error -32001: Forge subscription
+required` had two options: ask the human to restart the MCP, or fail.
+With 0.3.4 the agent can call `forge whoami --json` (via Bash) and
+get a structured answer it can act on:
+
+  * `source == "missing"` → tell the user to run `forge login`
+  * `source == "credentials_file"` + `verify_ok == false` → key is
+    revoked or stale; `forge login` again
+  * `source == "env"` + `verify_ok == false` → CI env var is wrong
+  * everything green → restart the MCP host (the running subprocess
+    needs a respawn to see the new env)
+
+This closes the loop for the auth experience — the agent can diagnose
+its own failure mode.
+
+### Tests
+
+902 passing, 2 skipped. `forge wire src/atomadic_forge` PASS,
+`forge certify .` holds at **100/100**.
+
+---
+
 ## 0.3.3 — MCP gate reads credentials.toml + actionable error message
 
 Hot-fix release. Closes the gap where `forge login` writes a key to
