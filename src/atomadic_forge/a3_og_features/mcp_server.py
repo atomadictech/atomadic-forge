@@ -43,6 +43,7 @@ from typing import IO
 
 from ..a1_at_functions.forge_auth import (
     hash_project_path,
+    read_api_key_from_credentials_file,
     read_api_key_from_env,
 )
 from ..a1_at_functions.mcp_protocol import (
@@ -141,12 +142,20 @@ handshake before the user has logged in.
 
 _AUTH_ERROR_CODE = -32001
 _UPGRADE_URL = "https://atomadic.tech/forge"
+_CREDENTIALS_PATH = Path("~/.atomadic-forge/credentials.toml").expanduser()
+_LOGIN_HINT = (
+    "Run `forge login` once to capture your subscription key into "
+    "~/.atomadic-forge/credentials.toml, OR export FORGE_API_KEY=fk_live_... "
+    "in the env that launches the MCP. Get a key at "
+    "https://atomadic.tech/forge#account."
+)
 
 
 def _auth_check(
     env: dict[str, str],
     *,
     client: ForgeAuthClient,
+    credentials_path: Path | None = None,
 ) -> tuple[bool, str, str]:
     """Return (ok, reason, api_key).
 
@@ -155,10 +164,24 @@ def _auth_check(
     error ``details`` field on rejection). ``api_key`` is the raw key
     when present (so the caller can fire usage-log telemetry); empty
     string when no key was configured.
+
+    Resolution order:
+      1. ``FORGE_API_KEY`` env var (CI / explicit override)
+      2. ``~/.atomadic-forge/credentials.toml`` (written by ``forge login``)
+
+    The credentials.toml fallback means a one-time ``forge login`` on
+    a workstation is enough — every subsequent ``forge mcp serve``
+    picks it up without needing the env var to be re-exported by
+    every shell, IDE, or MCP host.
     """
     api_key = read_api_key_from_env(env)
     if not api_key:
-        return False, "FORGE_API_KEY not set or wrong prefix", ""
+        path = credentials_path or _CREDENTIALS_PATH
+        api_key = read_api_key_from_credentials_file(path)
+    if not api_key:
+        return False, (
+            "Forge subscription key not configured. " + _LOGIN_HINT
+        ), ""
     result = client.verify(api_key)
     if result.get("ok"):
         return True, str(result.get("reason", "")), api_key

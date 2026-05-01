@@ -58,6 +58,64 @@ def read_api_key_from_env(env: dict[str, str]) -> str | None:
     return stripped
 
 
+def read_api_key_from_credentials_file(path: Path | str) -> str | None:
+    """Return the api_key from a Forge credentials.toml when shape-valid.
+
+    Pure: takes a path (caller passes ``Path("~/.atomadic-forge/credentials.toml")``
+    expanded, or a test fixture path), reads the file, parses it as TOML, and
+    returns the ``[forge_auth].api_key`` value only when it has the
+    ``fk_live_`` prefix. Missing file, missing section, missing key, malformed
+    TOML, or wrong-shape key all return ``None`` so the caller never sees a
+    half-loaded credential.
+
+    Pairs with ``read_api_key_from_env``: the MCP gate tries env first (for
+    CI / explicit overrides), then falls back to this so ``forge login`` once
+    is enough — every subsequent ``forge mcp serve`` picks the key up.
+    """
+    p = Path(path)
+    if not p.is_file():
+        return None
+    try:
+        body = p.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    try:
+        # Python 3.11+ — Forge already requires 3.10+ but tomllib lands at
+        # 3.11. Fall back to a tiny line parser when tomllib is missing so
+        # we don't add a runtime dependency on tomli for 3.10.
+        import tomllib  # noqa: PLC0415
+        try:
+            data = tomllib.loads(body)
+        except tomllib.TOMLDecodeError:
+            return None
+        section = data.get("forge_auth") if isinstance(data, dict) else None
+        raw = section.get("api_key") if isinstance(section, dict) else None
+    except ImportError:  # pragma: no cover — Python <3.11 fallback
+        raw = None
+        in_section = False
+        for line in body.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("#") or not stripped:
+                continue
+            if stripped == "[forge_auth]":
+                in_section = True
+                continue
+            if stripped.startswith("[") and stripped.endswith("]"):
+                in_section = False
+                continue
+            if in_section and "=" in stripped:
+                k, _, v = stripped.partition("=")
+                if k.strip() == "api_key":
+                    raw = v.strip().strip('"').strip("'")
+                    break
+    if not isinstance(raw, str):
+        return None
+    stripped = raw.strip()
+    if not stripped or not stripped.startswith(API_KEY_PREFIX):
+        return None
+    return stripped
+
+
 def is_valid_api_key_shape(key: str) -> bool:
     """Return True when ``key`` looks like a real Forge live key.
 
@@ -154,5 +212,6 @@ __all__ = [
     "hash_project_path",
     "is_valid_api_key_shape",
     "parse_verify_response",
+    "read_api_key_from_credentials_file",
     "read_api_key_from_env",
 ]
