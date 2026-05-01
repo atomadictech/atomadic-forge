@@ -119,16 +119,26 @@ jobs:
         id: forge_auto
         continue-on-error: true
         run: |
+          set -e
           cd target/repo
-          # Capture certify-before for the PR body
+          # Sanitize the order id for use as a directory name. Some
+          # session ids contain `_` which is fine, but the package name
+          # cannot contain `-`; we keep them separate (output dir vs
+          # --package).
+          PKG=$(echo "$ORDER_ID" | tr '-' '_' | tr '/' '_')
+          echo "pkg=$PKG" >> "$GITHUB_OUTPUT"
+          OUT_DIR="forged/$PKG"
+          # Capture certify-before for the PR body. These are best-effort
+          # — some repos don't have an obvious src/ root for wire.
           forge certify . --json > /tmp/certify-before.json 2>/dev/null || echo '{}' > /tmp/certify-before.json
-          forge wire src --json > /tmp/wire-before.json 2>/dev/null || echo '{}' > /tmp/wire-before.json
-          # Run the full pipeline. forge auto produces a tier-organized
-          # package under forged/. We then run wire + certify on it.
-          forge auto . forged/$ORDER_ID --apply --provider gemini > /tmp/forge-auto.log 2>&1 || true
-          forge certify forged/$ORDER_ID --json > /tmp/certify-after.json 2>/dev/null || echo '{}' > /tmp/certify-after.json
-          forge wire forged/$ORDER_ID --json > /tmp/wire-after.json 2>/dev/null || echo '{}' > /tmp/wire-after.json
-          ls -la forged/$ORDER_ID || true
+          forge wire . --json    > /tmp/wire-before.json    2>/dev/null || echo '{}' > /tmp/wire-before.json
+          # Run the flagship: scout → cherry-pick → assimilate → wire →
+          # certify → emergent. Real failures fail the step (no `|| true`).
+          forge auto . "$OUT_DIR" --apply --package absorbed
+          ls -la "$OUT_DIR" "$OUT_DIR/src" 2>&1 || true
+          forge certify "$OUT_DIR" --json > /tmp/certify-after.json 2>/dev/null || echo '{}' > /tmp/certify-after.json
+          forge wire    "$OUT_DIR/src" --json > /tmp/wire-after.json    2>/dev/null || echo '{}' > /tmp/wire-after.json
+          echo "forge_auto succeeded; output at target/repo/$OUT_DIR"
 
       - name: Fork customer repo to bot account
         id: fork
@@ -163,12 +173,23 @@ jobs:
         id: push
         if: steps.fork.outcome == 'success'
         run: |
+          set -e
           BRANCH="forge/refactor-$ORDER_ID"
+          PKG="${{ steps.forge_auto.outputs.pkg }}"
+          OUT_DIR="forged/$PKG"
           cd target/repo
-          # Replace src/ with the forged/ output (the canonical 5-tier
-          # layout). Files outside src/ are preserved.
+          # Replace src/ with the forge auto output. forge auto writes
+          # forged/<pkg>/src/<package>/aN_*/... — we lift the inner
+          # src/ wholesale into the customer's repo root.
           rm -rf src
-          cp -R forged/$ORDER_ID src
+          if [ -d "$OUT_DIR/src" ]; then
+            mv "$OUT_DIR/src" src
+          else
+            echo "::warning::forge auto did not produce $OUT_DIR/src; copying whole $OUT_DIR"
+            cp -R "$OUT_DIR" src
+          fi
+          # Drop the now-empty forged/ scratch dir from the PR.
+          rm -rf forged
           git config user.name  "Atomadic Forge"
           git config user.email "atomadic-forge@atomadictech.com"
           git checkout -b "$BRANCH"
