@@ -35,11 +35,27 @@ on:
     types: [forge-refactor]
   workflow_dispatch:
     inputs:
-      order_id:    { description: "Order id (forge-refactor-…)",   required: true,  type: string }
-      session_id:  { description: "Stripe session id",              required: false, type: string }
-      repo:        { description: "Customer repo URL",              required: true,  type: string }
-      email:       { description: "Customer email",                 required: true,  type: string }
-      amount_cents:{ description: "Amount paid (cents)",            required: false, type: string, default: "49900" }
+      order_id:
+        description: "Order id (forge-refactor-cs_...)"
+        required: true
+        type: string
+      session_id:
+        description: "Stripe session id"
+        required: false
+        type: string
+      repo:
+        description: "Customer repo URL (full https://github.com/...)"
+        required: true
+        type: string
+      email:
+        description: "Customer email"
+        required: true
+        type: string
+      amount_cents:
+        description: "Amount paid (cents)"
+        required: false
+        type: string
+        default: "49900"
 
 permissions:
   contents: read
