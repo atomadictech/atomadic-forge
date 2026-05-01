@@ -65,6 +65,7 @@ from ..a3_og_features.forge_pipeline import (
 from ..a3_og_features.forge_plan_apply import apply_all_applyable, apply_card
 from ..a3_og_features.mcp_server import serve_stdio as mcp_serve_stdio
 from .login_cmd import app as _login_app
+from .whoami_cmd import app as _whoami_app
 
 # Suppress SyntaxWarnings from third-party code in seed/forged directories.
 warnings.filterwarnings("ignore", category=SyntaxWarning)
@@ -1152,6 +1153,12 @@ app.add_typer(mcp_app, name="mcp",
 # at a3 gates `tools/call` on this key.
 app.add_typer(_login_app, name="login",
                help="Capture a Forge subscription key (required by `forge mcp serve`).")
+
+# Lane C W6 — `forge whoami` resolves the current auth state without
+# burning a real tool call. Pairs with `forge login` so agents can
+# verify what the gate is reading and where it came from.
+app.add_typer(_whoami_app, name="whoami",
+               help="Show the current Forge auth state — email, plan, source.")
 
 
 def _check_optional_dep(module: str) -> str:
