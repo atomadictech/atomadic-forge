@@ -51,7 +51,7 @@ export function Navigation({
   open,
   setOpen,
   brand = "FORGE STUDIO",
-  version = "atomadic-forge 0.3.2",
+  version = "atomadic-forge 0.3.4",
 }: {
   active: AppTab;
   onSelect: (t: AppTab) => void;

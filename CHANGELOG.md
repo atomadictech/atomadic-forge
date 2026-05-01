@@ -1,5 +1,65 @@
 # Changelog
 
+## 0.3.5 — Copilot's Copilot CLI parity + GUI version sync
+
+The MCP exposes 21 tools. Until 0.3.5, only 12 of them had CLI
+front-doors — the other 9 were JSON-RPC-only, which meant a developer
+or agent shell-running `forge` couldn't sample the same intelligence
+without spawning the MCP server, speaking JSON-RPC, and parsing
+`content[0].text`. This release closes the gap.
+
+### Added — 9 new top-level CLI verbs
+
+Every MCP-only Codex tool now has a CLI sibling that prints JSON to
+stdout, suitable for piping into `jq`, scripts, or an agent's Bash
+subprocess:
+
+| Verb | Codex # | What it does |
+|---|---|---|
+| `forge explain-repo <root>` | #6 | Humane operational orientation: one-liner + core flow + do_not_break list + important tests + release state |
+| `forge score-patch [--file diff.patch]` | #3 | Patch risk scorer: arch / test / public-API / release risk + needs_human_review boolean |
+| `forge select-tests <intent> --file ... --file ...` | #7 | Minimum + full-confidence test sets per intent; mirror-name matches plus tier-mate tests |
+| `forge rollback-plan --file ... --file ...` | #11 | Structured undo plan: files to remove, caches to clean, docs to restore, tests to rerun, risk level |
+| `forge compose-tools <goal>` | #9 | Tool-use planner: keyword → ordered MCP tool sequence (orient / release_check / fix_violation / before_edit / verify_patch) |
+| `forge why-did-this-change <file>` | #5 | Agent memory: every lineage entry + plan event that touched the file |
+| `forge what-failed-last-time <area>` | #5 | Failed / rolled-back plan events matching an area substring |
+| `forge adapt-plan --cap apply --cap shell` | #8 | Capability-aware card filtering: tag each card with recommended_handling |
+| `forge load-policy <root>` | #10 | Read `[tool.forge.agent]` from pyproject.toml (protected_files / release_gate / max_files_per_patch / require_human_review_for) |
+
+All verbs default to JSON output. None mutate the repo.
+
+### Why this matters for agents
+
+Before 0.3.5, an agent that wanted to compose a release-check tool
+chain had to either spawn `forge mcp serve`, hand-craft a tools/call
+JSON-RPC envelope, send it over stdio, and parse the wrapped text
+content — or skip the intelligence entirely. After 0.3.5, the same
+agent runs:
+
+```bash
+forge compose-tools "release_check" | jq .steps
+forge select-tests "fix(api): rate limit" --file src/api/limit.py
+forge score-patch --file my.diff
+```
+
+Three Bash calls. Same data. Zero JSON-RPC.
+
+### GUI version sync
+
+`forge-web` PWA + `forge-studio` Tauri both pull their version label
+from `forge-ui-core`'s `ForgeShell.tsx` default. That default was
+still pinned to `0.3.2`. Now `0.3.5` so both shells correctly identify
+themselves at the bottom of the sidebar.
+
+### Tests
+
+902 passing, 2 skipped (no test changes — every new verb is a thin
+wrapper around an already-tested a1 function).
+`forge wire src/atomadic_forge` PASS, `forge certify .` holds at
+**100/100**.
+
+---
+
 ## 0.3.4 — `forge whoami` for agents and humans
 
 Adds the agent-empowerment QOL win that 0.3.3 was missing: when the
