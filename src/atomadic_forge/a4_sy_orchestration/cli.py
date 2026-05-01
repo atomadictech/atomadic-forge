@@ -64,6 +64,7 @@ from ..a3_og_features.forge_pipeline import (
 )
 from ..a3_og_features.forge_plan_apply import apply_all_applyable, apply_card
 from ..a3_og_features.mcp_server import serve_stdio as mcp_serve_stdio
+from .copilots_cmd import COPILOTS_VERBS as _COPILOTS_VERBS
 from .login_cmd import app as _login_app
 from .whoami_cmd import app as _whoami_app
 
@@ -1159,6 +1160,12 @@ app.add_typer(_login_app, name="login",
 # verify what the gate is reading and where it came from.
 app.add_typer(_whoami_app, name="whoami",
                help="Show the current Forge auth state — email, plan, source.")
+
+# Lane C W7 — Codex 'Copilot's Copilot' surface as CLI verbs.
+# Until 0.3.5 these were MCP-only (tools/call); now they're shell-runnable
+# so any agent that can spawn Bash can sample the same intelligence.
+for _verb_name, _verb_app, _verb_help in _COPILOTS_VERBS:
+    app.add_typer(_verb_app, name=_verb_name, help=_verb_help)
 
 
 def _check_optional_dep(module: str) -> str:

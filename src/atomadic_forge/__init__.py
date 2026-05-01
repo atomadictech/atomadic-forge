@@ -9,4 +9,4 @@ Public version surface only — every symbol lives in its tier package and
 is re-exported lazily by the CLI.
 """
 
-__version__ = "0.3.4"
+__version__ = "0.3.5"

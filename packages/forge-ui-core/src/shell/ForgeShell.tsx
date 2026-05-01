@@ -30,7 +30,7 @@ export interface ForgeShellProps {
   client: ForgeClient;
   /** Sidebar brand label, default "FORGE STUDIO". */
   brand?: string;
-  /** Footer version string, default "atomadic-forge 0.3.2". */
+  /** Footer version string, default "atomadic-forge 0.3.4". */
   version?: string;
   /** Optional extra content to render at the right of the top bar (e.g. install-PWA button). */
   topBarRight?: ReactNode;
@@ -39,7 +39,7 @@ export interface ForgeShellProps {
 export function ForgeShell({
   client,
   brand = "FORGE STUDIO",
-  version = "atomadic-forge 0.3.2",
+  version = "atomadic-forge 0.3.4",
   topBarRight,
 }: ForgeShellProps) {
   const [activeTab, setActiveTab] = useState<AppTab>("scan");
