@@ -84,6 +84,10 @@ IGNORED_DIRS: Final[frozenset[str]] = frozenset({
     ".wrangler", ".wrangler-cache",
     # Atomadic-Forge's own scratch dir
     ".atomadic-forge",
+    # Intentional bad-wire test fixtures shipped with the Forge package.
+    # These exist to demonstrate violations and must NEVER count against
+    # the host repo's certify score.
+    "demo_packages",
 })
 
 
