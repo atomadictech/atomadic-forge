@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.3.3 — MCP gate reads credentials.toml + actionable error message
+
+Hot-fix release. Closes the gap where `forge login` writes a key to
+`~/.atomadic-forge/credentials.toml` but `forge mcp serve` rejects every
+tool call with `Forge subscription required` because it only checks
+`FORGE_API_KEY` env. After 0.3.3, `forge login` once is enough — every
+MCP host (Claude Code / Cursor / Aider / Devin / VS Code Copilot) picks
+the key up automatically with no shell-scoped env-var ritual.
+
+### Added
+
+- **`read_api_key_from_credentials_file(path)`** — pure a1 helper that
+  parses `~/.atomadic-forge/credentials.toml` (the file `forge login`
+  writes) and returns the `[forge_auth].api_key` value, only when it
+  has the `fk_live_` prefix. Six new unit tests cover missing file,
+  wrong prefix, missing section, malformed TOML, string-path argument,
+  and the canonical login output.
+- **MCP `_auth_check` falls back to credentials.toml** when
+  `FORGE_API_KEY` is not in env. Resolution order is documented in the
+  docstring: env first (CI / explicit override), then credentials file
+  (one-time `forge login`).
+- **Actionable auth-error message** — when neither env nor credentials
+  file yields a key, the JSON-RPC error now reads
+  `"Forge subscription key not configured. Run forge login once …"`
+  (was: `"FORGE_API_KEY not set or wrong prefix"`).
+
+### Tests
+
+896 passing, 2 skipped (was 841/2 at 0.3.2 — +6 new tests for the
+credentials.toml fallback). `forge wire src/atomadic_forge` PASS,
+`forge certify .` holds at **100/100**.
+
+---
+
 ## 0.3.2 — Cyberpunk Forge Studio UI + recovery fixes
 
 841 tests passing, 2 skipped. `forge wire src/atomadic_forge` PASS,
