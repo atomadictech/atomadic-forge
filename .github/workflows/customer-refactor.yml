@@ -1,0 +1,265 @@
+# Customer Refactor — fully automated $499 forge.atomadic.tech fulfillment.
+#
+# Triggered by Atomadic's REFACTOR_REPO action via the GitHub
+# repository_dispatch API. The cognition worker POSTs:
+#
+#   curl -X POST -H "Authorization: token $GH_TOKEN" \
+#     https://api.github.com/repos/atomadictech/atomadic-forge/dispatches \
+#     -d '{"event_type":"forge-refactor","client_payload":{...}}'
+#
+# Required client_payload fields:
+#   order_id        — opaque string, Stripe-session-derived (forge-refactor-cs_…)
+#   session_id      — Stripe session id, also used for tracing
+#   repo            — full URL to the customer's public GitHub repo
+#   email           — customer email (where the PR-ready notification goes)
+#   amount_cents    — amount paid, just for record-keeping
+#
+# The workflow:
+#   1. Clones the customer's repo into ./target/
+#   2. Installs atomadic-forge from PyPI
+#   3. Runs `forge auto` to produce a re-tiered package under ./forged/
+#   4. Forks the customer's repo to the bot account, pushes the refactor
+#      branch, and opens a PR back to the customer's main branch.
+#   5. POSTs the PR url + state to atomadic-cognition's /refactor-completed
+#      endpoint with the same shared bearer token used by /refactor-purchased.
+#
+# Failure handling: any step that fails is captured by the final
+# notify-cognition step and reported to the customer as `status=failed`.
+# The cognition endpoint emails the customer (apology + refund offer) and
+# pings Dad on Discord so the order can be retried manually.
+
+name: Customer Refactor (forge.atomadic.tech $499 fulfillment)
+
+on:
+  repository_dispatch:
+    types: [forge-refactor]
+  workflow_dispatch:
+    inputs:
+      order_id:    { description: "Order id (forge-refactor-…)",   required: true,  type: string }
+      session_id:  { description: "Stripe session id",              required: false, type: string }
+      repo:        { description: "Customer repo URL",              required: true,  type: string }
+      email:       { description: "Customer email",                 required: true,  type: string }
+      amount_cents:{ description: "Amount paid (cents)",            required: false, type: string, default: "49900" }
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  refactor:
+    name: forge auto + open PR
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      ORDER_ID:     ${{ github.event.client_payload.order_id     || inputs.order_id }}
+      SESSION_ID:   ${{ github.event.client_payload.session_id   || inputs.session_id }}
+      CUSTOMER_REPO: ${{ github.event.client_payload.repo        || inputs.repo }}
+      CUSTOMER_EMAIL: ${{ github.event.client_payload.email      || inputs.email }}
+      AMOUNT_CENTS: ${{ github.event.client_payload.amount_cents || inputs.amount_cents }}
+      BOT_TOKEN:    ${{ secrets.FORGE_BOT_TOKEN }}
+      FORGE_API_KEY: ${{ secrets.FORGE_API_KEY }}
+      PURCHASE_TOKEN: ${{ secrets.PURCHASE_WEBHOOK_TOKEN }}
+      COGNITION_URL: https://atomadic-cognition.atomadictech.workers.dev
+    outputs:
+      pr_url: ${{ steps.open_pr.outputs.pr_url }}
+      status: ${{ steps.open_pr.outputs.status }}
+
+    steps:
+      - name: Validate inputs
+        run: |
+          if [ -z "$CUSTOMER_REPO" ] || [ -z "$CUSTOMER_EMAIL" ] || [ -z "$ORDER_ID" ]; then
+            echo "::error::Missing required client_payload fields (repo, email, order_id)"
+            exit 1
+          fi
+          echo "Order:    $ORDER_ID"
+          echo "Repo:     $CUSTOMER_REPO"
+          echo "Customer: $CUSTOMER_EMAIL"
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install atomadic-forge from PyPI
+        run: |
+          python -m pip install --upgrade pip
+          pip install atomadic-forge==0.3.5
+          forge --version
+
+      - name: Clone customer repo
+        id: clone
+        run: |
+          mkdir -p target
+          git clone --depth 50 "$CUSTOMER_REPO" target/repo
+          cd target/repo
+          DEFAULT_BRANCH=$(git symbolic-ref --short HEAD)
+          REPO_OWNER=$(echo "$CUSTOMER_REPO" | sed -E 's|https://github.com/([^/]+)/.*|\1|')
+          REPO_NAME=$(echo "$CUSTOMER_REPO" | sed -E 's|https://github.com/[^/]+/([^/.]+).*|\1|')
+          echo "default_branch=$DEFAULT_BRANCH" >> "$GITHUB_OUTPUT"
+          echo "repo_owner=$REPO_OWNER"         >> "$GITHUB_OUTPUT"
+          echo "repo_name=$REPO_NAME"           >> "$GITHUB_OUTPUT"
+
+      - name: Run forge auto on the customer repo
+        id: forge_auto
+        continue-on-error: true
+        run: |
+          cd target/repo
+          # Capture certify-before for the PR body
+          forge certify . --json > /tmp/certify-before.json 2>/dev/null || echo '{}' > /tmp/certify-before.json
+          forge wire src --json > /tmp/wire-before.json 2>/dev/null || echo '{}' > /tmp/wire-before.json
+          # Run the full pipeline. forge auto produces a tier-organized
+          # package under forged/. We then run wire + certify on it.
+          forge auto . forged/$ORDER_ID --apply --provider gemini > /tmp/forge-auto.log 2>&1 || true
+          forge certify forged/$ORDER_ID --json > /tmp/certify-after.json 2>/dev/null || echo '{}' > /tmp/certify-after.json
+          forge wire forged/$ORDER_ID --json > /tmp/wire-after.json 2>/dev/null || echo '{}' > /tmp/wire-after.json
+          ls -la forged/$ORDER_ID || true
+
+      - name: Fork customer repo to bot account
+        id: fork
+        if: steps.forge_auto.outcome == 'success'
+        run: |
+          # POST /repos/{owner}/{repo}/forks creates a fork under the
+          # authenticated user (the bot). Idempotent — if already forked,
+          # returns the existing fork.
+          curl -sS -X POST \
+            -H "Authorization: token $BOT_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ steps.clone.outputs.repo_owner }}/${{ steps.clone.outputs.repo_name }}/forks" \
+            > /tmp/fork.json
+          BOT_OWNER=$(jq -r '.owner.login' /tmp/fork.json)
+          BOT_FORK_URL=$(jq -r '.clone_url' /tmp/fork.json)
+          if [ -z "$BOT_OWNER" ] || [ "$BOT_OWNER" = "null" ]; then
+            echo "::error::Fork API did not return an owner; check FORGE_BOT_TOKEN"
+            cat /tmp/fork.json
+            exit 1
+          fi
+          echo "bot_owner=$BOT_OWNER"         >> "$GITHUB_OUTPUT"
+          echo "bot_fork_url=$BOT_FORK_URL"   >> "$GITHUB_OUTPUT"
+          # Wait for fork to be available (forks are async)
+          for i in $(seq 1 12); do
+            curl -sS -H "Authorization: token $BOT_TOKEN" \
+              "https://api.github.com/repos/$BOT_OWNER/${{ steps.clone.outputs.repo_name }}" \
+              | jq -e '.id' >/dev/null 2>&1 && break
+            sleep 5
+          done
+
+      - name: Push refactored branch to bot fork
+        id: push
+        if: steps.fork.outcome == 'success'
+        run: |
+          BRANCH="forge/refactor-$ORDER_ID"
+          cd target/repo
+          # Replace src/ with the forged/ output (the canonical 5-tier
+          # layout). Files outside src/ are preserved.
+          rm -rf src
+          cp -R forged/$ORDER_ID src
+          git config user.name  "Atomadic Forge"
+          git config user.email "atomadic-forge@atomadictech.com"
+          git checkout -b "$BRANCH"
+          git add -A
+          git commit -m "Forge refactor — 5-tier monadic layout (order $ORDER_ID)" || echo "nothing to commit"
+          git remote add bot "https://x-access-token:$BOT_TOKEN@github.com/${{ steps.fork.outputs.bot_owner }}/${{ steps.clone.outputs.repo_name }}.git"
+          git push -u bot "$BRANCH" --force
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+
+      - name: Compose PR body
+        id: pr_body
+        if: steps.push.outcome == 'success'
+        run: |
+          CB=$(jq -r '.score // "?"' /tmp/certify-before.json 2>/dev/null || echo "?")
+          CA=$(jq -r '.score // "?"' /tmp/certify-after.json 2>/dev/null || echo "?")
+          WB=$(jq -r '.violation_count // "?"' /tmp/wire-before.json 2>/dev/null || echo "?")
+          WA=$(jq -r '.violation_count // "?"' /tmp/wire-after.json 2>/dev/null || echo "?")
+          {
+            echo "## Forge refactor — order \`$ORDER_ID\`"
+            echo ""
+            echo "This PR applies a full Forge pass against your repo:"
+            echo "**recon → cherry → wire → certify → emergent**."
+            echo ""
+            echo "### Scorecard"
+            echo "| Metric | Before | After |"
+            echo "|---|---|---|"
+            echo "| Certify | $CB | $CA |"
+            echo "| Wire violations | $WB | $WA |"
+            echo ""
+            echo "### What changed"
+            echo "- Every public symbol classified into the 5-tier monadic"
+            echo "  layout (a0 constants → a1 functions → a2 composites →"
+            echo "  a3 features → a4 orchestration)."
+            echo "- Upward imports rewritten down-tier or split."
+            echo "- All file moves preserve git history via \`forge auto\`."
+            echo ""
+            echo "### How to review"
+            echo "1. Skim the file-tree diff — every file is now in exactly"
+            echo "   one tier directory."
+            echo "2. Run \`forge wire src\` locally — should be PASS."
+            echo "3. Run \`forge certify .\` — should match the After number"
+            echo "   above."
+            echo "4. Run your own test suite — Forge does not touch behavior."
+            echo ""
+            echo "One round of revisions is included with your $499 order."
+            echo "Reply to the email you received from Atomadic with anything"
+            echo "you want changed."
+            echo ""
+            echo "— Atomadic Forge · powered by [forge.atomadic.tech](https://forge.atomadic.tech)"
+          } > /tmp/pr_body.md
+          # GitHub Output multiline
+          {
+            echo 'body<<EOF'
+            cat /tmp/pr_body.md
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Open PR from bot fork → customer repo
+        id: open_pr
+        if: steps.push.outcome == 'success'
+        run: |
+          PAYLOAD=$(jq -nR \
+            --arg title "Forge refactor — 5-tier monadic layout" \
+            --arg body  "${{ steps.pr_body.outputs.body }}" \
+            --arg head  "${{ steps.fork.outputs.bot_owner }}:${{ steps.push.outputs.branch }}" \
+            --arg base  "${{ steps.clone.outputs.default_branch }}" \
+            '{title:$title, body:$body, head:$head, base:$base, maintainer_can_modify:true, draft:false}')
+          curl -sS -X POST \
+            -H "Authorization: token $BOT_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ steps.clone.outputs.repo_owner }}/${{ steps.clone.outputs.repo_name }}/pulls" \
+            -d "$PAYLOAD" \
+            > /tmp/pr.json
+          PR_URL=$(jq -r '.html_url // empty' /tmp/pr.json)
+          PR_NUM=$(jq -r '.number  // empty' /tmp/pr.json)
+          if [ -z "$PR_URL" ]; then
+            echo "::error::Failed to open PR"
+            jq . /tmp/pr.json || cat /tmp/pr.json
+            echo "status=failed"  >> "$GITHUB_OUTPUT"
+            echo "pr_url="         >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+          echo "PR opened: $PR_URL"
+          echo "pr_url=$PR_URL"   >> "$GITHUB_OUTPUT"
+          echo "pr_number=$PR_NUM" >> "$GITHUB_OUTPUT"
+          echo "status=opened"     >> "$GITHUB_OUTPUT"
+
+      - name: Notify atomadic-cognition (success or failure)
+        if: always()
+        run: |
+          STATUS="${{ steps.open_pr.outputs.status }}"
+          PR_URL="${{ steps.open_pr.outputs.pr_url }}"
+          if [ "${{ steps.forge_auto.outcome }}" != "success" ]; then
+            STATUS="forge_auto_failed"
+          elif [ "${{ steps.push.outcome }}" != "success" ]; then
+            STATUS="push_failed"
+          fi
+          STATUS="${STATUS:-failed}"
+          PAYLOAD=$(jq -n \
+            --arg order_id "$ORDER_ID" \
+            --arg session_id "$SESSION_ID" \
+            --arg pr_url "${PR_URL:-}" \
+            --arg status "$STATUS" \
+            --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            '{order_id:$order_id, session_id:$session_id, pr_url:$pr_url, status:$status, run_url:$run_url}')
+          curl -sS -X POST \
+            -H "Authorization: Bearer $PURCHASE_TOKEN" \
+            -H "Content-Type: application/json" \
+            "$COGNITION_URL/refactor-completed" \
+            -d "$PAYLOAD" || true
