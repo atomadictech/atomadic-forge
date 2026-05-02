@@ -299,6 +299,66 @@ def _tool_get_recipe(project_root: Path, args: dict[str, Any]) -> dict[str, Any]
     return recipe
 
 
+def _tool_trust_gate_response(project_root: Path,
+                                  args: dict[str, Any]) -> dict[str, Any]:
+    """Backport from Forge Deluxe cycle 13. Run deterministic
+    hallucination checks against an LLM response. No LLM in the
+    loop; pure AST + regex over code blocks + URLs + claims."""
+    from .trust_gate_response import gate_response
+    response = str(args.get("response", ""))
+    known = args.get("known_capabilities") or []
+    local_prefix = str(args.get("local_pkg_prefix", ""))
+    if not response:
+        return {"error": "missing 'response' argument"}
+    verdict = gate_response(
+        response,
+        known_capabilities=list(known) if known else None,
+        local_pkg_prefix=local_prefix,
+    )
+    return {
+        "schema": verdict.schema,
+        "score": verdict.score,
+        "safe_to_act": verdict.safe_to_act,
+        "code_blocks_count": verdict.code_blocks_count,
+        "citations_count": verdict.citations_count,
+        "findings": [
+            {"severity": f.severity, "category": f.category,
+              "detail": f.detail, "evidence": f.evidence}
+            for f in verdict.findings
+        ],
+    }
+
+
+def _tool_exported_api_check(project_root: Path,
+                                  args: dict[str, Any]) -> dict[str, Any]:
+    """Backport from Forge Deluxe cycle 15. Verify a module's
+    docstring claims actually resolve to top-level definitions.
+    Catches the failure mode where a body-fill emit ships a
+    docstring promising a public function that isn't there."""
+    from .exported_api_check import check_exported_api
+    source = args.get("source")
+    if not source and args.get("path"):
+        try:
+            source = Path(args["path"]).read_text(encoding="utf-8")
+        except OSError as e:
+            return {"error": f"cannot read path: {e}"}
+    if not source:
+        return {"error": "missing 'source' or 'path' argument"}
+    strict = bool(args.get("strict", False))
+    result = check_exported_api(source, strict=strict)
+    return {
+        "schema": result.schema,
+        "ok": result.ok,
+        "detail": result.detail,
+        "claims_found": [
+            {"name": c.name, "source": c.source}
+            for c in result.claims_found
+        ],
+        "resolved": list(result.resolved),
+        "unresolved": list(result.unresolved),
+    }
+
+
 def _tool_auto_plan_unbound(project_root: Path,
                              args: dict[str, Any]) -> dict[str, Any]:
     """auto_plan stub — a3 binds the real ``run_auto_plan`` at import
@@ -744,6 +804,83 @@ TOOLS: dict[str, dict[str, Any]] = {
             "additionalProperties": False,
         },
         "handler": _tool_get_recipe,
+    },
+    "trust_gate_response": {
+        "name": "trust_gate_response",
+        "description": (
+            "Backport from Forge Deluxe cycle 13. Pure-AST "
+            "hallucination detector for LLM responses: catches "
+            "unresolved imports, syntax errors in code blocks, "
+            "stub-pattern code, false capability claims, and "
+            "placeholder URLs. No LLM in the loop."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "response": {
+                    "type": "string",
+                    "description": "The LLM response to gate.",
+                },
+                "known_capabilities": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": (
+                        "Optional list of capability ids the "
+                        "caller's project actually ships. When "
+                        "supplied, false-claim detection becomes "
+                        "active."
+                    ),
+                },
+                "local_pkg_prefix": {
+                    "type": "string",
+                    "description": (
+                        "Dotted prefix considered locally "
+                        "available (e.g. 'atomadic_forge')."
+                    ),
+                },
+            },
+            "required": ["response"],
+            "additionalProperties": False,
+        },
+        "handler": _tool_trust_gate_response,
+    },
+    "exported_api_check": {
+        "name": "exported_api_check",
+        "description": (
+            "Backport from Forge Deluxe cycle 15. Verify a "
+            "Python module's docstring promises (backticked + "
+            "signature-pattern identifiers) actually resolve to "
+            "top-level definitions. Catches the body-fill emit "
+            "that ships a docstring claiming a public function "
+            "that was never defined."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "source": {
+                    "type": "string",
+                    "description": "Python source to check.",
+                },
+                "path": {
+                    "type": "string",
+                    "description": (
+                        "Alternative to source: read from this "
+                        "file."
+                    ),
+                },
+                "strict": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": (
+                        "When true, also fail on unresolved "
+                        "PascalCase claims (default: only "
+                        "snake_case unresolved are fatal)."
+                    ),
+                },
+            },
+            "additionalProperties": False,
+        },
+        "handler": _tool_exported_api_check,
     },
 }
 

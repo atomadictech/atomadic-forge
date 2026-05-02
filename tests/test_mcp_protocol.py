@@ -80,6 +80,8 @@ def test_tools_list_pinned(tmp_path):
         "adapt_plan", "compose_tools", "load_policy",
         "why_did_this_change", "what_failed_last_time",
         "list_recipes", "get_recipe",
+        # Backported from Forge Deluxe (cycles 13 + 15):
+        "trust_gate_response", "exported_api_check",
     }
     assert pinned == names == set(TOOLS.keys()), (
         f"tools/list drifted: returned {names}, expected {pinned}"
