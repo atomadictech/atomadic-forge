@@ -480,9 +480,9 @@ def certify(root: Path, *, project: str = "Atomadic project",
             "importable": {
                 "ok": importable, "score_weight": 25,
                 "how_to_fix": (
-                    (f"Fix import error: {smoke['error_kind']} — "
+                    f"Fix import error: {smoke['error_kind']} — "
                      f"{smoke['error_message']}"
-                     if smoke else "Package not importable.")
+                     if smoke else "Package not importable."
                 ) if not importable else None,
             },
             "tests_pass": {
