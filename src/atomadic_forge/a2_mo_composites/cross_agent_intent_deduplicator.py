@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from collections import deque
 from itertools import count
-from typing import Deque, Dict, List
 
 from atomadic_forge.a1_at_functions import intent_similarity
 
@@ -32,7 +31,7 @@ class CrossAgentIntentDeduplicator:
             raise ValueError("threshold must be in [0.0, 1.0]")
         self._max_window = max_window
         self._threshold = threshold
-        self._window: Deque[Dict] = deque(maxlen=max_window)
+        self._window: deque[dict] = deque(maxlen=max_window)
         self._ids = count(1)
 
     def propose(self, agent_id: str, intent: str) -> dict:
@@ -60,7 +59,7 @@ class CrossAgentIntentDeduplicator:
         })
         return {"verdict": "ACCEPT", "intent_id": intent_id}
 
-    def recent(self) -> List[dict]:
+    def recent(self) -> list[dict]:
         """Window contents in insertion order; copies, not refs."""
         return [dict(entry) for entry in self._window]
 

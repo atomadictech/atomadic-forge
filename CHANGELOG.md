@@ -1,5 +1,55 @@
 # Changelog
 
+## 0.6.0 - MCP quality-of-life: 3 bug fixes + agent-optimized certify
+
+Fixes three bugs discovered during live Forge MCP audit, plus new
+machine-readable certify fields and two new golden-path recipes.
+
+### Fixed
+
+- **P0 (critical)** `recon` MCP tool no longer overflows LLM context
+  windows. `symbols[]` (771 K chars on forge itself) is stripped from
+  the default response; pass `verbose: true` to get the full walk.
+  `symbol_count` remains so agents still see cardinality inline.
+
+- **P1 (high)** `certify` behavioral score no longer reports `ran:
+  false, pass_ratio: 0.0` on repos using `xfailed`/`xpassed` pytest
+  status words. The `_parse_pytest_summary` parser now uses independent
+  per-metric regex patterns instead of a single monolithic regex that
+  choked on unknown status words between "passed" and "in Xs".
+  Atomadic-Lang's certify score recovers from 70 to 100.
+
+- **P2 (high)** `auto_plan` verdict no longer reports `PASS` for repos
+  with score < 75 and no action cards. `not cards` alone was treated as
+  PASS regardless of score; now requires `score >= 75`. No-input plans
+  (score defaults to 0.0) correctly return `FAIL`.
+
+### Added
+
+- `certify` output now includes `health_summary` (score + verdict +
+  blockers + scan_duration_ms) — a single at-a-glance block for agent
+  loops that don't want to parse the full response.
+
+- `certify` output now includes `axes` dict with per-axis `ok` bool and
+  `how_to_fix` string. When an axis fails, agents get an explicit action
+  ("Add README.md at the project root." / "Run forge wire src
+  --suggest-repairs -- N violation(s).") instead of just a flag.
+
+- `certify` now reports `scan_duration_ms` at top level and inside
+  `health_summary` — agents doing performance budgeting can use this
+  for timeout planning.
+
+- New recipe `bump_version` — checklist for patch/minor/major bumps:
+  edit pyproject.toml, update __version__, write CHANGELOG entry,
+  certify, commit, tag.
+
+- New recipe `fix_test_detection` — debugging guide for when certify
+  reports `ran=false` or `pass_ratio=0` despite pytest passing locally:
+  traces xfailed parse failure, wrong-package import filter, and import
+  smoke failure paths.
+
+---
+
 ## 0.5.3 - Documentation metadata sync
 
 Small follow-up to `0.5.2` so the published package description and

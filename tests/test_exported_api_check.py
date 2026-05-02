@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from atomadic_forge.a1_at_functions.exported_api_check import (
-    APIClaim, check_exported_api, extract_claims,
+    check_exported_api,
+    extract_claims,
 )
 
 
@@ -106,8 +107,9 @@ def test_mcp_tool_handler_registered():
 
 
 def test_mcp_tool_handler_with_source():
-    from atomadic_forge.a1_at_functions.mcp_protocol import TOOLS
     from pathlib import Path
+
+    from atomadic_forge.a1_at_functions.mcp_protocol import TOOLS
     handler = TOOLS["exported_api_check"]["handler"]
     src = '"""Exports `do_thing`."""\ndef do_thing(): return 1\n'
     out = handler(Path("."), {"source": src})
@@ -128,16 +130,18 @@ def test_mcp_tool_handler_with_path(tmp_path):
 
 
 def test_mcp_tool_missing_args_returns_error():
-    from atomadic_forge.a1_at_functions.mcp_protocol import TOOLS
     from pathlib import Path
+
+    from atomadic_forge.a1_at_functions.mcp_protocol import TOOLS
     handler = TOOLS["exported_api_check"]["handler"]
     out = handler(Path("."), {})
     assert "error" in out
 
 
 def test_mcp_tool_strict_flag_propagates():
-    from atomadic_forge.a1_at_functions.mcp_protocol import TOOLS
     from pathlib import Path
+
+    from atomadic_forge.a1_at_functions.mcp_protocol import TOOLS
     handler = TOOLS["exported_api_check"]["handler"]
     src = '"""Promises `BigClassName`."""\ndef x(): return 1\n'
     permissive = handler(Path("."), {"source": src})

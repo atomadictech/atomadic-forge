@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import threading
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 SCHEMA: str = "atomadic-forge-deluxe.cost-circuit-breaker/v1"
 

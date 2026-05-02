@@ -24,7 +24,6 @@ from atomadic_forge.a0_qk_constants.auth_constants import (
 )
 from atomadic_forge.a2_mo_composites.forge_auth_client import ForgeAuthClient
 
-
 # ---- fake urlopen helpers --------------------------------------------
 
 class _FakeResponse:
@@ -36,7 +35,7 @@ class _FakeResponse:
         else:
             self._buf = BytesIO(json.dumps(payload).encode("utf-8"))
 
-    def __enter__(self) -> "_FakeResponse":
+    def __enter__(self) -> _FakeResponse:
         return self
 
     def __exit__(self, *args: Any) -> bool:

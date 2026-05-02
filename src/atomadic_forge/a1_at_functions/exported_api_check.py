@@ -75,8 +75,8 @@ def _extract_module_docstring(tree: ast.Module) -> str:
 def _top_level_names(tree: ast.Module) -> set[str]:
     out: set[str] = set()
     for node in tree.body:
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef,
-                              ast.ClassDef)):
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef
+                                 | ast.ClassDef):
             out.add(node.name)
         elif isinstance(node, ast.Assign):
             for tgt in node.targets:

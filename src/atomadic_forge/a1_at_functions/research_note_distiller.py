@@ -47,7 +47,8 @@ def _dedupe(items: list[str]) -> list[str]:
     out: list[str] = []
     for x in items:
         if x not in seen:
-            seen.add(x); out.append(x)
+            seen.add(x)
+            out.append(x)
     return out
 
 

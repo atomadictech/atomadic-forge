@@ -7,8 +7,10 @@ intent_similarity (a1) + sealed-probe vetting + D_max=3 enforcement.
 from __future__ import annotations
 
 from atomadic_forge.a3_og_features.agent_hire_protocol import (
-    AgentConstraints, RoleSpec,
-    hire_for_role, post_role, vet_candidate,
+    RoleSpec,
+    hire_for_role,
+    post_role,
+    vet_candidate,
 )
 
 

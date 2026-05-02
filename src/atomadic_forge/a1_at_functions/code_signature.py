@@ -77,14 +77,14 @@ def _normalize_ast(node: ast.AST) -> str:
             parts.append(f"Cmp:{ops}")
         elif isinstance(sub, ast.UnaryOp):
             parts.append(f"U:{type(sub.op).__name__}")
-        elif isinstance(sub, (ast.For, ast.While, ast.If, ast.Try,
-                                ast.With, ast.Return, ast.Raise,
-                                ast.Assign, ast.AugAssign, ast.AnnAssign,
-                                ast.FunctionDef, ast.AsyncFunctionDef,
-                                ast.ClassDef, ast.Lambda, ast.ListComp,
-                                ast.DictComp, ast.SetComp, ast.GeneratorExp,
-                                ast.Import, ast.ImportFrom, ast.Call,
-                                ast.Attribute, ast.Subscript)):
+        elif isinstance(sub, ast.For | ast.While | ast.If | ast.Try
+                              | ast.With | ast.Return | ast.Raise
+                              | ast.Assign | ast.AugAssign | ast.AnnAssign
+                              | ast.FunctionDef | ast.AsyncFunctionDef
+                              | ast.ClassDef | ast.Lambda | ast.ListComp
+                              | ast.DictComp | ast.SetComp | ast.GeneratorExp
+                              | ast.Import | ast.ImportFrom | ast.Call
+                              | ast.Attribute | ast.Subscript):
             parts.append(cls)
     return "|".join(parts)
 
@@ -133,7 +133,7 @@ def _signature_function(node: ast.FunctionDef | ast.AsyncFunctionDef
 
 def _signature_class(node: ast.ClassDef) -> ClassSignature:
     methods = [n for n in node.body
-                if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]
+                if isinstance(n, ast.FunctionDef | ast.AsyncFunctionDef)]
     has_state = any(_has_self_assign(m) for m in methods
                      if isinstance(m, ast.FunctionDef)
                      and m.name == "__init__")
@@ -167,7 +167,7 @@ def signature_of(source: str) -> ModuleSignature:
     funcs: list[FunctionSignature] = []
     classes: list[ClassSignature] = []
     for node in tree.body:
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
             funcs.append(_signature_function(node))
         elif isinstance(node, ast.ClassDef):
             classes.append(_signature_class(node))

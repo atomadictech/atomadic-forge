@@ -22,7 +22,7 @@ import hashlib
 import json
 import time
 from dataclasses import dataclass, field
-from typing import Callable, Protocol
+from typing import Protocol
 
 from ..a1_at_functions import intent_similarity
 from ..a1_at_functions.trust_gate_response import gate_response

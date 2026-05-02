@@ -26,7 +26,6 @@ from __future__ import annotations
 
 from typing import TypedDict
 
-
 # ---- endpoints ----------------------------------------------------------
 
 DEFAULT_AUTH_ENDPOINT = "https://forge-auth.atomadic.tech/v1/forge/auth/verify"

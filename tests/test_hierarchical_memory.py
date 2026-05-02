@@ -6,10 +6,6 @@ M3 reflection) with Park-2023 recency×importance×relevance scoring.
 
 from __future__ import annotations
 
-from pathlib import Path
-
-import pytest
-
 from atomadic_forge.a2_mo_composites.hierarchical_memory import (
     HierarchicalMemory,
 )

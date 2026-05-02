@@ -8,11 +8,10 @@ Cherry-pick origin: forge-deluxe-seed cycle 7 (`dedup_engine`,
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from atomadic_forge.a1_at_functions import intent_similarity
 from atomadic_forge.a1_at_functions.code_signature import (
-    function_overlap, signature_of,
+    function_overlap,
+    signature_of,
 )
 from atomadic_forge.a1_at_functions.research_note_distiller import (
     distill_notes,
@@ -21,9 +20,10 @@ from atomadic_forge.a2_mo_composites.cross_agent_intent_deduplicator import (
     CrossAgentIntentDeduplicator,
 )
 from atomadic_forge.a3_og_features.dedup_engine import (
-    dedup_code_tree, dedup_research_notes, run_dedup,
+    dedup_code_tree,
+    dedup_research_notes,
+    run_dedup,
 )
-
 
 # ───────── intent_similarity ──────────
 

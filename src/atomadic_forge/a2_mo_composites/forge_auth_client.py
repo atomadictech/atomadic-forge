@@ -45,7 +45,6 @@ from ..a1_at_functions.forge_auth import (
     parse_verify_response,
 )
 
-
 # Type alias for the urlopen seam — accepts a Request and returns an
 # object with .read() (and ideally context-manager protocol).
 UrlOpen = Callable[..., Any]

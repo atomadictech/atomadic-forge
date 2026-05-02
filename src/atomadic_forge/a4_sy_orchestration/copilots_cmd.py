@@ -55,7 +55,7 @@ def _to_jsonable(obj: object) -> object:
         return str(obj)
     if isinstance(obj, set):
         return sorted(obj)
-    if isinstance(obj, (list, tuple)):
+    if isinstance(obj, list | tuple):
         return [_to_jsonable(v) for v in obj]
     if isinstance(obj, dict):
         return {k: _to_jsonable(v) for k, v in obj.items()}
@@ -128,7 +128,7 @@ def select_tests_cmd(
             "--file", "-f",
             help="Repeat for each changed file. Example: --file src/a/b.py --file src/a/c.py",
         ),
-    ] = [],
+    ] = [],  # noqa: B006 — Typer requires a literal default for repeated options
     project_root: Annotated[
         Path,
         typer.Option("--project-root", "-p", exists=True, file_okay=False, resolve_path=True),
@@ -149,7 +149,7 @@ def rollback_plan_cmd(
             "--file", "-f",
             help="Repeat for each changed file you want a rollback plan for.",
         ),
-    ] = [],
+    ] = [],  # noqa: B006 — Typer requires a literal default for repeated options
     project_root: Annotated[
         Path,
         typer.Option("--project-root", "-p", exists=True, file_okay=False, resolve_path=True),
@@ -195,7 +195,7 @@ def adapt_plan_cmd(
             "--cap", "-c",
             help="Repeat for each capability the agent advertises (e.g. -c apply -c shell).",
         ),
-    ] = [],
+    ] = [],  # noqa: B006 — Typer requires a literal default for repeated options
     file: Annotated[
         Path | None,
         typer.Option(
@@ -221,7 +221,7 @@ def policy_cmd(
 
 
 # Public registry — cli.py imports this and registers each.
-COPILOTS_VERBS: list[tuple[str, "typer.Typer", str]] = [
+COPILOTS_VERBS: list[tuple[str, typer.Typer, str]] = [
     ("explain-repo",        explain_app,  "Codex #6 — humane operational orientation of any repo."),
     ("score-patch",         score_app,    "Codex #3 — patch risk scorer (diff via stdin or --file)."),
     ("select-tests",        tests_app,    "Codex #7 — minimum + full-confidence test sets per intent."),

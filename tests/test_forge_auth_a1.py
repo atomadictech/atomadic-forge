@@ -25,7 +25,6 @@ from atomadic_forge.a1_at_functions.forge_auth import (
     read_api_key_from_env,
 )
 
-
 # ---- read_api_key_from_env --------------------------------------------
 
 def test_read_api_key_returns_none_when_env_missing():

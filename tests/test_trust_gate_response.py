@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from atomadic_forge.a1_at_functions.trust_gate_response import (
-    TrustVerdict, gate_response,
+    TrustVerdict,
+    gate_response,
 )
 
 
@@ -99,8 +100,9 @@ def test_mcp_tool_handler_runs():
 
 
 def test_mcp_tool_missing_response_returns_error():
-    from atomadic_forge.a1_at_functions.mcp_protocol import TOOLS
     from pathlib import Path
+
+    from atomadic_forge.a1_at_functions.mcp_protocol import TOOLS
     handler = TOOLS["trust_gate_response"]["handler"]
     out = handler(Path("."), {})
     assert "error" in out

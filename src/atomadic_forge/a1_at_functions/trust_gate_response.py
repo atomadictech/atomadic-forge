@@ -24,8 +24,8 @@ import ast
 import importlib.util
 import re
 import sys
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Iterable
 
 SCHEMA: str = "atomadic-forge.trust-gate-response/v1"
 
@@ -140,7 +140,7 @@ def _check_stub_pattern(code: str) -> bool:
     except SyntaxError:
         return False
     funcs = [n for n in ast.walk(tree)
-              if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]
+              if isinstance(n, ast.FunctionDef | ast.AsyncFunctionDef)]
     if not funcs:
         return False
     stub_count = 0

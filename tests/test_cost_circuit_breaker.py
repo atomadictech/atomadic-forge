@@ -76,8 +76,10 @@ def test_breaker_thread_safe_basic():
             cb.record(task_id="t", tokens_in=1, made_progress=True)
             cb.check(task_id="t")
     threads = [threading.Thread(target=worker) for _ in range(4)]
-    for t in threads: t.start()
-    for t in threads: t.join()
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
     s = cb.status()
     # 4 threads * 10 records = 40 entries
     assert s["today"]["tokens"] >= 30  # allow for any race-condition undercount

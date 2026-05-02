@@ -25,13 +25,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from ..a1_at_functions import intent_similarity
-from ..a1_at_functions.code_signature import signature_of, ModuleSignature
-from ..a1_at_functions.research_note_distiller import (
-    DistilledNotes, distill_notes,
-)
-from ..a2_mo_composites.cross_agent_intent_deduplicator import (
-    CrossAgentIntentDeduplicator,
-)
+from ..a1_at_functions.code_signature import signature_of
 
 SCHEMA: str = "atomadic-forge.dedup-engine/v1"
 
@@ -89,7 +83,6 @@ def dedup_research_notes(inbox: Path,
     near-duplicate notes by (title + thesis) similarity. Returns
     (duplicate_groups, novel_paths)."""
     notes = _read_md_dir(inbox)
-    distilled = distill_notes([content for _, content in notes])
     # Build per-note canonical text using title + thesis if present.
     canonical_texts: list[str] = []
     for _, content in notes:
