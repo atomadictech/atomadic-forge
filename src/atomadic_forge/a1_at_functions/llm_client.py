@@ -436,8 +436,10 @@ class OllamaClient:
 class OpenRouterClient:
     """OpenRouter — routes to 200+ models via OpenAI-compatible API.
 
-    Reads ``OPENROUTER_API_KEY``.  Default model: ``deepseek/deepseek-chat-v3-0324:free``
-    (free tier).  Override via ``FORGE_OPENROUTER_MODEL`` env var.
+    Reads ``OPENROUTER_API_KEY``.  Default model:
+    ``inclusionai/ling-2.6-1t:free`` (Ling-2.6-1T trillion-param MoE,
+    262K context, free tier — SOTA on SWE-bench at the time of wiring).
+    Override via ``FORGE_OPENROUTER_MODEL`` env var.
     """
 
     name = "openrouter"
@@ -448,7 +450,7 @@ class OpenRouterClient:
                  api_key_env: str = "OPENROUTER_API_KEY"):
         self.model = (model
                       or os.environ.get("FORGE_OPENROUTER_MODEL")
-                      or "google/gemma-3-27b-it:free")
+                      or "inclusionai/ling-2.6-1t:free")
         self._api_key_env = api_key_env
 
     def call(self, prompt: str, *, system: str = "",

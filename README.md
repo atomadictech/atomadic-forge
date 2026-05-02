@@ -292,7 +292,8 @@ forge chat ask "hello" --provider stub --no-cwd-context --json
 | `nexus` / `aaaa-nexus` | paid | `AAAA_NEXUS_API_KEY` | (Nexus default) | AAAA-Nexus sovereign AI; most reliable for long runs |
 | `anthropic` | paid | `ANTHROPIC_API_KEY` | `claude-sonnet-4-6` | Highest code quality (Claude 4.x; override with `claude-opus-4-7` for max reasoning or `claude-haiku-4-5-20251001` for speed) |
 | `openai` | paid | `OPENAI_API_KEY` | `gpt-4o-mini` | Cheap GPT path; override to `gpt-4.1` or `gpt-4o` for higher quality |
-| `openrouter` | **free tier available** | `OPENROUTER_API_KEY` | `google/gemma-3-27b-it:free` | Access 200+ models; good fallback when Gemini quota exhausted; override with `FORGE_OPENROUTER_MODEL` |
+| `openrouter` | **free tier available** | `OPENROUTER_API_KEY` | `inclusionai/ling-2.6-1t:free` | Access 200+ models; good fallback when Gemini quota exhausted; override with `FORGE_OPENROUTER_MODEL` |
+| `ling` | **free** | `OPENROUTER_API_KEY` | `inclusionai/ling-2.6-1t:free` | Shortcut for Ling-2.6-1T (1T-param MoE, 262K ctx, SOTA SWE-bench) — frontier model at zero cost via OpenRouter |
 | `ollama` | free, local | `FORGE_OLLAMA=1` | `qwen2.5-coder:7b` | Offline; fully private |
 | `stub` | free, offline | n/a | n/a | Tests, CI, dry-runs |
 

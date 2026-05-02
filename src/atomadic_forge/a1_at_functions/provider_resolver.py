@@ -18,7 +18,7 @@ from .llm_client import (
 
 PROVIDER_HELP = (
     "auto | nexus | aaaa-nexus | gemini | anthropic | openai | "
-    "openrouter | ollama | stub"
+    "openrouter | ling | ollama | stub"
 )
 
 
@@ -38,6 +38,8 @@ def resolve_provider(name: str = "auto") -> LLMClient:
         return OpenAIClient()
     if provider in ("openrouter", "router"):
         return OpenRouterClient()
+    if provider == "ling":
+        return OpenRouterClient(model="inclusionai/ling-2.6-1t:free")
     if provider == "ollama":
         return OllamaClient(
             model=os.environ.get("FORGE_OLLAMA_MODEL", "qwen2.5-coder:7b"),
