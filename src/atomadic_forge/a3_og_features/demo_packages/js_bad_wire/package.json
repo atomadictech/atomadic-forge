@@ -1,8 +1,0 @@
-{
-  "name": "js-bad-wire-showcase",
-  "version": "0.1.0",
-  "description": "Atomadic Forge showcase — JS package with one deliberate upward import",
-  "type": "module",
-  "main": "a4_sy_orchestration/index.js",
-  "license": "BSL-1.1"
-}
