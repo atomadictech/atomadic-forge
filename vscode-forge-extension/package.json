@@ -2,7 +2,7 @@
   "name": "atomadic-forge-vscode",
   "displayName": "Atomadic Forge",
   "description": "Live diagnostics + hover + goto-source for .forge sidecar files. Plugs into forge lsp serve.",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "publisher": "atomadictech",
   "license": "BUSL-1.1",
   "homepage": "https://github.com/atomadictech/atomadic-forge",

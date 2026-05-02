@@ -1146,7 +1146,7 @@ def dispatch_request(
         return _ok(msg_id, _initialize_response())
     if method == "ping":
         return _ok(msg_id, {})
-    if method == "notifications/initialized":
+    if method in {"notifications/initialized", "initialized"}:
         return None  # client → server; server replies nothing
     if method == "tools/list":
         return _ok(msg_id, _list_tools())

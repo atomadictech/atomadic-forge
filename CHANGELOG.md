@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.5.1 — MCP stdio framing compatibility
+
+Fixes `forge mcp serve` for MCP hosts that use LSP-style
+`Content-Length` framing over stdio instead of newline-delimited JSON.
+Modern Codex / VS Code MCP bridges can spawn the server, list tools,
+and then send framed `tools/call` requests; before this patch Forge
+could misread the frame header as JSON and leave the host waiting until
+its tool-call timeout.
+
+### Fixed
+
+- `forge mcp serve` now accepts both newline-delimited JSON-RPC and
+  `Content-Length` framed JSON-RPC on stdin.
+- MCP responses are written in the same framing style as the request
+  that triggered them, preserving compatibility with shell smoke tests
+  and stricter MCP clients.
+- The dispatcher now treats both `notifications/initialized` and
+  `initialized` as no-response initialization notifications.
+- The VS Code extension manifest version now tracks the `0.5.1`
+  package release.
+
+### Tests
+
+- Added a framed stdio regression test for initialize → initialized →
+  ping → shutdown.
+- Verified framed `tools/call list_recipes` against the real
+  `forge mcp serve` command.
+
+---
+
 ## 0.3.5 — Copilot's Copilot CLI parity + GUI version sync
 
 The MCP exposes 21 tools. Until 0.3.5, only 12 of them had CLI

@@ -39,7 +39,7 @@ import os
 import sys
 from pathlib import Path
 from pathlib import Path as _Path
-from typing import IO
+from typing import IO, Any
 
 from ..a1_at_functions.forge_auth import (
     hash_project_path,
@@ -223,8 +223,8 @@ def serve_stdio(
     setup error. Per-request errors NEVER raise — they're returned to
     the client as JSON-RPC error responses.
     """
-    src_in = stdin or sys.stdin
-    src_out = stdout or sys.stdout
+    src_in = stdin if stdin is not None else sys.stdin.buffer
+    src_out = stdout if stdout is not None else sys.stdout.buffer
     src_err = stderr or sys.stderr
     eff_env: dict[str, str] = dict(env if env is not None else os.environ)
     client = auth_client or ForgeAuthClient()
@@ -238,12 +238,15 @@ def serve_stdio(
     src_err.write(f"forge mcp serve: ready (project_root={project_root})\n")
     src_err.flush()
 
-    for raw in src_in:
+    while True:
+        raw, framed = _read_message(src_in)
+        if raw is None:
+            break
         line = raw.strip()
         if not line:
             continue
         try:
-            request = json.loads(line)
+            request = json.loads(line.decode("utf-8") if isinstance(line, bytes) else line)
         except json.JSONDecodeError as exc:
             response = {
                 "jsonrpc": "2.0",
@@ -253,11 +256,12 @@ def serve_stdio(
                     "message": f"Parse error: {exc}",
                 },
             }
-            _write(src_out, response)
+            _write(src_out, response, framed=framed)
             continue
         if isinstance(request, dict) and request.get("method") == "shutdown":
             _write(src_out, {"jsonrpc": "2.0",
-                              "id": request.get("id"), "result": {}})
+                              "id": request.get("id"), "result": {}},
+                   framed=framed)
             break
         # Lane C W5: subscription gate. Read-only metadata methods
         # bypass the check so initialize/tools/list still succeed
@@ -269,7 +273,7 @@ def serve_stdio(
                 _write(src_out, _auth_error_response(
                     request.get("id") if isinstance(request, dict) else None,
                     reason=reason,
-                ))
+                ), framed=framed)
                 continue
             # Fire-and-forget usage telemetry for tools/call only.
             if method == "tools/call" and api_key:
@@ -283,10 +287,70 @@ def serve_stdio(
                     pass
         response = dispatch_request(request, project_root=project_root)
         if response is not None:
-            _write(src_out, response)
+            _write(src_out, response, framed=framed)
     return 0
 
 
-def _write(stream: IO[str], payload: dict) -> None:
-    stream.write(json.dumps(payload, default=str) + "\n")
+def _read_message(stream: IO[Any]) -> tuple[str | bytes | None, bool]:
+    """Read one MCP stdio message.
+
+    Forge historically accepted newline-delimited JSON-RPC. Some MCP
+    hosts use LSP-style ``Content-Length`` frames instead. Accept both
+    shapes so existing shell smoke tests keep working and stricter MCP
+    clients do not block waiting for a newline that will never arrive.
+    """
+    first = stream.readline()
+    if not first:
+        return None, False
+    if isinstance(first, bytes):
+        probe = first.decode("ascii", errors="ignore").strip()
+    else:
+        probe = str(first).strip()
+    if probe.lower().startswith("content-length:"):
+        headers = [probe]
+        while True:
+            line = stream.readline()
+            if not line:
+                return None, True
+            text = (
+                line.decode("ascii", errors="ignore").rstrip("\r\n")
+                if isinstance(line, bytes)
+                else str(line).rstrip("\r\n")
+            )
+            if text == "":
+                break
+            headers.append(text)
+        length = 0
+        for header in headers:
+            key, _, value = header.partition(":")
+            if key.strip().lower() == "content-length":
+                try:
+                    length = int(value.strip())
+                except ValueError:
+                    length = 0
+                break
+        if length <= 0:
+            return b"" if isinstance(first, bytes) else "", True
+        body = stream.read(length)
+        return body, True
+    return first, False
+
+
+def _write(stream: IO[Any], payload: dict, *, framed: bool = False) -> None:
+    body = json.dumps(payload, default=str)
+    if framed:
+        encoded = body.encode("utf-8")
+        header = f"Content-Length: {len(encoded)}\r\n\r\n".encode("ascii")
+        try:
+            stream.write(header)
+            stream.write(encoded)
+        except TypeError:
+            stream.write(header.decode("ascii"))
+            stream.write(encoded.decode("utf-8"))
+        stream.flush()
+        return
+    try:
+        stream.write(body + "\n")
+    except TypeError:
+        stream.write((body + "\n").encode("utf-8"))
     stream.flush()

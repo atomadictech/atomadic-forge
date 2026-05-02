@@ -64,6 +64,15 @@ def test_initialized_notification_returns_none(tmp_path):
     assert resp is None
 
 
+def test_initialized_alias_notification_returns_none(tmp_path):
+    """Some stdio hosts send the LSP-style initialized notification."""
+    resp = dispatch_request(
+        {"jsonrpc": "2.0", "method": "initialized"},
+        project_root=tmp_path,
+    )
+    assert resp is None
+
+
 # ---- tools/list + resources/list ---------------------------------------
 
 def test_tools_list_pinned(tmp_path):
@@ -302,6 +311,48 @@ def test_serve_stdio_ping_round_trip(tmp_path):
     assert ping_resp["result"] == {}
     shutdown_resp = json.loads(lines[2])
     assert shutdown_resp["id"] == 3
+
+
+def _mcp_frame(msg: dict) -> bytes:
+    body = json.dumps(msg).encode("utf-8")
+    return f"Content-Length: {len(body)}\r\n\r\n".encode("ascii") + body
+
+
+def _mcp_framed_bodies(raw: bytes) -> list[dict]:
+    out = []
+    cursor = 0
+    while cursor < len(raw):
+        header_end = raw.find(b"\r\n\r\n", cursor)
+        assert header_end != -1, raw[cursor:]
+        header = raw[cursor:header_end].decode("ascii")
+        length = int(header.split(":", 1)[1].strip())
+        start = header_end + 4
+        body = raw[start:start + length]
+        out.append(json.loads(body.decode("utf-8")))
+        cursor = start + length
+    return out
+
+
+def test_serve_stdio_content_length_framed_round_trip(tmp_path):
+    """MCP hosts may use Content-Length framing instead of JSON lines."""
+    inp = io.BytesIO(b"".join([
+        _mcp_frame({"jsonrpc": "2.0", "id": 1, "method": "initialize"}),
+        _mcp_frame({"jsonrpc": "2.0", "method": "initialized"}),
+        _mcp_frame({"jsonrpc": "2.0", "id": 2, "method": "ping"}),
+        _mcp_frame({"jsonrpc": "2.0", "id": 3, "method": "shutdown"}),
+    ]))
+    out = io.BytesIO()
+    err = io.StringIO()
+
+    rc = serve_stdio(project_root=tmp_path, stdin=inp, stdout=out, stderr=err)
+
+    assert rc == 0
+    raw = out.getvalue()
+    assert raw.count(b"Content-Length:") == 3
+    bodies = _mcp_framed_bodies(raw)
+    assert bodies[0]["result"]["serverInfo"]["name"] == SERVER_NAME
+    assert bodies[1]["result"] == {}
+    assert bodies[2]["id"] == 3
 
 
 def test_serve_stdio_recovers_from_bad_json(tmp_path):
