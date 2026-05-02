@@ -34,17 +34,21 @@ from typing import Annotated
 
 import typer
 
+from ..a1_at_functions.agent_context_pack import emit_context_pack
 from ..a1_at_functions.agent_memory import (
     what_failed_last_time as _what_failed_last_time,
 )
 from ..a1_at_functions.agent_memory import why_did_this_change as _why_did_this_change
+from ..a1_at_functions.certify_checks import certify as _certify
 from ..a1_at_functions.patch_scorer import score_patch as _score_patch
 from ..a1_at_functions.plan_adapter import adapt_plan as _adapt_plan
 from ..a1_at_functions.policy_loader import load_policy as _load_policy
 from ..a1_at_functions.repo_explainer import explain_repo as _explain_repo
 from ..a1_at_functions.rollback_planner import rollback_plan as _rollback_plan
+from ..a1_at_functions.scout_walk import harvest_repo
 from ..a1_at_functions.test_selector import select_tests as _select_tests
 from ..a1_at_functions.tool_composer import compose_tools as _compose_tools
+from ..a1_at_functions.wire_check import scan_violations
 
 
 def _to_jsonable(obj: object) -> object:
@@ -98,7 +102,32 @@ def explain_repo_cmd(
     ] = Path("."),
     depth: Annotated[str, typer.Option("--depth")] = "agent",
 ) -> None:
-    _emit(_explain_repo(project_root=project_root, depth=depth))
+    try:
+        scout = harvest_repo(project_root)
+    except (OSError, ValueError):
+        scout = None
+    try:
+        wire = scan_violations(project_root)
+    except (OSError, ValueError):
+        wire = None
+    try:
+        cert = _certify(project_root, project=project_root.name)
+    except (OSError, RuntimeError, ValueError):
+        cert = None
+    pack = emit_context_pack(
+        project_root=project_root,
+        scout_report=scout,
+        wire_report=wire,
+        certify_report=cert,
+    )
+    _emit(_explain_repo(
+        project_root=project_root,
+        repo_purpose=pack.get("repo_purpose", ""),
+        scout_report=scout,
+        wire_report=wire,
+        certify_report=cert,
+        depth=depth,
+    ))
 
 
 @score_app.callback(invoke_without_command=True)

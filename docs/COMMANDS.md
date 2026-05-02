@@ -223,6 +223,7 @@ AAAA-Nexus signing) is unreachable.
 |  |  | `what_failed_last_time` |
 |  |  | `list_recipes` |
 |  |  | `get_recipe` |
+|  |  | `worktree_status` |
 |  |  | `trust_gate_response` |
 |  |  | `exported_api_check` |
 
@@ -240,10 +241,12 @@ requests, and reports whether the transport path is healthy.
 forge mcp doctor --project . --json
 ```
 
-Returns `atomadic-forge.mcp_doctor/v1` with Forge version, project
-root, tool count, framed-stdio status, server exit code, and a
-`next_command`. If this passes but your editor's live MCP tools fail,
-restart the MCP host/editor so it respawns the server.
+Returns `atomadic-forge.mcp_doctor/v1` with Forge version, Python
+executable, resolved `forge` command path, source module paths,
+project root, tool count, framed-stdio status, server exit code,
+recommended MCP config, and a `next_command`. If this passes but your
+editor's live MCP tools fail, restart the MCP host/editor so it
+respawns the server.
 
 What this unlocks per Golden Path Lane C: the Forge Receipt JSON
 becomes consumable by every major coding-agent platform via the same
@@ -345,6 +348,25 @@ a repo. Wraps scout + wire + certify and adds:
 forge context-pack . --json > context.json
 ```
 
+Targeted context is available when the agent already knows the task
+shape. Use `--focus` with `orientation`, `change`, `release`, or
+`debug`; add `--intent` plus repeatable `--file` values to include
+file context, preflight results, selected tests, and suggested next
+steps:
+
+```bash
+forge context-pack . \
+  --focus change \
+  --intent "Review the AGI epiphany research note" \
+  --file research/agi-epiphanies-20260428.md \
+  --json
+```
+
+Targeted packs add `focus`, `intent`, `target_files`,
+`file_context`, `change_preflight`, `selected_tests`, and
+`suggested_next_steps`. MCP accepts the same `target`, `focus`,
+`intent`, and `files` arguments.
+
 Agents that prefer MCP can call the matching `context_pack` tool over
 JSON-RPC for the same payload in one round-trip.
 
@@ -401,7 +423,8 @@ a versioned JSON schema agents should treat as a contract:
 | `explain_repo` | `atomadic-forge.explain/v1` | Humane orientation card — purpose, entry-points, do-not-break list, `release_state` (READY / BLOCKED). |
 | `adapt_plan` | `atomadic-forge.agent_plan_adapted/v1` | Filter an `agent_plan/v1` for a specific agent's capability set (`edit_files`, `run_commands`, `network`, `review`, `delegate`). Each card gets `recommended_handling`: `apply` / `delegate` / `ask_human` / `report_only`. |
 | `compose_tools` | n/a (returns ordered tool list) | Goal-keyword → ordered tool sequence. Pre-baked recipes: `orient`, `release_check`, `fix_violation`, `before_edit`, `verify_patch`. |
-| `list_recipes` / `get_recipe` | `atomadic-forge.recipe/v1` | Golden-path playbooks: `release_hardening`, `add_cli_command`, `fix_wire_violation`, `add_feature`, `publish_mcp`. Each recipe is a step-by-step plan agents can `get_recipe` and execute. |
+| `list_recipes` / `get_recipe` | `atomadic-forge.recipe/v1` | Golden-path playbooks: `release_hardening`, `add_cli_command`, `fix_wire_violation`, `add_feature`, `bump_version`, `fix_test_detection`, `publish_mcp`. Each recipe is a step-by-step plan agents can `get_recipe` and execute. |
+| `worktree_status` | `atomadic-forge.worktree_status/v1` | "Am I in the right checkout before I mutate it?" Reports git root, branch, upstream drift, dirty files, remotes, version surfaces, resolved `forge` command, stale-command detection, and recommendations. |
 | `trust_gate_response` | `trust_gate/v1` | Check generated responses for unresolved imports, syntax errors, stub-pattern code, false capability claims, and placeholder URLs. |
 | `exported_api_check` | `exported_api_check/v1` | Verify that docstring-promised public APIs resolve to actual top-level definitions. |
 
@@ -410,6 +433,22 @@ These complete Codex's 12-item Copilot's Copilot enumeration — items
 (`context_pack` / `preflight_change` / `score_patch`); item #4
 ("active guardrail") is composed via `preflight_change` +
 `score_patch` + `auto_step`.
+
+### `forge worktree status [PROJECT_ROOT]`
+
+Agent worktree orientation before editing, releasing, or publishing.
+It reports git root, branch, upstream, ahead/behind counts, dirty
+status lines, remotes, pyproject/package version surfaces, the
+resolved `forge` command path/version, stale-command detection, and
+next-step recommendations.
+
+```bash
+forge worktree status . --json
+```
+
+Use this when an agent is about to work across multiple Forge
+checkouts, after a force-push, before a release, or whenever the live
+MCP server seems stale relative to the source tree.
 
 ### `forge --version` / `forge -V`
 

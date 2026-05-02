@@ -1,5 +1,44 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `forge worktree status` and MCP `worktree_status` give agents a
+  pre-edit checkout report: git root, branch, upstream drift, dirty
+  files, remotes, version surfaces, resolved `forge` command, stale
+  install detection, and concrete recommendations.
+
+### Improved
+
+- `context-pack` accepts `--focus`, `--intent`, and repeatable
+  `--file` arguments. Targeted packs add file context, preflight
+  results, selected tests, and concrete next-step suggestions while
+  preserving the original first-call orientation fields.
+- MCP `context_pack` accepts the same `focus`, `intent`, and `files`
+  arguments as the CLI.
+- `tools/list` now reports Forge version and server source path so
+  agents can diagnose stale MCP hosts without guessing.
+- `forge mcp doctor` now includes Python executable, resolved
+  `forge` command path, source module paths, and a recommended
+  `python -m atomadic_forge mcp serve` config.
+- `forge explain-repo` now computes repo purpose/scout/wire/certify
+  context before calling the a1 explainer, matching the MCP path.
+- Recipe listing JSON now includes `recipe_count`, and the human CLI
+  list no longer truncates descriptions.
+- Synced `atomadic_forge.__version__` and README current-version
+  snippets with the published `0.6.1` package metadata.
+
+---
+
+## 0.6.1 - MCP registry publication metadata
+
+Patch release for MCP registry publication metadata. The package
+version is `0.6.1`; source docs and runtime version surfaces should
+report the same line.
+
+---
+
 ## 0.6.0 - Frontier features: dedup, budget, memory, swarm hiring, Ling-2.6-1T
 
 Major minor — five new capabilities cherry-picked from forge-deluxe-seed

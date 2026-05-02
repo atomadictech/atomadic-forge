@@ -158,7 +158,7 @@ Each tier is a layer of **verified building blocks**. Higher tiers never invent 
 
 ```bash
 pip install atomadic-forge
-forge --version   # atomadic-forge 0.6.0
+forge --version   # atomadic-forge 0.6.1
 forge doctor      # environment check
 ```
 
@@ -189,7 +189,7 @@ Forge ships a **Model Context Protocol server** — add it to Cursor, Claude Cod
 }
 ```
 
-**23 tools exposed:** `recon` · `wire` · `certify` · `enforce` · `audit_list` · `auto_plan` · `auto_step` · `auto_apply` · `context_pack` · `preflight_change` · `score_patch` · `select_tests` · `rollback_plan` · `explain_repo` · `adapt_plan` · `compose_tools` · `load_policy` · `why_did_this_change` · `what_failed_last_time` · `list_recipes` · `get_recipe` · `trust_gate_response` · `exported_api_check`
+**24 tools exposed:** `recon` · `wire` · `certify` · `enforce` · `audit_list` · `auto_plan` · `auto_step` · `auto_apply` · `context_pack` · `preflight_change` · `score_patch` · `select_tests` · `rollback_plan` · `explain_repo` · `adapt_plan` · `compose_tools` · `load_policy` · `why_did_this_change` · `what_failed_last_time` · `list_recipes` · `get_recipe` · `worktree_status` · `trust_gate_response` · `exported_api_check`
 
 **5 resources:** Receipt schema · formalization docs · lineage chain · blocker summary · verdicts
 
@@ -338,12 +338,13 @@ Forge waits before returning a clear provider error.
 
 | Command | Purpose |
 |---------|---------|
-| `forge mcp serve` | Stdio JSON-RPC MCP server — 23 tools for Cursor / Claude Code / Aider / Devin. |
+| `forge mcp serve` | Stdio JSON-RPC MCP server — 24 tools for Cursor / Claude Code / Aider / Devin. |
 | `forge plan / plan-list / plan-show / plan-step / plan-apply` | Agent plan persistence and step-by-step apply. |
 | `forge iterate` | LLM loop: intent → code → absorb → wire → score → iterate. Single shot. |
 | `forge evolve` | Recursive improvement: N rounds, catalog grows each round. |
 | `forge chat` | Terminal copilot over forge docs/source using the same AI provider layer. |
-| `forge context-pack` | Pack bounded repo context for agent first-call orientation. |
+| `forge context-pack` | Pack bounded repo context for first-call orientation or targeted change/release/debug focus. |
+| `forge worktree status` | Check branch, upstream drift, dirty files, version sync, and stale installed `forge` commands before editing. |
 | `forge preflight` | Pre-edit guardrail — forbidden imports, tier checks. |
 | `forge recipes` | List and fetch golden-path recipe templates. |
 
@@ -410,7 +411,7 @@ Forge ships with named limits. No overpromise.
 | Product | What it is | Status |
 |---------|------------|--------|
 | **AAAA-Nexus** | Trust/safety/payments substrate for autonomous agents | Live at [atomadic.tech](https://atomadic.tech) |
-| **Atomadic Forge** | Absorb-and-emerge engine for developers (this repo) | **0.6.0** — on PyPI, 944 tests, 100/100, MCP server, multi-agent safeguards |
+| **Atomadic Forge** | Absorb-and-emerge engine for developers (this repo) | **0.6.1** — on PyPI, 944 tests, 100/100, MCP server, multi-agent safeguards |
 | **Atomadic Assistant** | Sovereign AI assistant with cognitive loop on Cloudflare | In development |
 
 ## License
@@ -459,7 +460,7 @@ forge commandsmith smoke             # Smoke-test all 36+ registered verbs
 - ✓ **944 tests** passing, 2 skipped
 - ✓ **100/100 certify** — forge scores itself on every CI run
 - ✓ **0 wire violations** — forge passes its own import-law scan
-- ✓ **On PyPI** — `pip install atomadic-forge` (latest: v0.6.0)
+- ✓ **On PyPI** — `pip install atomadic-forge` (latest: v0.6.1)
 - ✓ **MCP server** — full tool surface; works with Cursor, Claude Code, Aider, Devin
 - ✓ **Multi-agent safeguards** — `cost_circuit_breaker`, `dedup_engine`, `agent_hire_protocol`, `hierarchical_memory` (MemGPT 4-tier)
 - ✓ **8 LLM providers** — auto, AAAA-Nexus, Anthropic, Gemini, OpenAI, OpenRouter, **Ling-2.6-1T (free 1T-param frontier)**, Ollama (local)

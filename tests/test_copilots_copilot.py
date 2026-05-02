@@ -116,6 +116,35 @@ def test_context_pack_uses_plan_top_action_when_provided(tmp_path):
     assert pack["best_next_action"]["id"] == "fix-something"
 
 
+def test_context_pack_targeted_files_add_change_guidance(tmp_path):
+    repo = _seed_repo(tmp_path)
+    docs = repo / "research"
+    docs.mkdir()
+    (docs / "note.md").write_text("# note\n", encoding="utf-8")
+    pack = emit_context_pack(
+        project_root=repo,
+        focus="change",
+        intent="Edit research note",
+        files=["research/note.md"],
+    )
+    assert pack["focus"] == "change"
+    assert pack["intent"] == "Edit research note"
+    assert pack["target_files"] == ["research/note.md"]
+    assert pack["file_context"][0]["kind"] == "docs"
+    assert pack["change_preflight"]["proposed_files"][0]["likely_tests"] == []
+    assert pack["selected_tests"]["minimum_command"]
+    assert any(s["action"] == "run_minimum_validation"
+               for s in pack["suggested_next_steps"])
+
+
+def test_context_pack_normalizes_absolute_target_files(tmp_path):
+    repo = _seed_repo(tmp_path)
+    target = repo / "src" / "demo" / "a1_at_functions" / "ok.py"
+    pack = emit_context_pack(project_root=repo, files=[str(target)])
+    assert pack["target_files"] == ["src/demo/a1_at_functions/ok.py"]
+    assert pack["file_context"][0]["exists"] is True
+
+
 def test_context_pack_cli_renders(tmp_path):
     repo = _seed_repo(tmp_path)
     result = runner.invoke(app, ["context-pack", str(repo)])
@@ -124,6 +153,27 @@ def test_context_pack_cli_renders(tmp_path):
     assert "purpose:" in result.stdout
     assert "tiers:" in result.stdout
     assert "tests:" in result.stdout
+
+
+def test_context_pack_cli_targeted_json(tmp_path):
+    repo = _seed_repo(tmp_path)
+    target = repo / "src" / "demo" / "a1_at_functions" / "ok.py"
+    result = runner.invoke(
+        app,
+        [
+            "context-pack",
+            str(repo),
+            "--focus", "change",
+            "--intent", "Refine ok helper",
+            "--file", str(target.relative_to(repo).as_posix()),
+            "--json",
+        ],
+    )
+    assert result.exit_code == 0
+    pack = json.loads(result.stdout)
+    assert pack["focus"] == "change"
+    assert pack["target_files"] == ["src/demo/a1_at_functions/ok.py"]
+    assert pack["file_context"][0]["detected_tier"] == "a1_at_functions"
 
 
 def test_context_pack_cli_json(tmp_path):
@@ -147,6 +197,25 @@ def test_mcp_context_pack_tool(tmp_path):
     summary = resp["result"]["_summary"]
     assert summary is not None
     assert summary["schema_version"] == "atomadic-forge.summary/v1"
+
+
+def test_mcp_context_pack_accepts_focus_intent_and_files(tmp_path):
+    repo = _seed_repo(tmp_path)
+    resp = dispatch_request(
+        {"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+         "params": {"name": "context_pack",
+                    "arguments": {
+                        "target": str(repo),
+                        "focus": "change",
+                        "intent": "Touch ok helper",
+                        "files": ["src/demo/a1_at_functions/ok.py"],
+                    }}},
+        project_root=tmp_path,
+    )
+    body = json.loads(resp["result"]["content"][0]["text"])
+    assert body["focus"] == "change"
+    assert body["intent"] == "Touch ok helper"
+    assert body["selected_tests"]["minimum_command"]
 
 
 # ============================================================

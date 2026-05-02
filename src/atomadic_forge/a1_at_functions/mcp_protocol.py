@@ -35,6 +35,7 @@ responses; callers never see a Python traceback.
 from __future__ import annotations
 
 import json
+import sys
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -58,6 +59,7 @@ from .scout_walk import harvest_repo
 from .test_selector import select_tests as _select_tests
 from .tool_composer import compose_tools as _compose_tools
 from .wire_check import scan_violations
+from .worktree_status import worktree_status as _worktree_status
 
 PROTOCOL_VERSION = "2024-11-05"   # MCP spec rev the server advertises
 SERVER_NAME = "atomadic-forge"
@@ -164,6 +166,9 @@ def _tool_audit_list(project_root: Path, args: dict[str, Any]) -> dict[str, Any]
 def _tool_context_pack(project_root: Path, args: dict[str, Any]) -> dict[str, Any]:
     """Codex 'Copilot's Copilot' #1 — first-call context pack."""
     root = Path(args.get("target", project_root)).resolve()
+    focus = args.get("focus")
+    intent = str(args.get("intent", ""))
+    files = list(args.get("files") or args.get("target_files") or [])
     try:
         scout = harvest_repo(root)
     except (OSError, ValueError):
@@ -179,6 +184,9 @@ def _tool_context_pack(project_root: Path, args: dict[str, Any]) -> dict[str, An
     return emit_context_pack(
         project_root=root,
         scout_report=scout, wire_report=wire, certify_report=cert,
+        focus=str(focus) if focus is not None else None,
+        intent=intent,
+        files=[str(f) for f in files],
     )
 
 
@@ -203,7 +211,8 @@ def _tool_preflight_change(project_root: Path, args: dict[str, Any]) -> dict[str
 def _tool_score_patch(project_root: Path, args: dict[str, Any]) -> dict[str, Any]:
     """Codex 'Copilot's Copilot' #3 — pre-merge patch risk scorer."""
     diff = str(args.get("diff", ""))
-    return _score_patch(diff)
+    root = Path(args.get("project_root", project_root)).resolve()
+    return _score_patch(diff, project_root=root)
 
 
 def _tool_select_tests(project_root: Path, args: dict[str, Any]) -> dict[str, Any]:
@@ -290,6 +299,7 @@ def _tool_list_recipes(project_root: Path, args: dict[str, Any]) -> dict[str, An
     return {
         "schema_version": "atomadic-forge.recipe.list/v1",
         "recipes": list_recipes(),
+        "recipe_count": len(list_recipes()),
         "catalogue": {n: r["description"] for n, r in all_recipes().items()},
     }
 
@@ -301,6 +311,15 @@ def _tool_get_recipe(project_root: Path, args: dict[str, Any]) -> dict[str, Any]
     if recipe is None:
         return {"error": f"unknown recipe: {name!r}"}
     return recipe
+
+
+def _tool_worktree_status(project_root: Path, args: dict[str, Any]) -> dict[str, Any]:
+    """Agent worktree orientation: git, remote, version, stale command."""
+    root = Path(args.get("project_root", project_root)).resolve()
+    return _worktree_status(
+        project_root=root,
+        max_files=int(args.get("max_files", 20)),
+    )
 
 
 def _tool_trust_gate_response(project_root: Path,
@@ -589,6 +608,24 @@ TOOLS: dict[str, dict[str, Any]] = {
             "properties": {
                 "target": {"type": "string",
                             "description": "Project path; defaults to project_root."},
+                "focus": {
+                    "type": "string",
+                    "enum": ["orientation", "change", "release", "debug"],
+                    "description": (
+                        "Optional mode. 'change' adds file-targeted "
+                        "preflight/test context; 'release' emphasizes the "
+                        "gate; 'debug' emphasizes lineage."
+                    ),
+                },
+                "intent": {
+                    "type": "string",
+                    "description": "One-line task intent for suggestions.",
+                },
+                "files": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Target or changed files for focused context.",
+                },
             },
             "additionalProperties": False,
         },
@@ -633,6 +670,7 @@ TOOLS: dict[str, dict[str, Any]] = {
                 "diff": {"type": "string",
                           "description": "Unified-diff text "
                                           "(git diff / patch format)."},
+                "project_root": {"type": "string"},
             },
             "required": ["diff"],
             "additionalProperties": False,
@@ -786,7 +824,8 @@ TOOLS: dict[str, dict[str, Any]] = {
         "description": (
             "Codex #12 — list named golden-path recipes "
             "(release_hardening, add_cli_command, fix_wire_violation, "
-            "add_feature, publish_mcp). Pair with get_recipe."
+            "add_feature, bump_version, fix_test_detection, publish_mcp). "
+            "Pair with get_recipe."
         ),
         "inputSchema": {
             "type": "object",
@@ -808,6 +847,28 @@ TOOLS: dict[str, dict[str, Any]] = {
             "additionalProperties": False,
         },
         "handler": _tool_get_recipe,
+    },
+    "worktree_status": {
+        "name": "worktree_status",
+        "description": (
+            "Agent worktree orientation: reports git root, branch, "
+            "upstream drift, dirty files, remotes, declared/package "
+            "versions, resolved forge command path/version, and "
+            "recommendations before an agent mutates a checkout."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "project_root": {"type": "string"},
+                "max_files": {
+                    "type": "integer",
+                    "default": 20,
+                    "description": "Maximum dirty status lines to include.",
+                },
+            },
+            "additionalProperties": False,
+        },
+        "handler": _tool_worktree_status,
     },
     "trust_gate_response": {
         "name": "trust_gate_response",
@@ -897,7 +958,10 @@ _CLI_FALLBACKS: dict[str, str] = {
     "auto_plan": "forge plan <repo> --json",
     "auto_step": "forge plan-step <plan-id> <card-id> --project <repo>",
     "auto_apply": "forge plan-apply <plan-id> --project <repo>",
-    "context_pack": "forge context-pack <project-root> --json",
+    "context_pack": (
+        "forge context-pack <project-root> "
+        "[--focus change --intent <intent> --file <path>] --json"
+    ),
     "preflight_change": "forge preflight <intent> <file...> --project <repo> --json",
     "score_patch": "git diff | forge score-patch --project-root <repo>",
     "select_tests": "forge select-tests --file <path> --project-root <repo> <intent>",
@@ -910,6 +974,7 @@ _CLI_FALLBACKS: dict[str, str] = {
     "what_failed_last_time": "forge what-failed-last-time <area> --project-root <repo>",
     "list_recipes": "forge recipes --json",
     "get_recipe": "forge recipes <name> --json",
+    "worktree_status": "forge worktree status <project-root> --json",
     "trust_gate_response": "MCP-only: trust_gate_response",
     "exported_api_check": "MCP-only: exported_api_check",
 }
@@ -1119,12 +1184,21 @@ def _serialize_result(value: Any, *, name: str = "") -> dict[str, Any]:
 
 
 def _list_tools() -> dict[str, Any]:
+    server_source_path = str(Path(__file__).resolve())
     return {
+        "serverInfo": {
+            "name": SERVER_NAME,
+            "version": __version__,
+            "source_path": server_source_path,
+            "python_executable": sys.executable,
+        },
         "tools": [
             {"name": t["name"],
              "description": t["description"],
              "inputSchema": t["inputSchema"],
-             "cli_command": _CLI_FALLBACKS.get(t["name"], "")}
+             "cli_command": _CLI_FALLBACKS.get(t["name"], ""),
+             "forge_version": __version__,
+             "server_source_path": server_source_path}
             for t in TOOLS.values()
         ],
     }

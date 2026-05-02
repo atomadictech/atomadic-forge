@@ -16,6 +16,32 @@ def test_doctor_runs():
     assert "atomadic_forge_version" in data
 
 
+def test_mcp_doctor_reports_paths(tmp_path):
+    result = runner.invoke(app, ["mcp", "doctor", "--project", str(tmp_path), "--json"])
+    assert result.exit_code == 0
+    data = json.loads(result.stdout)
+    assert data["schema_version"] == "atomadic-forge.mcp_doctor/v1"
+    assert data["python_executable"]
+    assert data["recommended_config"]["args"][:3] == ["-m", "atomadic_forge", "mcp"]
+
+
+def test_worktree_status_non_git_runs(tmp_path):
+    result = runner.invoke(app, ["worktree", "status", str(tmp_path), "--json"])
+    assert result.exit_code == 0
+    data = json.loads(result.stdout)
+    assert data["schema_version"] == "atomadic-forge.worktree_status/v1"
+    assert data["is_git_repo"] is False
+    assert data["recommendations"]
+
+
+def test_explain_repo_cli_runs(tmp_path):
+    (tmp_path / "README.md").write_text("# demo\n\nA tiny demo repo.\n", encoding="utf-8")
+    result = runner.invoke(app, ["explain-repo", str(tmp_path)])
+    assert result.exit_code == 0
+    data = json.loads(result.stdout)
+    assert data["schema_version"] == "atomadic-forge.explain_repo/v1"
+
+
 def test_help_lists_chat():
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0

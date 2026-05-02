@@ -121,6 +121,7 @@ def test_cli_recipes_lists_json():
     data = json.loads(result.stdout)
     assert data["schema_version"] == "atomadic-forge.recipe.list/v1"
     assert "fix_wire_violation" in data["recipes"]
+    assert data["recipe_count"] == len(data["recipes"])
 
 
 def test_cli_recipes_show_one_human():

@@ -93,7 +93,7 @@ def test_tools_list_pinned(tmp_path):
         "select_tests", "rollback_plan", "explain_repo",
         "adapt_plan", "compose_tools", "load_policy",
         "why_did_this_change", "what_failed_last_time",
-        "list_recipes", "get_recipe",
+        "list_recipes", "get_recipe", "worktree_status",
         # Backported from Forge Deluxe (cycles 13 + 15):
         "trust_gate_response", "exported_api_check",
     }
@@ -105,8 +105,13 @@ def test_tools_list_pinned(tmp_path):
         assert "inputSchema" in tool
         assert tool["inputSchema"]["type"] == "object"
         assert "cli_command" in tool
+        assert tool["forge_version"]
+        assert tool["server_source_path"].endswith("mcp_protocol.py")
+    assert resp["result"]["serverInfo"]["source_path"].endswith("mcp_protocol.py")
     audit = next(t for t in resp["result"]["tools"] if t["name"] == "audit_list")
     assert audit["cli_command"] == "forge audit list --json"
+    wt = next(t for t in resp["result"]["tools"] if t["name"] == "worktree_status")
+    assert wt["cli_command"] == "forge worktree status <project-root> --json"
 
 
 def test_resources_list_pinned(tmp_path):
@@ -148,6 +153,18 @@ def test_tools_call_recon(tmp_path):
     body = json.loads(resp["result"]["content"][0]["text"])
     assert body["schema_version"] == "atomadic-forge.scout/v1"
     assert body["primary_language"] == "python"
+
+
+def test_tools_call_worktree_status(tmp_path):
+    resp = dispatch_request(
+        {"jsonrpc": "2.0", "id": 4, "method": "tools/call",
+         "params": {"name": "worktree_status",
+                    "arguments": {"project_root": str(tmp_path)}}},
+        project_root=tmp_path,
+    )
+    body = json.loads(resp["result"]["content"][0]["text"])
+    assert body["schema_version"] == "atomadic-forge.worktree_status/v1"
+    assert body["is_git_repo"] is False
 
 
 def test_tools_call_wire_pass(tmp_path):

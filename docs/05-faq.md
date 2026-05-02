@@ -429,8 +429,9 @@ config:
 }
 ```
 
-Once registered, the agent gets **23 tools** + **5 resources** (the
-full Codex-1..5 surface plus response/API trust gates). The 23 tools group into
+Once registered, the agent gets **24 tools** + **5 resources** (the
+full Codex-1..5 surface plus response/API trust gates and worktree
+status). The 24 tools group into
 *inventory* (`recon` / `wire` / `certify` / `enforce` / `audit_list` /
 `agent_summary`), *action loop* (`auto_plan` / `auto_step` /
 `auto_apply`), and *Copilot's Copilot* (`context_pack` /

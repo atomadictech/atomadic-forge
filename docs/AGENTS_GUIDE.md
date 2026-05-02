@@ -42,7 +42,7 @@ Claude Code / Aider / your own):
 }
 ```
 
-Once registered, the agent gets **23 tools** + **5 resources** in its
+Once registered, the agent gets **24 tools** + **5 resources** in its
 tool list. No
 additional setup.
 
@@ -113,6 +113,7 @@ always-on senior engineer beside the coding agent:
 | Tool | Schema | Call when |
 |---|---|---|
 | **`context_pack`** ← *Codex-4* | `context_pack/v1` — repo purpose, pinned 5-tier law, tier_map, blockers digest, best-next-action, detected test commands, release gate, risky files, recent lineage, pinned `forge://` resources | **First call after `initialize`** — orientation bundle. One round-trip replaces 6+ separate calls. |
+| **`worktree_status`** | `worktree_status/v1` — git root, branch, upstream drift, dirty files, remotes, version surfaces, resolved `forge` command, stale-command detection, recommendations | **Before editing or release work** when there are multiple checkouts, stale MCP concerns, dirty trees, or version mismatches. |
 | **`preflight_change`** ← *Codex-4* | `preflight/v1` — per file: detected_tier, forbidden_imports, likely_tests, siblings_to_read; overall write_scope_too_broad flag | **Before** every `WriteFile` / `Edit`. Verdict `REFINE` when scope > 8 files. |
 | **`score_patch`** ← *Codex-4* | `patch_score/v1` — architectural_risk, public_api_risk, release_risk, test_risk, `needs_human_review`, suggested validation commands | **After** drafting a unified-diff but **before** applying. |
 | **`select_tests`** ← *Codex-5* | `test_select/v1` — `minimum_set` (mirror match) + `full_set` (tier-mate) | "Which tests must I run for this change?" — feeds into the agent's iteration loop. |
@@ -123,14 +124,16 @@ always-on senior engineer beside the coding agent:
 | **`load_policy`** ← *Codex-5* | `policy/v1` from `pyproject.toml [tool.forge.agent]` | First-orientation. Tells you the repo's `protected_files`, `release_gate`, `max_files_per_patch`, `require_human_review_for`. Defaults are lenient when no policy declared. |
 | **`why_did_this_change`** ← *Codex-5* | `why/v1` — lineage + plan-event entries referencing a file | "Why did this file get touched, historically?" |
 | **`what_failed_last_time`** ← *Codex-5* | `what_failed/v1` — historical failures scoped to an area | "What went wrong here before — so I don't repeat it?" |
-| **`list_recipes`** ← *Codex-5* | catalogue of golden-path recipes | First-orientation. Pre-baked: `release_hardening`, `add_cli_command`, `fix_wire_violation`, `add_feature`, `publish_mcp`. |
+| **`list_recipes`** ← *Codex-5* | catalogue of golden-path recipes | First-orientation. Pre-baked: `release_hardening`, `add_cli_command`, `fix_wire_violation`, `add_feature`, `bump_version`, `fix_test_detection`, `publish_mcp`. |
 | **`get_recipe`** ← *Codex-5* | `recipe/v1` — step-by-step plan | "Walk me through `release_hardening` step by step." |
 | **`trust_gate_response`** | `trust_gate/v1` — response hallucination checks | Before sending generated implementation notes or code snippets back to a human. |
 | **`exported_api_check`** | `exported_api_check/v1` — docstring/API promise verification | Before publishing generated modules that claim public functions in docs. |
 
 Every `tools/list` entry includes a `cli_command` fallback. If the MCP
 transport drops, use that command shape directly in the shell while
-you restart the editor or MCP host.
+you restart the editor or MCP host. `tools/list` also includes the
+Forge version and server source path so agents can detect stale MCP
+hosts.
 
 (Plus four `plan_list` / `plan_show` / `plan_step` / `plan_apply`
 verbs from Codex-3 — same 1:1 mapping to the CLI verbs of the same
@@ -144,7 +147,7 @@ name.)
    orientation; `preflight_change` *before* every write;
    `score_patch` *after* drafting the diff. Forge is the always-on
    senior engineer reviewing each step.
-3. **Proposal-engine (full 23 tools)**: `auto_plan` for direction,
+3. **Proposal-engine (full 24 tools)**: `auto_plan` for direction,
    `adapt_plan` for capability-aware filtering, `auto_apply` to
    execute, `enforce` for mechanical fixes, `rollback_plan` if
    anything regresses, `why_did_this_change` /
@@ -426,9 +429,12 @@ control plane around any coding agent**:
 
 - **`context_pack`** (CLI: `forge context-pack`, MCP: `context_pack`) —
   the orientation bundle the agent loads on first contact with a
-  repo. One call, one JSON, ten fields (purpose / law / tier_map /
-  blockers / next-action / test-commands / release-gate / risky-files
-  / lineage / pinned resources).
+  repo. One call, one JSON, ten baseline fields (purpose / law /
+  tier_map / blockers / next-action / test-commands / release-gate /
+  risky-files / lineage / pinned resources). When the task is already
+  known, call it with `focus`, `intent`, and `files` to get targeted
+  file context, preflight, selected tests, and suggested next steps in
+  the same payload.
 - **`preflight_change`** (CLI: `forge preflight`, MCP: `preflight_change`)
   — pre-edit guardrail. Per file: tier detected, tiers forbidden,
   likely tests, siblings to read. Returns `write_scope_too_broad =

@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import io
 import json
+import shutil
 import sys
 import warnings
 from pathlib import Path
@@ -53,6 +54,7 @@ from ..a1_at_functions.sidecar_parser import (
 )
 from ..a1_at_functions.sidecar_validator import validate_sidecar
 from ..a1_at_functions.wire_check import scan_violations
+from ..a1_at_functions.worktree_status import worktree_status
 from ..a2_mo_composites.lineage_chain_store import LineageChainStore
 from ..a2_mo_composites.plan_store import PlanStore
 from ..a2_mo_composites.receipt_signer import sign_receipt
@@ -397,6 +399,18 @@ def context_pack_cmd(
     target: Annotated[Path, typer.Argument(
         exists=True, file_okay=False, dir_okay=True, resolve_path=True,
         help="Project root.")] = Path("."),
+    focus: Annotated[str | None, typer.Option(
+        "--focus",
+        help="Optional context focus: orientation, change, release, or debug.",
+    )] = None,
+    intent: Annotated[str, typer.Option(
+        "--intent",
+        help="One-line task intent used for targeted suggestions.",
+    )] = "",
+    files: Annotated[list[str] | None, typer.Option(
+        "--file", "-f",
+        help="Repeat for each target or changed file to include targeted context.",
+    )] = None,
     json_out: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
     """Codex 'Copilot's Copilot' #1: first-call context bundle.
@@ -405,6 +419,11 @@ def context_pack_cmd(
     next action + test commands + release gate + risky files +
     recent lineage in one read. The single tool every coding agent
     should call on first connect.
+
+    Examples:
+
+        forge context-pack . --json
+        forge context-pack . --focus change --intent "Edit README" --file README.md --json
     """
     target = Path(target).resolve()
     try:
@@ -422,6 +441,7 @@ def context_pack_cmd(
     pack = emit_context_pack(
         project_root=target,
         scout_report=scout, wire_report=wire, certify_report=cert,
+        focus=focus, intent=intent, files=files or [],
     )
     if json_out:
         typer.echo(json.dumps(pack, indent=2, default=str))
@@ -429,6 +449,7 @@ def context_pack_cmd(
     typer.echo(f"\nForge context-pack: {target}")
     typer.echo("-" * 60)
     typer.echo(f"  purpose:   {pack['repo_purpose'][:200]}")
+    typer.echo(f"  focus:     {pack.get('focus', 'orientation')}")
     typer.echo(f"  language:  {pack['primary_language']}")
     typer.echo(f"  tiers:     {pack['tier_map']}")
     bs = pack["blockers_summary"]
@@ -442,6 +463,26 @@ def context_pack_cmd(
             typer.echo(f"             {nc[:140]}")
     typer.echo(f"  tests:     {' | '.join(pack['test_commands'][:3])}")
     typer.echo(f"  gate:      {' && '.join(pack['release_gate'])}")
+    if pack.get("target_files"):
+        typer.echo("  target files:")
+        for f in pack.get("file_context", [])[:8]:
+            tier = f.get("detected_tier") or "-"
+            typer.echo(
+                f"    - {f.get('path')}  "
+                f"({f.get('kind')}, tier={tier}, exists={f.get('exists')})"
+            )
+    if pack.get("selected_tests"):
+        tests = pack["selected_tests"]
+        typer.echo(f"  focused:   {tests.get('minimum_command', '')}")
+    if pack.get("suggested_next_steps"):
+        typer.echo("  suggestions:")
+        for step in pack["suggested_next_steps"][:5]:
+            label = step.get("action", "?")
+            why = step.get("why", "").strip()
+            typer.echo(f"    - {label}: {why[:140]}")
+            cmd = step.get("next_command", "").strip()
+            if cmd:
+                typer.echo(f"      next: {cmd[:160]}")
     if pack["risky_files"]:
         typer.echo("  risky files (most-edited):")
         for f in pack["risky_files"][:5]:
@@ -601,13 +642,14 @@ def recipes_cmd(
             typer.echo(json.dumps(
                 {"schema_version": "atomadic-forge.recipe.list/v1",
                  "recipes": names,
+                 "recipe_count": len(names),
                  "catalogue": {n: r["description"] for n, r in catalogue.items()}},
                 indent=2, default=str))
             return
         typer.echo("\nForge — golden-path recipes")
         typer.echo("-" * 60)
         for n in names:
-            typer.echo(f"  {n:<22}  {catalogue[n]['description'][:60]}")
+            typer.echo(f"  {n:<22}  {catalogue[n]['description']}")
         typer.echo("\n  forge recipes <name>  — show one recipe")
         return
     recipe = get_recipe(name)
@@ -1116,6 +1158,9 @@ def _mcp_doctor_report(project: Path) -> dict[str, object]:
     raw = stdout.getvalue()
     response_count = raw.count(b"Content-Length:")
     ok = rc == 0 and response_count >= 3 and bool(TOOLS)
+    forge_path = shutil.which("forge") or ""
+    server_source = str(Path(mcp_serve_stdio.__code__.co_filename).resolve())
+    protocol_source = str(Path(__file__).resolve())
     return {
         "schema_version": "atomadic-forge.mcp_doctor/v1",
         "verdict": "PASS" if ok else "FAIL",
@@ -1123,6 +1168,17 @@ def _mcp_doctor_report(project: Path) -> dict[str, object]:
         "project_root": str(project),
         "project_exists": project.exists(),
         "tool_count": len(TOOLS),
+        "python_executable": sys.executable,
+        "forge_command_path": forge_path,
+        "server_module_path": server_source,
+        "cli_module_path": protocol_source,
+        "recommended_config": {
+            "command": sys.executable,
+            "args": [
+                "-m", "atomadic_forge", "mcp", "serve",
+                "--project", str(project),
+            ],
+        },
         "framed_stdio_smoke": "PASS" if response_count >= 3 else "FAIL",
         "response_count": response_count,
         "server_exit_code": rc,
@@ -1157,7 +1213,7 @@ def mcp_serve_cmd(
           }
         }
 
-    Tools exposed (21):
+    Tools exposed (24):
       recon                 — scout the repo + classify symbols
       wire                  — upward-import scan; --suggest-repairs
       certify               — 4-axis score; --emit-receipt / --print-card
@@ -1179,6 +1235,9 @@ def mcp_serve_cmd(
       what_failed_last_time — agent memory: failed/rolled_back events
       list_recipes          — golden-path recipes catalogue
       get_recipe            — fetch one named recipe
+      worktree_status       — git/version/stale-command orientation
+      trust_gate_response   — deterministic response hallucination checks
+      exported_api_check    — docstring/API promise verification
 
     Resources exposed (5):
       forge://docs/receipt           — Receipt v1 schema docs
@@ -1200,7 +1259,12 @@ def mcp_doctor_cmd(
         help="Project root to smoke-test through the MCP stdio surface.")] = Path("."),
     json_out: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
-    """Smoke-test MCP stdio framing, tool listing, and server startup."""
+    """Smoke-test MCP stdio framing, tool listing, and server startup.
+
+    Example:
+
+        forge mcp doctor --project . --json
+    """
     report = _mcp_doctor_report(project)
     if json_out:
         typer.echo(json.dumps(report, indent=2, default=str))
@@ -1211,6 +1275,8 @@ def mcp_doctor_cmd(
     typer.echo("-" * 60)
     typer.echo(f"  verdict:      {report['verdict']}")
     typer.echo(f"  version:      {report['forge_version']}")
+    typer.echo(f"  python:       {report['python_executable']}")
+    typer.echo(f"  forge cmd:    {report['forge_command_path']}")
     typer.echo(f"  project:      {report['project_root']}")
     typer.echo(f"  tools:        {report['tool_count']}")
     typer.echo(f"  stdio frame:  {report['framed_stdio_smoke']}")
@@ -1221,6 +1287,55 @@ def mcp_doctor_cmd(
 
 app.add_typer(mcp_app, name="mcp",
                help="MCP server surface — speak Forge to coding agents.")
+
+
+worktree_app = typer.Typer(
+    no_args_is_help=True,
+    help="Agent worktree utilities — status before editing, release, or publish work.",
+)
+
+
+@worktree_app.command("status")
+def worktree_status_cmd(
+    project_root: Annotated[Path, typer.Argument(
+        exists=True, file_okay=False, dir_okay=True, resolve_path=True,
+        help="Project root or any directory inside a git worktree.")] = Path("."),
+    max_files: Annotated[int, typer.Option(
+        "--max-files",
+        help="Maximum dirty status lines to include.")] = 20,
+    json_out: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    """Report git, remote, version, and installed-command state.
+
+    Example:
+
+        forge worktree status . --json
+    """
+    report = worktree_status(project_root=project_root, max_files=max_files)
+    if json_out:
+        typer.echo(json.dumps(report, indent=2, default=str))
+        return
+    typer.echo("\nForge worktree status")
+    typer.echo("-" * 60)
+    typer.echo(f"  root:       {report.get('git_root') or report['project_root']}")
+    typer.echo(f"  branch:     {report.get('branch') or '-'}")
+    typer.echo(f"  upstream:   {report.get('upstream') or '-'}")
+    typer.echo(
+        f"  dirty:      {report['dirty']}  "
+        f"ahead={report['ahead']} behind={report['behind']}"
+    )
+    typer.echo(
+        f"  version:    pyproject={report.get('declared_version') or '-'}  "
+        f"package={report.get('package_version') or '-'}"
+    )
+    typer.echo(f"  forge cmd:  {report.get('forge_command_version') or '-'}")
+    typer.echo("  recommendations:")
+    for item in report["recommendations"]:
+        typer.echo(f"    - {item}")
+
+
+app.add_typer(worktree_app, name="worktree",
+               help="Agent worktree utilities.")
 
 # Lane C W5 — `forge login` captures a paid Forge subscription key
 # and stores it in ~/.atomadic-forge/credentials.toml. The MCP server

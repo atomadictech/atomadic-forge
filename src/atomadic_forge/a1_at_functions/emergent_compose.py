@@ -30,6 +30,18 @@ _GENERIC_RE = re.compile(r"^(\w+)\[(.+)\]$")
 _COLLECTION_FAMILY = {"list", "List", "Sequence", "Iterable", "Collection",
                       "tuple", "Tuple", "set", "Set", "frozenset"}
 
+_PRIMITIVE_TYPES = {"str", "int", "float", "bool", "bytes", "None", "NoneType"}
+
+
+def is_primitive(t: str) -> bool:
+    """Return True for scalar primitives that make noisy, semantically empty bridges.
+
+    ``str → str`` chains connect almost every function in a codebase and produce
+    thousands of look-alike candidates with no semantic value.  Filtering them as
+    seeds focuses the search on domain-specific, typed connections.
+    """
+    return _normalize(t) in _PRIMITIVE_TYPES
+
 
 def _strip_optional(t: str) -> str:
     t = t.strip()
@@ -110,6 +122,8 @@ def find_chains(
     domain_jump_required: bool = False,
     strict_types: bool = True,
     drop_anyish_seeds: bool = True,
+    drop_primitive_seeds: bool = True,
+    max_seed_fanout: int = 25,
 ) -> list[CompositionChain]:
     """Enumerate type-compatible chains across the catalog.
 
@@ -129,6 +143,12 @@ def find_chains(
       is a generic ``dict``/``Mapping``/``Any`` carrier.  Such symbols are
       bottlenecks (they connect to half the catalog) and produce many
       look-alike candidates.
+    * ``drop_primitive_seeds`` — skip seeds whose output is a primitive scalar
+      (``str``, ``int``, ``bool`` …).  A ``str``-producing function feeds almost
+      every other function and generates thousands of meaningless chains.
+    * ``max_seed_fanout`` — skip seeds whose output has more than this many
+      compatible consumers.  High-fanout hubs are structurally valid but
+      low-signal.  Set to ``0`` to disable.
     """
     catalog = [c for c in cards if not (require_pure and not c["is_pure"])]
     by_qual = {c["qualname"]: c for c in catalog}
@@ -183,8 +203,23 @@ def find_chains(
         )
         out.append(chain)
 
-    seeds = [c for c in catalog
-             if not (drop_anyish_seeds and is_anyish(c["output"]))]
+    seeds = [
+        c for c in catalog
+        if not (drop_anyish_seeds and is_anyish(c["output"]))
+        and not (drop_primitive_seeds and is_primitive(c["output"]))
+    ]
+    if max_seed_fanout > 0 and seeds:
+        fanout = {
+            s["qualname"]: sum(
+                1 for c in catalog
+                if c["qualname"] != s["qualname"] and any(
+                    types_compatible(s["output"], ti, strict=strict_types)
+                    for ti in _consumer_inputs(c)
+                )
+            )
+            for s in seeds
+        }
+        seeds = [s for s in seeds if fanout.get(s["qualname"], 0) <= max_seed_fanout]
     for seed in seeds:
         extend([seed])
         if len(out) >= max_chains:
