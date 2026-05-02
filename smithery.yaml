@@ -1,0 +1,22 @@
+startCommand:
+  type: stdio
+  configSchema:
+    type: object
+    properties:
+      projectRoot:
+        type: string
+        title: Project Root Path
+        description: "Absolute path to the repo you want Forge to analyze. Defaults to current working directory."
+      apiKey:
+        type: string
+        title: Forge API Key
+        description: "Your Forge subscription key (fk_live_...). Required for tools/call. Get one at https://forge.atomadic.tech. Metadata tools work without a key."
+    required: []
+  commandFunction: |-
+    (config) => ({
+      command: "forge",
+      args: ["mcp", "serve", "--project", config.projectRoot || "."],
+      env: {
+        FORGE_API_KEY: config.apiKey || ""
+      }
+    })
