@@ -14,7 +14,7 @@ Wire format:
 
 from __future__ import annotations
 
-from typing import Literal, TypedDict
+from typing import Literal, NotRequired, TypedDict
 
 SynergyKind = Literal[
     "json_artifact",        # producer emits --json-out, consumer takes file arg
@@ -22,6 +22,9 @@ SynergyKind = Literal[
     "shared_schema",        # both reference the same JSON schema name
     "shared_vocabulary",    # high lexical overlap in help/docstrings
     "phase_omission",       # natural phase chain skips a step
+    "feedback_loop",        # certifier's output loops back into the producer
+    "type_pipeline",        # specific named type flows directly A→B in memory
+    "data_flow_gap",        # A and B share a specific type but no adapter bridges them
 ]
 
 
@@ -38,6 +41,10 @@ class FeatureSurfaceCard(TypedDict):
     schemas: list[str]          # schema names mentioned in help/docstring
     vocabulary: list[str]       # unique tokens harvested from help+args
     phase_hint: str             # heuristic phase tag (recon/ingest/.../emit)
+    # Enriched by harvest_multilevel_surfaces (optional — CLI-only cards omit these)
+    input_types: NotRequired[list[str]]
+    output_types: NotRequired[list[str]]
+    tier: NotRequired[str]
 
 
 class SynergyCandidateCard(TypedDict):

@@ -1,13 +1,19 @@
 """Tier a1 — pure feature-surface extractor for the Synergy Scan.
 
-Walks ``commands/`` modules + the unified CLI to build a
-:class:`FeatureSurfaceCard` per CLI verb.  The card captures:
+Two extraction modes:
 
-* CLI option names
-* file-pattern args (anything ending in ``.json`` / ``.yaml`` / ``.md`` …)
-* product mentions in help text (``--json-out``, ``--save``, ``MANIFEST``)
-* schema strings (``atomadic-forge.<x>/v1``) referenced in source
-* a phase hint (``recon`` / ``ingest`` / ``materialize`` / ``emit`` / …)
+``harvest_feature_surfaces`` — CLI-only (original behaviour).
+  Walks ``commands/`` modules and the unified CLI to build one
+  :class:`FeatureSurfaceCard` per CLI verb.
+
+``harvest_multilevel_surfaces`` — multi-tier (richer signal).
+  Calls ``harvest_feature_surfaces`` then also walks
+  ``a3_og_features/`` and ``a2_mo_composites/``, extracting a card per
+  *class* with its public method return types and __init__ input types.
+  These enriched cards carry ``input_types``, ``output_types``, and
+  ``tier`` fields used by the type-pipeline and feedback-loop detectors.
+
+Both functions return ``list[FeatureSurfaceCard]``.
 """
 
 from __future__ import annotations
@@ -160,4 +166,169 @@ def harvest_feature_surfaces(
     unified = package_root / package / "a4_sy_orchestration" / "unified_cli.py"
     if unified.exists():
         out.extend(_harvest_module(unified, f"{package}.a4_sy_orchestration.unified_cli"))
+    return out
+
+
+# ── Multi-level extraction ────────────────────────────────────────────────────
+
+_PRIMITIVE_ANN = frozenset({
+    "str", "int", "float", "bool", "bytes", "None", "NoneType",
+    "Any", "Path", "dict", "list", "tuple", "set",
+})
+
+# Methods whose names suggest a particular phase tag
+_METHOD_PHASE = {
+    "scan": "recon", "recon": "recon", "discover": "recon",
+    "ingest": "ingest", "harvest": "ingest", "extract": "ingest",
+    "plan": "plan", "blueprint": "plan",
+    "synthesize": "materialize", "implement": "materialize",
+    "materialize": "materialize", "generate": "materialize", "render": "materialize",
+    "certify": "certify", "verify": "certify", "audit": "certify", "validate": "certify",
+    "emit": "emit", "save": "emit", "publish": "emit", "report": "emit",
+    "register": "register", "wire": "register", "install": "register",
+}
+
+
+def _harvest_tiered_module(
+    py_file: Path, module: str, tier: str
+) -> list[FeatureSurfaceCard]:
+    """Extract one :class:`FeatureSurfaceCard` per public class in a tier file.
+
+    Unlike CLI-mode extraction (which looks for Typer ``app`` objects), this
+    function targets class-based feature and composite APIs — the a2/a3 style
+    where capabilities are exposed as class methods.
+    """
+    try:
+        text = py_file.read_text(encoding="utf-8")
+        tree = ast.parse(text)
+    except (SyntaxError, OSError):
+        return []
+
+    schemas = sorted(set(_SCHEMA_RE.findall(text)))
+    cards: list[FeatureSurfaceCard] = []
+
+    for node in tree.body:
+        if not isinstance(node, ast.ClassDef):
+            continue
+        if node.name.startswith("_"):
+            continue
+
+        class_doc = (ast.get_docstring(node) or "").split("\n", 1)[0].strip()
+        vocab: set[str] = _split_words(class_doc)
+        vocab.add(node.name.lower())
+
+        inputs: list[str] = []
+        input_types: list[str] = []
+        outputs: list[str] = []
+        output_types: list[str] = []
+        detected_phase = "misc"
+
+        for method in node.body:
+            if not isinstance(method, ast.FunctionDef | ast.AsyncFunctionDef):
+                continue
+
+            method_doc = (ast.get_docstring(method) or "").split("\n", 1)[0].strip()
+            vocab |= _split_words(method_doc)
+            vocab |= _split_words(method.name)
+
+            # Phase hint from method name
+            mname = method.name.lower()
+            if mname in _METHOD_PHASE and detected_phase == "misc":
+                detected_phase = _METHOD_PHASE[mname]
+
+            if method.name == "__init__":
+                for arg in method.args.args:
+                    if arg.arg in ("self", "cls"):
+                        continue
+                    inputs.append(arg.arg)
+                    if arg.annotation:
+                        ann = ast.unparse(arg.annotation)
+                        base = ann.split("[")[0].split("|")[0].strip()
+                        if base not in _PRIMITIVE_ANN:
+                            input_types.append(ann)
+                        vocab |= _split_words(ann)
+            elif not method.name.startswith("_"):
+                # Public method: capture return type AND parameter types as inputs
+                if method.returns:
+                    ret = ast.unparse(method.returns)
+                    base = ret.split("[")[0].split("|")[0].strip()
+                    if base not in _PRIMITIVE_ANN | {"None"}:
+                        output_types.append(ret)
+                        outputs.append(method.name)
+                    vocab |= _split_words(ret)
+                # Also harvest method parameter types as potential input types
+                for arg in method.args.args + method.args.kwonlyargs:
+                    if arg.arg in ("self", "cls"):
+                        continue
+                    if arg.annotation:
+                        ann = ast.unparse(arg.annotation)
+                        base = ann.split("[")[0].split("|")[0].strip()
+                        if base not in _PRIMITIVE_ANN:
+                            input_types.append(ann)
+                        vocab |= _split_words(ann)
+
+        # Build the enriched card
+        feature_name = f"{py_file.stem}.{node.name}".replace("_", "-")
+        phase = _phase_hint(vocab, class_doc, node.name)
+        if detected_phase != "misc":
+            phase = detected_phase
+
+        card: FeatureSurfaceCard = FeatureSurfaceCard(
+            name=feature_name,
+            module=module,
+            help_text=class_doc,
+            inputs=sorted(set(inputs)),
+            input_files=[],
+            outputs=sorted(set(outputs)),
+            output_files=[],
+            schemas=schemas,
+            vocabulary=sorted(vocab),
+            phase_hint=phase,
+            input_types=sorted(set(input_types)),
+            output_types=sorted(set(output_types)),
+            tier=tier,
+        )
+        cards.append(card)
+
+    return cards
+
+
+def harvest_multilevel_surfaces(
+    package_root: Path,
+    package: str = "atomadic_forge",
+) -> list[FeatureSurfaceCard]:
+    """Walk ``commands/``, ``a3_og_features/``, and ``a2_mo_composites/``.
+
+    Returns a richer surface list than :func:`harvest_feature_surfaces` alone:
+
+    * CLI verb cards from ``commands/`` (same as before).
+    * One class-level card per public class in ``a3_og_features/`` — captures
+      scan/synthesize/implement return types and __init__ inputs.
+    * One class-level card per public class in ``a2_mo_composites/`` — captures
+      the composite's stateful wrapper inputs and its public method outputs.
+
+    Cards from a3/a2 carry ``input_types``, ``output_types``, and ``tier``
+    which enable the ``type_pipeline``, ``feedback_loop``, and
+    ``data_flow_gap`` synergy detectors.
+    """
+    out = harvest_feature_surfaces(package_root, package)
+
+    base = package_root / package
+    for tier_dir, tier_label in [
+        ("a3_og_features", "a3"),
+        ("a2_mo_composites", "a2"),
+    ]:
+        tdir = base / tier_dir
+        if not tdir.exists():
+            continue
+        for py in sorted(tdir.rglob("*.py")):
+            if py.name.startswith("_"):
+                continue
+            try:
+                rel = py.relative_to(package_root).with_suffix("")
+            except ValueError:
+                continue
+            module = ".".join(rel.parts)
+            out.extend(_harvest_tiered_module(py, module, tier_label))
+
     return out

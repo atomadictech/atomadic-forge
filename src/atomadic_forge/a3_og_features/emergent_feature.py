@@ -55,7 +55,13 @@ class EmergentScan:
             domain_jump_required=domain_jump_required,
         )
         self._chains_count = len(chains)
-        candidates = rank_chains(chains, catalog=catalog, top_n=top_n)
+        a3_dir = self.src_root / self.package / "a3_og_features"
+        a3_feature_stems = (
+            [p.stem for p in sorted(a3_dir.glob("*.py")) if not p.name.startswith("_")]
+            if a3_dir.exists() else []
+        )
+        candidates = rank_chains(chains, catalog=catalog, top_n=top_n,
+                                  a3_feature_stems=a3_feature_stems)
 
         domain_inv: collections.Counter[str] = collections.Counter(
             c["domain"] for c in catalog

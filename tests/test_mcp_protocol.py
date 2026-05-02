@@ -155,7 +155,11 @@ def test_tools_call_recon(tmp_path):
     assert body["primary_language"] == "python"
 
 
-def test_tools_call_worktree_status(tmp_path):
+def test_tools_call_worktree_status(tmp_path, monkeypatch):
+    # Block git's parent-walk so this test works inside a CI clone — without
+    # this env var, `git rev-parse --show-toplevel` finds the surrounding
+    # atomadic-forge clone and reports is_git_repo=True.
+    monkeypatch.setenv("GIT_CEILING_DIRECTORIES", str(tmp_path.parent))
     resp = dispatch_request(
         {"jsonrpc": "2.0", "id": 4, "method": "tools/call",
          "params": {"name": "worktree_status",

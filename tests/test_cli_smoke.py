@@ -25,7 +25,11 @@ def test_mcp_doctor_reports_paths(tmp_path):
     assert data["recommended_config"]["args"][:3] == ["-m", "atomadic_forge", "mcp"]
 
 
-def test_worktree_status_non_git_runs(tmp_path):
+def test_worktree_status_non_git_runs(tmp_path, monkeypatch):
+    # Block git's parent-walk so this test works inside a CI clone — without
+    # this env var, `git rev-parse --show-toplevel` finds the surrounding
+    # atomadic-forge clone and reports is_git_repo=True.
+    monkeypatch.setenv("GIT_CEILING_DIRECTORIES", str(tmp_path.parent))
     result = runner.invoke(app, ["worktree", "status", str(tmp_path), "--json"])
     assert result.exit_code == 0
     data = json.loads(result.stdout)
