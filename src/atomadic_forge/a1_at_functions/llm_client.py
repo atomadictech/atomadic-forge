@@ -99,7 +99,7 @@ class AnthropicClient:
 
     name = "anthropic"
 
-    def __init__(self, *, model: str = "claude-3-5-sonnet-latest",
+    def __init__(self, *, model: str = "claude-sonnet-4-6",
                  api_key_env: str = "ANTHROPIC_API_KEY"):
         self.model = model
         self._api_key_env = api_key_env
@@ -184,7 +184,6 @@ class GeminiClient:
       * ``gemini-2.5-flash``        — high-quality default (free tier)
       * ``gemini-2.0-flash``        — older, more stable on free tier
       * ``gemini-2.5-pro``          — better reasoning; check tier in AI Studio
-      * ``gemini-3.1-pro-preview``  — newest; check tier in AI Studio
 
     Override the default via ``FORGE_GEMINI_MODEL=<id>`` env var.  Concrete
     rate limits live on your AI Studio dashboard:

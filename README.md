@@ -13,6 +13,8 @@
 
 > **Absorb. Enforce. Emerge.** The architecture substrate for AI-generated code — now polyglot (Python, JavaScript, TypeScript).
 
+🔗 **Try it live:** [forge.atomadic.tech](https://forge.atomadic.tech) — paste any GitHub repo and watch the analysis in real time.
+
 Forge is a monadic-architecture engine that does three things no existing
 tool combines:
 
@@ -288,8 +290,8 @@ forge chat ask "hello" --provider stub --no-cwd-context --json
 |----------|------|---------|---------------|-------------|
 | `gemini` | **free tier** | `GEMINI_API_KEY` / `GOOGLE_API_KEY` | `gemini-2.5-flash` | Best free cloud option; override with `FORGE_GEMINI_MODEL` |
 | `nexus` / `aaaa-nexus` | paid | `AAAA_NEXUS_API_KEY` | (Nexus default) | AAAA-Nexus sovereign AI; most reliable for long runs |
-| `anthropic` | paid | `ANTHROPIC_API_KEY` | `claude-3-5-sonnet-latest` | Highest code quality |
-| `openai` | paid | `OPENAI_API_KEY` | `gpt-4o-mini` | Cheap GPT path |
+| `anthropic` | paid | `ANTHROPIC_API_KEY` | `claude-sonnet-4-6` | Highest code quality (Claude 4.x; override with `claude-opus-4-7` for max reasoning or `claude-haiku-4-5-20251001` for speed) |
+| `openai` | paid | `OPENAI_API_KEY` | `gpt-4o-mini` | Cheap GPT path; override to `gpt-4.1` or `gpt-4o` for higher quality |
 | `openrouter` | **free tier available** | `OPENROUTER_API_KEY` | `google/gemma-3-27b-it:free` | Access 200+ models; good fallback when Gemini quota exhausted; override with `FORGE_OPENROUTER_MODEL` |
 | `ollama` | free, local | `FORGE_OLLAMA=1` | `qwen2.5-coder:7b` | Offline; fully private |
 | `stub` | free, offline | n/a | n/a | Tests, CI, dry-runs |
@@ -476,3 +478,7 @@ forge commandsmith smoke             # Smoke-test all 36+ registered verbs
 - ✓ **Cloudflare badge worker** — live certify score in any README
 - ✗ Chain-of-custody notarization (future)
 - ✗ Rust / Go tier classification (roadmap)
+
+---
+
+💰 **Interested in investing?** [invest.atomadic.tech](https://invest.atomadic.tech) — learn about the Atomadic Technologies ecosystem.
