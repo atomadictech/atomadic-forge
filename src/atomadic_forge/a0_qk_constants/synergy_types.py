@@ -14,7 +14,14 @@ Wire format:
 
 from __future__ import annotations
 
-from typing import Literal, NotRequired, TypedDict
+from typing import Literal, TypedDict
+
+# `NotRequired` was added to `typing` in 3.11; on 3.10 it lives in
+# `typing_extensions` (already in the dep tree via Typer / Pydantic).
+try:
+    from typing import NotRequired  # type: ignore[attr-defined]
+except ImportError:  # pragma: no cover — Python 3.10 path
+    from typing_extensions import NotRequired
 
 SynergyKind = Literal[
     "json_artifact",        # producer emits --json-out, consumer takes file arg
