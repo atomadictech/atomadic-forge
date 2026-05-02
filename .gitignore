@@ -1,3 +1,4 @@
+# ─── Python ─────────────────────────────────────────────────────────────
 __pycache__/
 *.py[cod]
 *.egg-info/
@@ -12,49 +13,73 @@ venv/
 .coverage
 htmlcov/
 *.log
+.import_linter_cache/
+
+# Forge state / scratch
 .atomadic-forge/
+
+# ─── Editors / OS ───────────────────────────────────────────────────────
 .DS_Store
 .vscode/
 .idea/
 .claude/
+.cursor/
+*.swp
 
-# Demo / evolve / iterate output directories (generated artifacts)
+# ─── Local environment ──────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+
+# ─── Demo / evolve / iterate output (generated artifacts) ───────────────
 forge-demo-*/
 forge-evolve-*/
 forge-iterate-*/
 
-# ─── JavaScript / TypeScript monorepo ───────────────────────────────────
+# ─── Out-of-scope sister projects (live in their own repos) ─────────────
+# These directories are tracked in separate repositories and must NEVER
+# be re-added to atomadic-forge:
+#   * Tauri GUI         → atomadic-forge-tauri-studio
+#   * Web app           → atomadic-forge-site
+#   * VS Code extension → atomadic-forge-vscode-ext
+#   * Cloudflare Worker → atomadic-forge-cloudflare-workers
+#   * Investor site     → atomadic-investor-site
+forge-studio/
+forge-web/
+vscode-forge-extension/
+cloudflare-workers/
+packages/
+investor-site/
+
+# ─── JavaScript / Node tooling (atomadic-forge is pure Python) ──────────
 node_modules/
 .pnpm-store/
 .pnpm-debug.log*
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-
-# Build outputs
-forge-studio/dist/
-forge-studio/.vite/
-forge-studio/src-tauri/target/
-forge-studio/src-tauri/gen/
-forge-studio/src-tauri/Cargo.lock
-forge-web/.next/
-forge-web/out/
-forge-web/next-env.d.ts
-packages/*/dist/
-
-# Test / coverage
+package.json
+package-lock.json
+pnpm-lock.yaml
+pnpm-workspace.yaml
+.npmrc
+*.tsbuildinfo
 coverage/
 .nyc_output/
-*.tsbuildinfo
 
-# investor-site is maintained separately in atomadic-investor-site repo
-investor-site/
+# ─── Rust / Tauri build artifacts (in case any sneak in) ────────────────
+target/
+Cargo.lock
+*.rlib
+*.rmeta
 
-# Local environment
-.env
-.env.local
-.env.*.local
+# ─── Cloudflare Wrangler ────────────────────────────────────────────────
+.wrangler/
 
-# Editor
-.cursor/
-*.swp
+# ─── Binaries / installers (don't ship from this repo) ──────────────────
+*.exe
+*.msi
+*.dmg
+*.AppImage
+*.deb
+*.rpm

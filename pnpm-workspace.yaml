@@ -1,4 +1,0 @@
-packages:
-  - "packages/*"
-  - "forge-studio"
-  - "forge-web"
