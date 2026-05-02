@@ -85,6 +85,36 @@ def test_select_tests_falls_back_to_full_when_no_match(tmp_path):
     assert "tests/test_other.py" in rep["full_tests"]
 
 
+def test_select_tests_javascript_repo_uses_npm_verify(tmp_path):
+    (tmp_path / "package.json").write_text(
+        '{"scripts":{"verify":"npm run check && npm test","test":"node --test"}}',
+        encoding="utf-8",
+    )
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests" / "cognition.test.js").write_text(
+        "import test from 'node:test';\ntest('x', () => {});\n",
+        encoding="utf-8",
+    )
+    rep = select_tests(
+        intent="change cognition", changed_files=["cognition/worker.js"],
+        project_root=tmp_path,
+    )
+    assert rep["minimum_command"] == "npm run verify"
+    assert rep["full_command"] == "npm run verify"
+
+
+def test_select_tests_non_code_artifact_has_no_mirror_requirement(tmp_path):
+    (tmp_path / "package.json").write_text(
+        '{"scripts":{"verify":"npm run verify"}}', encoding="utf-8")
+    rep = select_tests(
+        intent="add research note",
+        changed_files=["research/forge-agent-review.md"],
+        project_root=tmp_path,
+    )
+    assert any("non-code artifact" in r for r in rep["rationale"])
+    assert rep["minimum_command"] == "npm run verify"
+
+
 def test_mcp_select_tests_tool(tmp_path):
     (tmp_path / "tests").mkdir()
     (tmp_path / "tests" / "test_x.py").write_text("def test_a(): pass\n")
@@ -336,6 +366,13 @@ def test_compose_tools_fix_violation_recipe():
     assert plan["matched_recipe"] == "fix_violation"
     tools = [s["tool"] for s in plan["steps"]]
     assert "auto_apply" in tools
+
+
+def test_compose_tools_exact_verify_patch_recipe():
+    plan = compose_tools(goal="verify_patch")
+    assert plan["matched_recipe"] == "verify_patch"
+    tools = [s["tool"] for s in plan["steps"]]
+    assert tools == ["score_patch", "select_tests", "wire", "certify"]
 
 
 def test_mcp_compose_tools_tool(tmp_path):

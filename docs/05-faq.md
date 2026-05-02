@@ -429,19 +429,23 @@ config:
 }
 ```
 
-Once registered, the agent gets **21 tools** + **5 resources** (the
-full Codex-1..5 surface as of `v0.3.0`). The 21 tools group into
+Once registered, the agent gets **23 tools** + **5 resources** (the
+full Codex-1..5 surface plus response/API trust gates). The 23 tools group into
 *inventory* (`recon` / `wire` / `certify` / `enforce` / `audit_list` /
 `agent_summary`), *action loop* (`auto_plan` / `auto_step` /
 `auto_apply`), and *Copilot's Copilot* (`context_pack` /
 `preflight_change` / `score_patch` / `select_tests` / `rollback_plan` /
 `explain_repo` / `adapt_plan` / `compose_tools` / `load_policy` /
 `why_did_this_change` / `what_failed_last_time` / `list_recipes` /
-`get_recipe`). See the full **[Agents Guide](AGENTS_GUIDE.md)** for
+`get_recipe` / `trust_gate_response` / `exported_api_check`). See the full **[Agents Guide](AGENTS_GUIDE.md)** for
 integration patterns, the agent-friendly `agent_summary` /
 `context_pack` tools, the Forge Receipt schema agents should
 consume, F-code routing for mechanical fixes, the proposal-engine
 flow, and best practices.
+
+For MCP troubleshooting, run `forge mcp doctor --project . --json`.
+As of `0.5.2`, `tools/list` also includes a `cli_command` fallback for
+each MCP tool, and validation hints are language-aware.
 
 ### What's the difference between AGENTS.md and the Agents Guide?
 
@@ -449,7 +453,7 @@ flow, and best practices.
   the dev contract: tier discipline, F-code namespace, schema
   versioning, branch hygiene, the verification lane.
 - **`docs/AGENTS_GUIDE.md`** is for agents *using* Forge — Cursor /
-  Claude Code / Aider / etc. integrating via MCP, calling the 21
+  Claude Code / Aider / etc. integrating via MCP, calling the 23
   tools, consuming Receipts, running `preflight_change` /
   `score_patch` guardrails, applying mechanical fixes via `enforce`.
 

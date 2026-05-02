@@ -42,26 +42,23 @@ Claude Code / Aider / your own):
 }
 ```
 
-Once registered, the agent gets **21 tools** + **5 resources** in its
-tool list (the full Codex-1..5 surface, shipped at v0.3.0). No
+Once registered, the agent gets **23 tools** + **5 resources** in its
+tool list. No
 additional setup.
 
 Smoke test that the server is reachable:
 
 ```bash
-printf '%s\n%s\n%s\n' \
-  '{"jsonrpc":"2.0","id":1,"method":"initialize"}' \
-  '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
-  '{"jsonrpc":"2.0","id":3,"method":"shutdown"}' \
-  | forge mcp serve --project .
+forge mcp doctor --project . --json
 ```
 
-→ returns `serverInfo`, the 21 tool schemas, and `{}` for shutdown.
+Returns Forge version, tool count, framed-stdio status, and the next
+recovery command if the MCP host needs a restart.
 Or against the installed CLI:
 
 ```bash
 $ forge --version
-atomadic-forge 0.3.0
+atomadic-forge 0.5.2
 ```
 
 The `--version` flag (and `-V`) is the canonical "Forge is wired in
@@ -69,7 +66,7 @@ correctly" smoke check — pin it in your setup scripts.
 
 ---
 
-## The 21 MCP tools — by phase of an agent's lifecycle
+## The 23 MCP tools — by phase of an agent's lifecycle
 
 | Inventory (read-only) | Action loop | Copilot's Copilot |
 |---|---|---|
@@ -86,6 +83,8 @@ correctly" smoke check — pin it in your setup scripts.
 |  |  | `what_failed_last_time` |
 |  |  | `list_recipes` |
 |  |  | `get_recipe` |
+|  |  | `trust_gate_response` |
+|  |  | `exported_api_check` |
 
 **Inventory tools — read-only state queries.** Cheap; safe to call
 in a loop:
@@ -126,6 +125,12 @@ always-on senior engineer beside the coding agent:
 | **`what_failed_last_time`** ← *Codex-5* | `what_failed/v1` — historical failures scoped to an area | "What went wrong here before — so I don't repeat it?" |
 | **`list_recipes`** ← *Codex-5* | catalogue of golden-path recipes | First-orientation. Pre-baked: `release_hardening`, `add_cli_command`, `fix_wire_violation`, `add_feature`, `publish_mcp`. |
 | **`get_recipe`** ← *Codex-5* | `recipe/v1` — step-by-step plan | "Walk me through `release_hardening` step by step." |
+| **`trust_gate_response`** | `trust_gate/v1` — response hallucination checks | Before sending generated implementation notes or code snippets back to a human. |
+| **`exported_api_check`** | `exported_api_check/v1` — docstring/API promise verification | Before publishing generated modules that claim public functions in docs. |
+
+Every `tools/list` entry includes a `cli_command` fallback. If the MCP
+transport drops, use that command shape directly in the shell while
+you restart the editor or MCP host.
 
 (Plus four `plan_list` / `plan_show` / `plan_step` / `plan_apply`
 verbs from Codex-3 — same 1:1 mapping to the CLI verbs of the same
@@ -139,12 +144,19 @@ name.)
    orientation; `preflight_change` *before* every write;
    `score_patch` *after* drafting the diff. Forge is the always-on
    senior engineer reviewing each step.
-3. **Proposal-engine (full 21 tools)**: `auto_plan` for direction,
+3. **Proposal-engine (full 23 tools)**: `auto_plan` for direction,
    `adapt_plan` for capability-aware filtering, `auto_apply` to
    execute, `enforce` for mechanical fixes, `rollback_plan` if
    anything regresses, `why_did_this_change` /
    `what_failed_last_time` for historical context. Forge drives;
    the agent supplies LLM context where Forge can't mechanize.
+
+`context_pack`, `preflight_change`, `select_tests`, and `score_patch`
+are language-aware as of `0.5.2`: JavaScript projects with
+`package.json` scripts get `npm run verify` / `npm test`, tier wire
+commands are derived from real tier roots, and documentation paths
+such as `docs/`, `research/`, `.github/`, and `cognition/guides/` are
+treated as non-code artifacts rather than misplaced source.
 
 ---
 
@@ -356,7 +368,7 @@ Forge's normative answer; only the *attestation chain* is missing.
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | Tools list returns 0 tools | MCP client didn't pass `--project .` | Check args in MCP config |
-| Tools list returns < 21 (e.g. 6 or 10) | Old `forge` install (pre-v0.3.0) | `pip install -U atomadic-forge` (or `pip install -e .` from the repo). Pin `forge --version >= 0.3.0`. |
+| Tools list returns < 23 (e.g. 21 or 10) | Old `forge` install | `pip install -U atomadic-forge` (or `pip install -e .` from the repo). Pin `forge --version >= 0.5.2`. |
 | `wire` says PASS but agent still hits import errors | Agent is running tests in a different working directory | `--project` should match the test cwd |
 | `certify` returns score 90 instead of 100 | Project has no `.github/workflows/` and no `CHANGELOG.md` (operational axis is 0) | Add either; both are 5pts |
 | Receipt's `signatures` is null | `AAAA_NEXUS_API_KEY` not set, or AAAA-Nexus endpoint not yet shipped | Soft-fail behavior — Receipt is still valid for local use |
@@ -423,7 +435,7 @@ control plane around any coding agent**:
   true` when the agent's intent fans out across more than 8 files
   (configurable). CLI exits 1 in that case so a pre-commit hook can
   block.
-- **`score_patch`** (MCP-only: `score_patch`) — diff-level risk
+- **`score_patch`** (CLI: `forge score-patch`, MCP: `score_patch`) — diff-level risk
   preview. Given a unified-diff string, surfaces architectural_risk
   (new upward imports), public_api_risk (`__init__.py` touched),
   release_risk (pyproject / version / CHANGELOG / LICENSE), test_risk

@@ -77,6 +77,21 @@ def test_context_pack_test_commands_detected(tmp_path):
     assert "python -m pytest" in pack["test_commands"]
 
 
+def test_context_pack_prefers_npm_verify_for_js_repo(tmp_path):
+    (tmp_path / "package.json").write_text(
+        '{"scripts":{"verify":"npm run check && npm test","test":"node --test"}}',
+        encoding="utf-8",
+    )
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests" / "worker.test.js").write_text(
+        "import test from 'node:test';\ntest('x', () => {});\n",
+        encoding="utf-8",
+    )
+    pack = emit_context_pack(project_root=tmp_path)
+    assert pack["test_commands"][0] == "npm run verify"
+    assert "python -m pytest" not in pack["release_gate"]
+
+
 def test_context_pack_release_gate_includes_certify(tmp_path):
     repo = _seed_repo(tmp_path)
     pack = emit_context_pack(project_root=repo)
@@ -172,6 +187,18 @@ def test_preflight_likely_tests_mirror_path():
     )
     tests = rep["proposed_files"][0]["likely_tests"]
     assert any("test_helper.py" in t for t in tests)
+
+
+def test_preflight_non_code_artifact_no_tier_warning(tmp_path):
+    rep = preflight_change(
+        intent="add docs",
+        proposed_files=["research/forge-agent-review.md"],
+        project_root=tmp_path,
+    )
+    f = rep["proposed_files"][0]
+    assert f["likely_tests"] == []
+    assert any("non-code artifact" in note for note in f["notes"])
+    assert not any("likely belongs in a tier" in note for note in f["notes"])
 
 
 def test_preflight_scope_too_broad_at_default_threshold():
@@ -338,6 +365,19 @@ def test_score_patch_test_risk_when_code_changed_without_tests():
 
 def test_score_patch_tests_only_no_test_risk():
     rep = score_patch(_DIFF_TESTS_ONLY)
+    assert rep["test_risk"] is False
+
+
+def test_score_patch_docs_only_no_test_risk(tmp_path):
+    diff = """\
+diff --git a/research/review.md b/research/review.md
+--- /dev/null
++++ b/research/review.md
+@@ -0,0 +1,2 @@
++# Review
++Notes.
+"""
+    rep = score_patch(diff, project_root=tmp_path)
     assert rep["test_risk"] is False
 
 

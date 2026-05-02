@@ -884,6 +884,32 @@ TOOLS: dict[str, dict[str, Any]] = {
     },
 }
 
+_CLI_FALLBACKS: dict[str, str] = {
+    "recon": "forge recon <repo> --json",
+    "wire": "forge wire <tier-root> --json",
+    "certify": "forge certify <project-root> --json",
+    "enforce": "forge enforce <tier-root>",
+    "audit_list": "forge audit list --json",
+    "auto_plan": "forge plan <repo> --json",
+    "auto_step": "forge plan-step <plan-id> <card-id> --project <repo>",
+    "auto_apply": "forge plan-apply <plan-id> --project <repo>",
+    "context_pack": "forge context-pack <project-root> --json",
+    "preflight_change": "forge preflight <intent> <file...> --project <repo> --json",
+    "score_patch": "git diff | forge score-patch --project-root <repo>",
+    "select_tests": "forge select-tests --file <path> --project-root <repo> <intent>",
+    "rollback_plan": "forge rollback-plan --file <path> --project-root <repo>",
+    "explain_repo": "forge explain-repo <project-root>",
+    "adapt_plan": "forge adapt-plan --file <plan.json>",
+    "compose_tools": "forge compose-tools <goal>",
+    "load_policy": "forge load-policy <project-root>",
+    "why_did_this_change": "forge why-did-this-change <file> --project-root <repo>",
+    "what_failed_last_time": "forge what-failed-last-time <area> --project-root <repo>",
+    "list_recipes": "forge recipes --json",
+    "get_recipe": "forge recipes <name> --json",
+    "trust_gate_response": "MCP-only: trust_gate_response",
+    "exported_api_check": "MCP-only: exported_api_check",
+}
+
 
 # --- Resource registry ---------------------------------------------------
 
@@ -1093,7 +1119,8 @@ def _list_tools() -> dict[str, Any]:
         "tools": [
             {"name": t["name"],
              "description": t["description"],
-             "inputSchema": t["inputSchema"]}
+             "inputSchema": t["inputSchema"],
+             "cli_command": _CLI_FALLBACKS.get(t["name"], "")}
             for t in TOOLS.values()
         ],
     }

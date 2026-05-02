@@ -1,5 +1,49 @@
 # Changelog
 
+## 0.5.2 - Agent ergonomics and language-aware guidance
+
+Implements the first round of quality-of-life improvements from the
+Forge agent review. This release makes Forge friendlier when an agent
+uses it on JavaScript repos, documentation/research patches, or live
+MCP connections.
+
+### Added
+
+- `forge mcp doctor` smoke-tests MCP stdio with framed `initialize`,
+  `tools/list`, and `shutdown` requests. It reports version, project
+  root, tool count, framed-stdio status, server exit code, and a
+  recovery hint.
+- `tools/list` entries now include a `cli_command` fallback so agents
+  can switch from MCP to shell without guessing command names.
+- Shared validation heuristics now detect `package.json` scripts,
+  JS/TS tests, tier roots, and release-gate commands.
+
+### Improved
+
+- `context-pack` prefers `npm run verify` / `npm test` for JavaScript
+  projects and derives `forge wire` gates from real tier roots.
+- `preflight` recognizes non-code artifacts such as `docs/`,
+  `research/`, `.github/`, and `cognition/guides/` as valid project
+  memory instead of misplaced source.
+- `select-tests` discovers JS/TS test files and avoids mirror pytest
+  requirements for documentation-only changes.
+- `score-patch` no longer treats docs/research-only diffs as code
+  changes without tests, and emits language-aware validation commands
+  when a project root is provided.
+- `compose-tools verify_patch` now maps to
+  `score_patch -> select_tests -> wire -> certify`.
+- Hidden worktrees, experiment directories, build output, and
+  `node_modules` are skipped when deriving release-gate wire roots.
+
+### Tests
+
+- Added regression tests for JavaScript validation selection,
+  non-code artifact preflight, docs-only patch scoring, exact
+  `verify_patch` recipe matching, MCP CLI fallback metadata, and
+  `forge mcp doctor`.
+
+---
+
 ## 0.5.1 — MCP stdio framing compatibility
 
 Fixes `forge mcp serve` for MCP hosts that use LSP-style

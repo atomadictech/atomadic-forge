@@ -15,6 +15,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TypedDict
 
+from .validation_commands import (
+    command_for_selected_tests,
+    is_non_code_artifact,
+    release_gate_commands,
+)
+
 SCHEMA_VERSION_PREFLIGHT_V1 = "atomadic-forge.preflight/v1"
 
 
@@ -79,6 +85,8 @@ def _likely_tests_for(path: str) -> list[str]:
     src/pkg/a1_at_functions/foo.py -> tests/test_foo.py,
                                        tests/a1_at_functions/test_foo.py
     """
+    if is_non_code_artifact(path):
+        return []
     p = Path(path)
     stem = p.stem
     if stem.startswith("test_") or stem.endswith("_test"):
@@ -124,7 +132,12 @@ def _file_preflight(
     forbidden = list(_FORBIDDEN_BY_TIER.get(tier, ())) if tier else []
     likely_tests = _likely_tests_for(path)
     siblings = _siblings_to_read(path, project_root=project_root)
-    if tier is None:
+    if tier is None and is_non_code_artifact(path):
+        notes.append(
+            "non-code artifact path — no monadic tier required; "
+            "validate with the repo's docs or full test gate as appropriate"
+        )
+    elif tier is None:
         notes.append(
             "no tier directory in this path — file likely belongs in "
             "a tier under src/<package>/aN_*/"
@@ -210,6 +223,11 @@ def preflight_change(
             "test-only change — verify it pins existing behaviour and "
             "is not silently masking a regression."
         )
+    validation = [
+        command_for_selected_tests(project_root, []),
+        *release_gate_commands(project_root),
+    ]
+    validation = list(dict.fromkeys(validation))
     return PreflightReport(
         schema_version=SCHEMA_VERSION_PREFLIGHT_V1,
         intent=intent,
@@ -219,9 +237,5 @@ def preflight_change(
         write_scope_size=len(proposed_files),
         write_scope_threshold=scope_threshold,
         overall_notes=overall,
-        suggested_validation_commands=[
-            "forge wire src --fail-on-violations",
-            "python -m pytest",
-            "forge certify . --fail-under 75",
-        ],
+        suggested_validation_commands=validation,
     )

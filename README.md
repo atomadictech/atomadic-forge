@@ -184,13 +184,20 @@ Forge ships a **Model Context Protocol server** — add it to Cursor, Claude Cod
 }
 ```
 
-**21 tools exposed:** `recon` · `wire` · `certify` · `enforce` · `audit_list` · `auto_plan` · `auto_step` · `auto_apply` · `context_pack` · `preflight_change` · `score_patch` · `select_tests` · `rollback_plan` · `explain_repo` · `adapt_plan` · `compose_tools` · `load_policy` · `why_did_this_change` · `what_failed_last_time` · `list_recipes` · `get_recipe`
+**23 tools exposed:** `recon` · `wire` · `certify` · `enforce` · `audit_list` · `auto_plan` · `auto_step` · `auto_apply` · `context_pack` · `preflight_change` · `score_patch` · `select_tests` · `rollback_plan` · `explain_repo` · `adapt_plan` · `compose_tools` · `load_policy` · `why_did_this_change` · `what_failed_last_time` · `list_recipes` · `get_recipe` · `trust_gate_response` · `exported_api_check`
 
 **5 resources:** Receipt schema · formalization docs · lineage chain · blocker summary · verdicts
 
 ```bash
 forge mcp serve --help   # full tool + resource listing with examples
+forge mcp doctor --project . --json
 ```
+
+As of `0.5.2`, `tools/list` includes a `cli_command` fallback for
+each MCP tool. `context-pack`, `preflight`, `select-tests`, and
+`score-patch` also use language-aware validation commands so
+JavaScript projects get `npm run verify` / `npm test` guidance and
+documentation/research paths are treated as non-code project memory.
 
 ### Subscription required for `forge mcp serve`
 
@@ -338,7 +345,7 @@ Forge waits before returning a clear provider error.
 
 | Command | Purpose |
 |---------|---------|
-| `forge mcp serve` | Stdio JSON-RPC MCP server — 21 tools for Cursor / Claude Code / Aider / Devin. |
+| `forge mcp serve` | Stdio JSON-RPC MCP server — 23 tools for Cursor / Claude Code / Aider / Devin. |
 | `forge plan / plan-list / plan-show / plan-step / plan-apply` | Agent plan persistence and step-by-step apply. |
 | `forge iterate` | LLM loop: intent → code → absorb → wire → score → iterate. Single shot. |
 | `forge evolve` | Recursive improvement: N rounds, catalog grows each round. |
@@ -460,7 +467,7 @@ forge commandsmith smoke             # Smoke-test all 36+ registered verbs
 - ✓ **100/100 certify** — forge scores itself on every CI run
 - ✓ **0 wire violations** — forge passes its own import-law scan
 - ✓ **On PyPI** — `pip install atomadic-forge`
-- ✓ **MCP server** — 21 tools, 5 resources; works with Cursor, Claude Code, Aider, Devin
+- ✓ **MCP server** — 23 tools, 5 resources; works with Cursor, Claude Code, Aider, Devin
 - ✓ **Desktop GUI** — Forge Studio (Tauri 2 + React)
 - ✓ **Ed25519 signing** — `forge certify --local-sign`
 - ✓ **CycloneDX SBOM** — `forge sbom`

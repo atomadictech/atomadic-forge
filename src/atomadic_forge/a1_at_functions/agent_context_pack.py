@@ -20,6 +20,7 @@ from typing import TypedDict
 
 from .agent_summary import summarize_blockers
 from .lineage_reader import read_lineage
+from .validation_commands import detect_test_commands, release_gate_commands
 
 SCHEMA_VERSION_CONTEXT_PACK_V1 = "atomadic-forge.context_pack/v1"
 
@@ -86,40 +87,12 @@ def _read_repo_purpose(project_root: Path) -> str:
 
 
 def _detect_test_commands(project_root: Path) -> list[str]:
-    cmds: list[str] = []
-    if (project_root / "pyproject.toml").exists():
-        cmds.append("python -m pytest")
-    if (project_root / "tox.ini").exists():
-        cmds.append("tox")
-    if (project_root / "package.json").exists():
-        cmds.append("npm test")
-    if (project_root / "Cargo.toml").exists():
-        cmds.append("cargo test")
-    if (project_root / "Makefile").exists():
-        # Look for a 'test' target.
-        try:
-            mk = (project_root / "Makefile").read_text(
-                encoding="utf-8", errors="replace")
-            if re.search(r"^test:", mk, re.MULTILINE):
-                cmds.append("make test")
-        except OSError:
-            pass
-    if not cmds:
-        cmds.append("# no test runner detected — add tests/ + pytest")
-    return cmds
+    return detect_test_commands(project_root)
 
 
 def _release_gate(project_root: Path) -> list[str]:
     """Heuristic release gate: lint + tests + wire + certify ≥ 75."""
-    gate: list[str] = []
-    if (project_root / "pyproject.toml").exists():
-        gate.append("python -m ruff check .")
-    gate.extend([
-        "python -m pytest",
-        "forge wire src --fail-on-violations",
-        "forge certify . --fail-under 75",
-    ])
-    return gate
+    return release_gate_commands(project_root)
 
 
 def _risky_files(lineage: list[dict], top_n: int = 10) -> list[dict]:

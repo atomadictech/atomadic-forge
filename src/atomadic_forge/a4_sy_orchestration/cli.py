@@ -20,6 +20,7 @@ Specialty verbs (advanced):
 
 from __future__ import annotations
 
+import io
 import json
 import sys
 import warnings
@@ -39,6 +40,7 @@ from ..a1_at_functions.certify_checks import certify as certify_checks
 from ..a1_at_functions.error_hints import format_hint
 from ..a1_at_functions.local_signer import sign_receipt_local
 from ..a1_at_functions.manifest_diff import diff_manifests
+from ..a1_at_functions.mcp_protocol import TOOLS
 from ..a1_at_functions.preflight_change import preflight_change
 from ..a1_at_functions.progress_reporter import make_stderr_reporter
 from ..a1_at_functions.receipt_emitter import build_receipt, receipt_to_json
@@ -1090,6 +1092,50 @@ mcp_app = typer.Typer(no_args_is_help=True,
                        help="MCP server surface — speak Forge to coding agents.")
 
 
+def _mcp_frame(payload: dict[str, object]) -> bytes:
+    body = json.dumps(payload).encode("utf-8")
+    return f"Content-Length: {len(body)}\r\n\r\n".encode("ascii") + body
+
+
+def _mcp_doctor_report(project: Path) -> dict[str, object]:
+    project = Path(project).resolve()
+    stdin = io.BytesIO(
+        _mcp_frame({"jsonrpc": "2.0", "id": 1, "method": "initialize"})
+        + _mcp_frame({"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
+        + _mcp_frame({"jsonrpc": "2.0", "id": 3, "method": "shutdown"})
+    )
+    stdout = io.BytesIO()
+    stderr = io.StringIO()
+    rc = mcp_serve_stdio(
+        project_root=project,
+        stdin=stdin,
+        stdout=stdout,
+        stderr=stderr,
+        env={},
+    )
+    raw = stdout.getvalue()
+    response_count = raw.count(b"Content-Length:")
+    ok = rc == 0 and response_count >= 3 and bool(TOOLS)
+    return {
+        "schema_version": "atomadic-forge.mcp_doctor/v1",
+        "verdict": "PASS" if ok else "FAIL",
+        "forge_version": __version__,
+        "project_root": str(project),
+        "project_exists": project.exists(),
+        "tool_count": len(TOOLS),
+        "framed_stdio_smoke": "PASS" if response_count >= 3 else "FAIL",
+        "response_count": response_count,
+        "server_exit_code": rc,
+        "stderr": stderr.getvalue().strip(),
+        "next_command": (
+            "restart the MCP host/editor if this command passes but the live "
+            "agent connection is stale"
+            if ok else
+            f"forge mcp doctor --project {project} --json"
+        ),
+    }
+
+
 @mcp_app.command("serve")
 def mcp_serve_cmd(
     project: Annotated[Path, typer.Option(
@@ -1144,6 +1190,33 @@ def mcp_serve_cmd(
     rc = mcp_serve_stdio(project_root=project)
     if rc != 0:
         raise typer.Exit(code=rc)
+
+
+@mcp_app.command("doctor")
+def mcp_doctor_cmd(
+    project: Annotated[Path, typer.Option(
+        "--project",
+        exists=True, file_okay=False, dir_okay=True, resolve_path=True,
+        help="Project root to smoke-test through the MCP stdio surface.")] = Path("."),
+    json_out: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    """Smoke-test MCP stdio framing, tool listing, and server startup."""
+    report = _mcp_doctor_report(project)
+    if json_out:
+        typer.echo(json.dumps(report, indent=2, default=str))
+        if report["verdict"] != "PASS":
+            raise typer.Exit(code=1)
+        return
+    typer.echo("\nForge MCP doctor")
+    typer.echo("-" * 60)
+    typer.echo(f"  verdict:      {report['verdict']}")
+    typer.echo(f"  version:      {report['forge_version']}")
+    typer.echo(f"  project:      {report['project_root']}")
+    typer.echo(f"  tools:        {report['tool_count']}")
+    typer.echo(f"  stdio frame:  {report['framed_stdio_smoke']}")
+    typer.echo(f"  next:         {report['next_command']}")
+    if report["verdict"] != "PASS":
+        raise typer.Exit(code=1)
 
 
 app.add_typer(mcp_app, name="mcp",

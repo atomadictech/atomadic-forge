@@ -23,6 +23,8 @@ import io
 import json
 from pathlib import Path
 
+from typer.testing import CliRunner
+
 from atomadic_forge.a1_at_functions.mcp_protocol import (
     PROTOCOL_VERSION,
     RESOURCES,
@@ -31,6 +33,9 @@ from atomadic_forge.a1_at_functions.mcp_protocol import (
     dispatch_request,
 )
 from atomadic_forge.a3_og_features.mcp_server import serve_stdio
+from atomadic_forge.a4_sy_orchestration.cli import app
+
+runner = CliRunner()
 
 # ---- handshake ---------------------------------------------------------
 
@@ -99,6 +104,9 @@ def test_tools_list_pinned(tmp_path):
     for tool in resp["result"]["tools"]:
         assert "inputSchema" in tool
         assert tool["inputSchema"]["type"] == "object"
+        assert "cli_command" in tool
+    audit = next(t for t in resp["result"]["tools"] if t["name"] == "audit_list")
+    assert audit["cli_command"] == "forge audit list --json"
 
 
 def test_resources_list_pinned(tmp_path):
@@ -198,6 +206,15 @@ def test_tools_call_audit_list_empty(tmp_path):
     body = json.loads(resp["result"]["content"][0]["text"])
     assert body["schema_version"] == "atomadic-forge.audit.list/v1"
     assert body["artifacts"] == []
+
+
+def test_mcp_doctor_cli_json(tmp_path):
+    result = runner.invoke(app, ["mcp", "doctor", "--project", str(tmp_path), "--json"])
+    assert result.exit_code == 0
+    body = json.loads(result.stdout)
+    assert body["schema_version"] == "atomadic-forge.mcp_doctor/v1"
+    assert body["verdict"] == "PASS"
+    assert body["framed_stdio_smoke"] == "PASS"
 
 
 def test_tools_call_unknown_tool_returns_method_not_found(tmp_path):

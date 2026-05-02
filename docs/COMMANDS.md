@@ -1,6 +1,6 @@
 # Atomadic Forge — Command Reference
 
-All verbs available in the `forge` CLI as of 0.2.2.
+All verbs available in the `forge` CLI as of 0.5.2.
 
 ## Pipeline / absorption
 
@@ -206,7 +206,7 @@ clean shutdown. The soft-fail contract from `receipt_signer.py`
 applies — every tool gracefully degrades when an upstream (e.g.,
 AAAA-Nexus signing) is unreachable.
 
-**The 21 MCP tools, grouped by phase of an agent's lifecycle:**
+**The 23 MCP tools, grouped by phase of an agent's lifecycle:**
 
 | Inventory (read-only) | Action loop | Copilot's Copilot |
 |---|---|---|
@@ -223,10 +223,27 @@ AAAA-Nexus signing) is unreachable.
 |  |  | `what_failed_last_time` |
 |  |  | `list_recipes` |
 |  |  | `get_recipe` |
+|  |  | `trust_gate_response` |
+|  |  | `exported_api_check` |
 
 **5 MCP resources:** `forge://docs/receipt`, `forge://docs/formalization`,
 `forge://lineage/chain`, `forge://schema/receipt`,
 `forge://summary/blockers`.
+
+### `forge mcp doctor`
+
+Agent-facing MCP health check. It starts the local stdio server in
+memory, sends framed `initialize`, `tools/list`, and `shutdown`
+requests, and reports whether the transport path is healthy.
+
+```bash
+forge mcp doctor --project . --json
+```
+
+Returns `atomadic-forge.mcp_doctor/v1` with Forge version, project
+root, tool count, framed-stdio status, server exit code, and a
+`next_command`. If this passes but your editor's live MCP tools fail,
+restart the MCP host/editor so it respawns the server.
 
 What this unlocks per Golden Path Lane C: the Forge Receipt JSON
 becomes consumable by every major coding-agent platform via the same
@@ -317,10 +334,11 @@ a repo. Wraps scout + wire + certify and adds:
 - `architecture_law` — pinned 5-tier law text (so the agent doesn't
   have to look it up).
 - `tier_map`, `blockers_summary`, `best_next_action`.
-- `test_commands` — detected from pyproject / tox.ini / package.json /
-  Cargo.toml / Makefile.
-- `release_gate` — the canonical `ruff && pytest && wire && certify
-  ≥ 75` recipe.
+- `test_commands` — language-aware detection from `package.json`
+  scripts, pyproject / tox.ini, Cargo.toml, or Makefile.
+- `release_gate` — language-aware validation: JS repos prefer
+  `npm run verify` / `npm test`, Python repos get pytest/ruff, and
+  `forge wire` targets real tier roots instead of hard-coded `src`.
 - `risky_files`, `recent_lineage`, `pinned_resources`.
 
 ```bash
@@ -339,10 +357,13 @@ write, emits `atomadic-forge.preflight/v1` with:
 - `forbidden_imports` — tiers above this file's tier (read-only, but
   the agent should treat as hard rules before drafting).
 - `likely_tests` — mirror-style: `tests/test_<stem>.py`,
-  `<stem>_test.py`, etc.
+  `<stem>_test.py`, JS/TS `*.test.*` / `*.spec.*`, etc.
 - `siblings_to_read` — first 5 `.py` siblings in the same dir.
 - Overall `write_scope_too_broad` flag (default threshold = 8 files;
   override with `--scope-threshold N`).
+- Non-code artifacts under `docs/`, `research/`, `.github/`,
+  `cognition/guides/`, and similar paths are accepted as project
+  memory with no tier warning.
 
 ```bash
 forge preflight 'Add a parser helper' \
@@ -353,17 +374,22 @@ Exits **1** when `write_scope_too_broad` is true — designed to be
 called from a pre-commit hook or an agent's tool-use loop. Add
 `--json` for machine-readable output.
 
-(`score_patch` — diff-scoring of a candidate unified-diff — is
-intentionally MCP-only. Diff strings are awkward as positional CLI
-args; agents pipe the diff through the `score_patch` MCP tool
-instead.)
+`score_patch` also has a CLI front door:
 
-### Copilot's Copilot — the rest of Codex-5 (MCP-only)
+```bash
+git diff | forge score-patch --project-root .
+forge score-patch --file patch.diff --project-root .
+```
+
+When a project root is supplied, its suggested validation commands use
+the same language-aware gate as `context-pack`.
+
+### Copilot's Copilot — the rest of Codex-5
 
 The 8 modules added in `276a092` (Codex's items #5–#12) ship as MCP
-tools rather than CLI verbs. Agents consume them through the running
-`forge mcp serve` over stdio JSON-RPC. Each returns a versioned JSON
-schema agents should treat as a contract:
+tools and CLI verbs. Agents can consume them through `forge mcp serve`
+or use the `cli_command` fallback exposed by `tools/list`. Each returns
+a versioned JSON schema agents should treat as a contract:
 
 | MCP tool | Schema | What it answers |
 |---|---|---|
@@ -376,6 +402,8 @@ schema agents should treat as a contract:
 | `adapt_plan` | `atomadic-forge.agent_plan_adapted/v1` | Filter an `agent_plan/v1` for a specific agent's capability set (`edit_files`, `run_commands`, `network`, `review`, `delegate`). Each card gets `recommended_handling`: `apply` / `delegate` / `ask_human` / `report_only`. |
 | `compose_tools` | n/a (returns ordered tool list) | Goal-keyword → ordered tool sequence. Pre-baked recipes: `orient`, `release_check`, `fix_violation`, `before_edit`, `verify_patch`. |
 | `list_recipes` / `get_recipe` | `atomadic-forge.recipe/v1` | Golden-path playbooks: `release_hardening`, `add_cli_command`, `fix_wire_violation`, `add_feature`, `publish_mcp`. Each recipe is a step-by-step plan agents can `get_recipe` and execute. |
+| `trust_gate_response` | `trust_gate/v1` | Check generated responses for unresolved imports, syntax errors, stub-pattern code, false capability claims, and placeholder URLs. |
+| `exported_api_check` | `exported_api_check/v1` | Verify that docstring-promised public APIs resolve to actual top-level definitions. |
 
 These complete Codex's 12-item Copilot's Copilot enumeration — items
 #5–#12. Items #1–#3 are the Codex-4 hero primitives
@@ -391,7 +419,7 @@ Prints the installed Forge version and exits 0. Hardened in v0.3.0
 
 ```bash
 $ forge --version
-atomadic-forge 0.3.0
+atomadic-forge 0.5.2
 ```
 
 ### `.forge` sidecars — Lane D W8

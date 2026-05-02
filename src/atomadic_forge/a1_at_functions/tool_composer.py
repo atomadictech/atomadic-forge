@@ -83,13 +83,14 @@ _RECIPES: dict[str, dict] = {
     },
     "verify_patch": {
         "match": ("verify patch", "score diff", "review patch", "is this safe",
-                   "review my change"),
+                   "review my change", "verify_patch"),
         "steps": [
             {"tool": "score_patch",
               "why": "architecture / api / release / test risk"},
-            {"tool": "wire", "why": "confirm no upward imports introduced"},
             {"tool": "select_tests",
               "why": "minimum tests for the changed files"},
+            {"tool": "wire", "why": "confirm no upward imports introduced"},
+            {"tool": "certify", "why": "final repo confidence gate"},
         ],
     },
 }
@@ -100,10 +101,14 @@ def compose_tools(*, goal: str) -> ComposedToolPlan:
     tool-use plan. Falls back to the 'orient' recipe when no keyword
     matches."""
     goal_l = (goal or "").lower()
+    normalized_goal = goal_l.replace("_", " ").replace("-", " ")
     matched: str = ""
     chosen: list[dict] | None = None
     for name, recipe in _RECIPES.items():
-        if any(kw in goal_l for kw in recipe["match"]):
+        normalized_name = name.replace("_", " ").replace("-", " ")
+        if normalized_goal.strip() in {name, normalized_name} or any(
+            kw in normalized_goal for kw in recipe["match"]
+        ):
             matched = name
             chosen = recipe["steps"]
             break

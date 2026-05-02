@@ -16,6 +16,13 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TypedDict
 
+from .validation_commands import (
+    command_for_selected_tests,
+    has_javascript_tests,
+    is_non_code_artifact,
+    preferred_full_test_command,
+)
+
 SCHEMA_VERSION_TEST_SELECT_V1 = "atomadic-forge.test_select/v1"
 
 _TIER_NAMES = (
@@ -52,6 +59,11 @@ def _list_tests(project_root: Path) -> list[str]:
             candidates.append(str(f.relative_to(project_root).as_posix()))
         for f in sorted(d.rglob("*_test.py")):
             candidates.append(str(f.relative_to(project_root).as_posix()))
+        for pattern in ("*.test.js", "*.spec.js", "*.test.mjs", "*.spec.mjs",
+                        "*.test.cjs", "*.spec.cjs", "*.test.ts", "*.spec.ts",
+                        "*.test.tsx", "*.spec.tsx", "*.test.jsx", "*.spec.jsx"):
+            for f in sorted(d.rglob(pattern)):
+                candidates.append(str(f.relative_to(project_root).as_posix()))
     return sorted(set(candidates))
 
 
@@ -67,8 +79,15 @@ def select_tests(
     minimum: set[str] = set()
     full: set[str] = set()
     rationale: list[str] = []
+    saw_code_file = False
 
     for path in changed_files:
+        if is_non_code_artifact(path):
+            rationale.append(
+                f"{path} is a non-code artifact; no mirror test is required."
+            )
+            continue
+        saw_code_file = True
         stem = Path(path).stem
         tier = _detect_tier(path)
         # Direct mirror match
@@ -86,7 +105,7 @@ def select_tests(
         for t in all_tests:
             if stem and stem in Path(t).stem and stem != Path(t).stem:
                 full.add(t)
-    if not minimum and all_tests:
+    if not minimum and all_tests and saw_code_file:
         # No mirror match — the safe minimum is full + a clear note.
         rationale.append(
             "no mirror-name test match for any changed file; "
@@ -94,12 +113,14 @@ def select_tests(
             "preserved."
         )
         minimum = set(full or all_tests)
-    if not full:
+    if not full and saw_code_file:
         full = set(all_tests)
         rationale.append(
             "no tier-mate matches found; full_tests defaulted to the "
             "complete tests/ tree."
         )
+    elif not full and all_tests:
+        full = set(all_tests)
     rationale.append(
         f"intent: {intent[:200]}" if intent
         else "no intent provided — selection is path-based only."
@@ -114,9 +135,13 @@ def select_tests(
         minimum_tests=minimum_list,
         full_tests=full_list,
         minimum_command=(
-            "python -m pytest " + " ".join(minimum_list)
-            if minimum_list else "python -m pytest"
+            command_for_selected_tests(project_root, minimum_list)
+            if minimum_list else preferred_full_test_command(project_root)
         ),
-        full_command="python -m pytest",
+        full_command=(
+            preferred_full_test_command(project_root)
+            if has_javascript_tests(project_root)
+            else command_for_selected_tests(project_root, full_list)
+        ),
         rationale=rationale,
     )

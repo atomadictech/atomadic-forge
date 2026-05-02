@@ -15,7 +15,10 @@ think about before applying the diff.
 from __future__ import annotations
 
 import re
+from pathlib import Path
 from typing import TypedDict
+
+from .validation_commands import is_non_code_artifact, release_gate_commands
 
 SCHEMA_VERSION_PATCH_SCORE_V1 = "atomadic-forge.patch_score/v1"
 
@@ -197,7 +200,8 @@ def score_patch(diff: str, *, project_root: object | None = None) -> PatchScore:
 
     src_paths = [f for f in files
                  if not f["path"].startswith(("tests/", "test/"))
-                 and not f["path"].endswith(("_test.py",))]
+                 and not f["path"].endswith(("_test.py",))
+                 and not is_non_code_artifact(f["path"])]
     test_paths = [f for f in files
                    if f["path"].startswith(("tests/", "test/"))
                    or f["path"].endswith(("_test.py",))]
@@ -220,10 +224,8 @@ def score_patch(diff: str, *, project_root: object | None = None) -> PatchScore:
     protected_hits: list[str] = []
     if project_root is not None:
         try:
-            from pathlib import Path as _Path
-
             from .policy_loader import file_is_protected, load_policy
-            policy = load_policy(_Path(str(project_root)))
+            policy = load_policy(Path(str(project_root)))
             for f in files:
                 if file_is_protected(f["path"], policy):
                     protected_hits.append(f["path"])
@@ -258,10 +260,13 @@ def score_patch(diff: str, *, project_root: object | None = None) -> PatchScore:
         release_risk=rel_risk,
         needs_human_review=needs_review,
         files=files,
-        suggested_validation_commands=[
-            "forge wire src --fail-on-violations",
-            "python -m pytest",
-            "forge certify . --fail-under 75",
-        ],
+        suggested_validation_commands=(
+            release_gate_commands(Path(str(project_root)))
+            if project_root is not None else [
+                "forge wire src --fail-on-violations",
+                "python -m pytest",
+                "forge certify . --fail-under 75",
+            ]
+        ),
         notes=notes,
     )
