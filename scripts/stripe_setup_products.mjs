@@ -29,9 +29,43 @@ const SITE_CHECKOUT = resolve(ROOT, "..", "..", "Users", "atoma", "atomadic-forg
 // Fallback: try the canonical Windows path the user has
 const SITE_CHECKOUT_FALLBACK = "C:/Users/atoma/atomadic-forge-site/functions/api/checkout.ts";
 
+// Auto-load from the master VAULT.env if STRIPE_SECRET_KEY isn't already
+// in the environment. The vault is the canonical home for ecosystem keys
+// per the May 2026 reorg.
+function loadFromVault() {
+  const VAULTS = [
+    "C:/!!AtomadicStandard/VAULT.env",
+    process.env.HOME ? `${process.env.HOME}/.atomadic/.env` : null,
+    process.env.USERPROFILE ? `${process.env.USERPROFILE}/.atomadic/.env` : null,
+  ].filter(Boolean);
+  for (const p of VAULTS) {
+    if (!existsSync(p)) continue;
+    const text = readFileSync(p, "utf-8");
+    for (const line of text.split(/\r?\n/)) {
+      const m = line.match(/^\s*([A-Z][A-Z0-9_]*)\s*=\s*(.*?)\s*$/);
+      if (!m) continue;
+      const [, k, vRaw] = m;
+      if (k.startsWith("#")) continue;
+      const v = vRaw.replace(/^['"]|['"]$/g, "");
+      if (v && !process.env[k]) process.env[k] = v;
+    }
+    if (process.env.STRIPE_SECRET_KEY) {
+      console.log(`📒 Loaded STRIPE_SECRET_KEY from ${p}`);
+      return;
+    }
+  }
+}
+loadFromVault();
+
 const KEY = process.env.STRIPE_SECRET_KEY;
 if (!KEY || !KEY.startsWith("sk_")) {
-  console.error("ERROR: STRIPE_SECRET_KEY env var not set or invalid (must start with sk_).");
+  console.error("ERROR: STRIPE_SECRET_KEY not found.");
+  console.error("Searched:");
+  console.error("  • C:/!!AtomadicStandard/VAULT.env");
+  console.error("  • $HOME/.atomadic/.env");
+  console.error("  • process env");
+  console.error("");
+  console.error("Add `STRIPE_SECRET_KEY=sk_...` to one of those files, or set it via:");
   console.error("PowerShell:  $env:STRIPE_SECRET_KEY = 'sk_test_...'");
   console.error("Bash:        export STRIPE_SECRET_KEY=sk_test_...");
   process.exit(1);
