@@ -202,9 +202,9 @@ What the agent gets through the LSP surface:
   in `foo.py.forge` jumps to `foo.py:login`.
 
 VS Code + Neovim drop-in snippets are in
-[`docs/COMMANDS.md`](COMMANDS.md) under `forge lsp serve`. Reserved
-for **W14** (VS Code extension packaging) and **W18** (JetBrains
-plugin).
+[`docs/COMMANDS.md`](COMMANDS.md) under `forge lsp serve`. The
+packaged VS Code extension lives in its own repository
+(`atomadic-forge-vscode-ext`); a JetBrains plugin is roadmap.
 
 This is the third axis of agent integration — alongside the MCP
 tool surface and the Receipt JSON wire format. **Coding agents

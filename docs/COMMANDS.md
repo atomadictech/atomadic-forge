@@ -477,9 +477,10 @@ forge sidecar validate users/auth.py --json | jq
 
 Pure AST walk + sidecar dict walk; no exec, no LLM, no network.
 
-Reserved for **W14** (VS Code extension), **W18** (JetBrains
-plugin), and **W20** (Bao-Rompf `compose_with` checker [`S0005`] +
-Lean4 `proves:` discharger [`S0007`]).
+The VS Code extension consumes this same sidecar surface — it
+lives in its own repository (`atomadic-forge-vscode-ext`). A
+JetBrains plugin and the Bao-Rompf `compose_with` / Lean4
+`proves:` checkers are roadmap items.
 
 ### `forge lsp serve` (Lane D W12)
 
@@ -535,9 +536,9 @@ at `a3_og_features/lsp_server.py`. Bad JSON surfaces `-32700`
 without killing the loop. The reasonable LSP failure modes
 (client-disconnect, malformed request, etc.) all degrade gracefully.
 
-Reserved for **W14** (VS Code extension packaging) and **W18**
-(JetBrains plugin) — `forge lsp serve` is the substrate they will
-consume.
+The VS Code extension (`atomadic-forge-vscode-ext`, separate repo)
+consumes `forge lsp serve` over stdio. A JetBrains plugin is on the
+roadmap — `forge lsp serve` is the substrate it will consume.
 
 ### `forge recipes [NAME]` (Codex-6)
 

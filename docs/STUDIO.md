@@ -1,69 +1,34 @@
-﻿# Forge Studio
+# Forge Studio (moved)
 
-Desktop Visual Sandbox for Atomadic Forge — Tauri v2 + React + TypeScript.
-Connects to `forge mcp serve` over stdio JSON-RPC for live architecture, debt, and complexity data.
+The desktop GUI (Tauri 2 + React + TypeScript) is no longer part of the
+`atomadic-forge` repository. It lives in its own project so this repo
+stays a focused Python CLI tool.
 
-## Requirements
+**New location:** `atomadic-forge-tauri-studio` (separate repo)
 
-| Dependency | Min version |
+The Studio still talks to `forge mcp serve` over JSON-RPC stdio, exactly
+as before — only the build tree was split.
+
+## Why the move
+
+`atomadic-forge` is the Python engine. The Studio is a TypeScript/Rust
+desktop app with its own toolchain (pnpm, Vite, Cargo). Bundling both in
+one repo meant carrying ~3 GB of Rust build artifacts and ~500 MB of
+node_modules in every clone. Splitting them keeps the Python repo lean
+(under 30 MB) without giving up the GUI roadmap.
+
+## What lives here now
+
+The Forge engine surfaces every Studio capability as a CLI verb or MCP
+tool:
+
+| What you wanted in Studio | How to get it from the engine |
 |---|---|
-| Rust / Cargo | 1.77 |
-| Node.js | 20 |
-| pnpm | 9 |
-| `forge` on PATH | 0.1.0 (`pip install atomadic-forge`) |
+| Architecture graph | `forge recon --json` (tier distributions + symbol map) |
+| Complexity heatmap | `forge certify --json` includes complexity scoring axis |
+| Debt counter | `forge wire --json` returns violations with severity |
+| Agent topology | `forge mcp serve` exposes `tools/list` + `resources/list` |
+| Live scoring | The Cloudflare badge Worker (separate repo) embeds the score |
 
-## Quick Start
-
-```bash
-cd forge-studio
-pnpm install
-pnpm tauri dev
-```
-
-## Golden Path Lane B Milestones
-
-| Week | Deliverable |
-|---|---|
-| W4 | Tauri scaffold + MCP stdio transport |
-| W5 | Project Scan Dashboard + Architecture Graph |
-| W6 | Complexity Heatmap + Real-Time Debt Counter |
-| W7 | Agent Topology Map |
-
-## Features
-
-**W5 Project Scan** — Drop folder → recon scan → tier distribution + symbol counts.
-Brittleness = 1 - (autofixable/total). Click tier bar → drill into file list.
-
-**W5 Architecture Graph** — Cytoscape.js renders 5 tiers. Edges = upward-only import law.
-Click node → filter scan dashboard.
-
-**W6 Complexity Heatmap** — complexipy per file, 0(green)→100(red). Graceful degradation:
-install notice when complexipy missing.
-
-**W6 Debt Counter** — CISQ: error=4, warn=2, info=1 × hourly_rate ($80 default).
-Polls wire every 5s; counter flashes green on violation drop.
-
-**W7 Agent Topology** — tools/list + resources/list on connect. Solid=tools, dashed=resources.
-Live edge pulse on hover.
-
-## MCP Transport
-
-stdio only (v0). Rust spawns `forge mcp serve --project-root <path>` via `std::process::Command`,
-performs initialize handshake, routes all tool calls through Tauri invoke bridge.
-Clear error when forge not on PATH.
-
-## State Management
-
-Zustand for UI/connection state + React Query for server-state caching.
-
-## Testing
-
-```bash
-pnpm test       # Vitest unit (no Tauri bridge)
-pnpm test:e2e   # Playwright smoke (requires pnpm dev)
-pnpm typecheck  # TypeScript strict
-```
-
-## Bundle Size
-
-<8 MB JS. Manual chunks: react, cytoscape, @tanstack/react-query.
+If you want the desktop UI specifically, clone
+`atomadic-forge-tauri-studio` and follow its README.

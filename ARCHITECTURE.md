@@ -33,14 +33,25 @@ nothing new.
 
 ```
 src/atomadic_forge/
-├── a0_qk_constants/        # tier_names, forge_types, lang_extensions, *_types.py
+├── a0_qk_constants/        # tier_names, forge_types, lang_extensions,
+│                            # auth_constants, recipe schemas, *_types.py
 ├── a1_at_functions/        # classify_tier, scout_walk, cherry_pick, wire_check,
 │                            # certify_checks, body_extractor, import_repair,
-│                            # js_parser, commandsmith_*, emergent_*, synergy_*
-├── a2_mo_composites/       # manifest_store
+│                            # js_parser, llm_client, provider_resolver,
+│                            # code_signature, intent_similarity,
+│                            # research_note_distiller, exported_api_check,
+│                            # trust_gate_response, recipes, mcp_protocol,
+│                            # commandsmith_*, emergent_*, synergy_*
+├── a2_mo_composites/       # manifest_store, plan_store, lineage_chain_store,
+│                            # receipt_signer, forge_auth_client,
+│                            # cost_circuit_breaker, hierarchical_memory,
+│                            # cross_agent_intent_deduplicator
 ├── a3_og_features/         # forge_pipeline (run_auto/run_recon/run_cherry/run_finalize),
 │                            # emergent_feature, synergy_feature, commandsmith_feature,
-│                            # demo_runner + demo_packages/ (static showcase presets)
+│                            # demo_runner + demo_packages/ (static showcase presets),
+│                            # mcp_server, lsp_server, setup_wizard,
+│                            # dedup_engine, agent_hire_protocol,
+│                            # forge_enforce, forge_evolve, forge_loop, forge_plan_apply
 ├── a4_sy_orchestration/    # cli.py — Typer app with `auto` flagship
 └── commands/               # Per-verb Typer modules (specialty surfaces)
 ```

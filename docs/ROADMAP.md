@@ -72,7 +72,8 @@ Multi-language + ecosystem:
 - Rust + Go first-class support
 - Plugin system: per-language tier classifiers, per-language wire scanners
 - Pypi-hosted release with the `forge` console script
-- VS Code extension that surfaces wire violations inline
+- VS Code extension (lives in `atomadic-forge-vscode-ext`) — surfaces
+  wire violations inline via the LSP server (`forge lsp serve`)
 - Forge runs on PR diffs (not whole repos) for CI speed
 - Multi-LLM ensemble (ask N providers in parallel, take the highest score)
 

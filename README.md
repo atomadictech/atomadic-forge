@@ -155,7 +155,7 @@ Each tier is a layer of **verified building blocks**. Higher tiers never invent 
 
 ```bash
 pip install atomadic-forge
-forge --version   # atomadic-forge 0.5.3
+forge --version   # atomadic-forge 0.6.0
 forge doctor      # environment check
 ```
 
@@ -224,19 +224,6 @@ keeps you running for 24 hours after the last successful verify.
 Without a key (or with a revoked one), `tools/call` returns the
 JSON-RPC error code `-32001` with `message="Forge subscription
 required"` and an `upgrade_url` pointing back to the dashboard.
-
-## Forge Studio — desktop GUI
-
-A native Tauri 2 + React desktop app that connects to your project via the MCP server:
-
-```bash
-cd forge-studio
-npm install
-npm run tauri dev    # development
-npm run tauri build  # native binary
-```
-
-**Panels:** Architecture Graph (5-tier Cytoscape) · Complexity Heatmap · Real-Time Debt Counter · Wire violations · Lineage log
 
 ## Code-from-intent (LLM-driven, with Forge as the architectural backbone)
 
@@ -420,7 +407,7 @@ Forge ships with named limits. No overpromise.
 | Product | What it is | Status |
 |---------|------------|--------|
 | **AAAA-Nexus** | Trust/safety/payments substrate for autonomous agents | Live at [atomadic.tech](https://atomadic.tech) |
-| **Atomadic Forge** | Absorb-and-emerge engine for developers (this repo) | **0.5.3** — on PyPI, 937 tests, 100/100, 23-tool MCP server, desktop GUI |
+| **Atomadic Forge** | Absorb-and-emerge engine for developers (this repo) | **0.6.0** — on PyPI, 944 tests, 100/100, MCP server, multi-agent safeguards |
 | **Atomadic Assistant** | Sovereign AI assistant with cognitive loop on Cloudflare | In development |
 
 ## License
@@ -466,17 +453,20 @@ forge commandsmith smoke             # Smoke-test all 36+ registered verbs
 
 **Production-ready for architecture enforcement. Working, honest, self-eating.**
 
-- ✓ **841 tests** passing, 2 skipped
+- ✓ **944 tests** passing, 2 skipped
 - ✓ **100/100 certify** — forge scores itself on every CI run
 - ✓ **0 wire violations** — forge passes its own import-law scan
-- ✓ **On PyPI** — `pip install atomadic-forge`
-- ✓ **MCP server** — 23 tools, 5 resources; works with Cursor, Claude Code, Aider, Devin
-- ✓ **Desktop GUI** — Forge Studio (Tauri 2 + React)
+- ✓ **On PyPI** — `pip install atomadic-forge` (latest: v0.6.0)
+- ✓ **MCP server** — full tool surface; works with Cursor, Claude Code, Aider, Devin
+- ✓ **Multi-agent safeguards** — `cost_circuit_breaker`, `dedup_engine`, `agent_hire_protocol`, `hierarchical_memory` (MemGPT 4-tier)
+- ✓ **8 LLM providers** — auto, AAAA-Nexus, Anthropic, Gemini, OpenAI, OpenRouter, **Ling-2.6-1T (free 1T-param frontier)**, Ollama (local)
 - ✓ **Ed25519 signing** — `forge certify --local-sign`
 - ✓ **CycloneDX SBOM** — `forge sbom`
 - ✓ **Compliance mappings** — EU AI Act · NIST SR 11-7 · FDA PCCP · CMMC-AI
 - ✓ **Polyglot** — Python + JavaScript + TypeScript, same 5-tier law
-- ✓ **Cloudflare badge worker** — live certify score in any README
+- ✗ Desktop GUI — moved to its own repo (atomadic-forge-tauri-studio)
+- ✗ VS Code extension — moved to its own repo (atomadic-forge-vscode-ext)
+- ✗ Cloudflare badge Worker — moved to its own repo (atomadic-forge-cloudflare-workers)
 - ✗ Chain-of-custody notarization (future)
 - ✗ Rust / Go tier classification (roadmap)
 
