@@ -77,40 +77,53 @@ def check_documentation(root: Path) -> tuple[bool, dict]:
 def check_tests_present(root: Path) -> tuple[bool, dict]:
     """Return (ok, detail). Recognises Python AND JS/TS test conventions.
 
-    Counts:
-      Python  — ``tests/test_*.py`` or ``tests/*_test.py``
-      JS/TS   — ``tests/*.test.{js,mjs,jsx,ts,tsx}`` or ``*.spec.{js,…}``,
-                 plus the ``__tests__/`` directory convention.
+    Python conventions (any of):
+      - ``tests/test_*.py``
+      - ``tests/*_test.py``
+      - ``test/test_*.py`` / ``test/*_test.py`` (singular ``test/``)
+
+    JavaScript / TypeScript conventions (any of):
+      - ``tests/*.test.{js,mjs,jsx,cjs,ts,tsx}``
+      - ``tests/*.spec.{js,mjs,jsx,cjs,ts,tsx}``
+      - same patterns under ``test/`` (singular)
+      - same patterns under ``__tests__/`` (Jest convention)
+      - **colocated** ``*.test.{ts,tsx,js,…}`` / ``*.spec.{…}`` anywhere in
+        the source tree (Vitest / Jest / Bun colocated convention)
     """
+    js_exts = (".js", ".mjs", ".jsx", ".cjs", ".ts", ".tsx")
     py_tests: set[Path] = set()
     js_tests: set[Path] = set()
     seen_dirs: set[Path] = set()
-    for d in root.rglob("tests"):
-        if not d.is_dir():
-            continue
-        rel_parts = d.relative_to(root).parts
-        if _is_under_ignored(rel_parts):
-            continue
-        if d in seen_dirs:
-            continue
-        seen_dirs.add(d)
-        py_tests.update(
-            p for p in d.rglob("test_*.py")
-            if not _is_under_ignored(p.relative_to(root).parts)
-        )
-        py_tests.update(
-            p for p in d.rglob("*_test.py")
-            if not _is_under_ignored(p.relative_to(root).parts)
-        )
-        for ext in (".js", ".mjs", ".jsx", ".cjs", ".ts", ".tsx"):
-            js_tests.update(
-                p for p in d.rglob(f"*.test{ext}")
+
+    # Walk both `tests/` (plural) and `test/` (singular) — both are common.
+    for dir_name in ("tests", "test"):
+        for d in root.rglob(dir_name):
+            if not d.is_dir():
+                continue
+            rel_parts = d.relative_to(root).parts
+            if _is_under_ignored(rel_parts):
+                continue
+            if d in seen_dirs:
+                continue
+            seen_dirs.add(d)
+            py_tests.update(
+                p for p in d.rglob("test_*.py")
                 if not _is_under_ignored(p.relative_to(root).parts)
             )
-            js_tests.update(
-                p for p in d.rglob(f"*.spec{ext}")
+            py_tests.update(
+                p for p in d.rglob("*_test.py")
                 if not _is_under_ignored(p.relative_to(root).parts)
             )
+            for ext in js_exts:
+                js_tests.update(
+                    p for p in d.rglob(f"*.test{ext}")
+                    if not _is_under_ignored(p.relative_to(root).parts)
+                )
+                js_tests.update(
+                    p for p in d.rglob(f"*.spec{ext}")
+                    if not _is_under_ignored(p.relative_to(root).parts)
+                )
+
     # __tests__ convention (Jest etc.)
     for d in root.rglob("__tests__"):
         if not d.is_dir():
@@ -118,11 +131,25 @@ def check_tests_present(root: Path) -> tuple[bool, dict]:
         rel_parts = d.relative_to(root).parts
         if _is_under_ignored(rel_parts):
             continue
-        for ext in (".js", ".mjs", ".jsx", ".cjs", ".ts", ".tsx"):
+        for ext in js_exts:
             js_tests.update(
                 p for p in d.rglob(f"*{ext}")
                 if not _is_under_ignored(p.relative_to(root).parts)
             )
+
+    # Colocated tests — `*.test.{ts,…}` / `*.spec.{ts,…}` anywhere in the
+    # tree (Vitest / Jest / Bun convention: `src/foo.test.ts` next to
+    # `src/foo.ts`). Matters for Cloudflare Workers, Next.js apps, and
+    # other non-Python repos that don't centralise tests in `tests/`.
+    for ext in js_exts:
+        for pattern in (f"*.test{ext}", f"*.spec{ext}"):
+            for p in root.rglob(pattern):
+                if not p.is_file():
+                    continue
+                if _is_under_ignored(p.relative_to(root).parts):
+                    continue
+                js_tests.add(p)
+
     total = len(py_tests) + len(js_tests)
     return total > 0, {
         "test_files_found": total,
@@ -344,8 +371,14 @@ def certify(root: Path, *, project: str = "Atomadic project",
         issues.append("Documentation incomplete — add README.md or docs/*.md")
         recs.append("Run `forge auto` to scaffold a docs starter.")
     if not tests_ok:
-        issues.append("No test files under tests/")
-        recs.append("Add tests/test_*.py before claiming production-ready.")
+        issues.append(
+            "No test files found (tests/test_*.py / *.test.ts / *.spec.ts / __tests__/)."
+        )
+        recs.append(
+            "Add at least one test file before claiming production-ready: "
+            "Python `tests/test_*.py`, JS/TS `tests/*.test.ts` or "
+            "colocated `src/<file>.test.ts`."
+        )
     if not layout_ok:
         present_count = layout_d.get("tiers_present_count", 0)
         present_list = ", ".join(layout_d.get("tiers_present", [])) or "none"
@@ -453,8 +486,11 @@ def certify(root: Path, *, project: str = "Atomadic project",
             },
             "tests_present": {
                 "ok": tests_ok, "score_weight": 5,
-                "how_to_fix": ("Create tests/test_*.py with at least one test."
-                               if not tests_ok else None),
+                "how_to_fix": (
+                    "Add at least one test file. Python: tests/test_*.py. "
+                    "JS/TS: tests/*.test.ts (or colocated src/*.test.ts, "
+                    "or __tests__/*.ts)."
+                ) if not tests_ok else None,
             },
             "tier_layout": {
                 "ok": layout_ok, "score_weight": 10,
