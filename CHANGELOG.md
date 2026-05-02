@@ -1,9 +1,40 @@
 # Changelog
 
-## 0.6.0 - MCP quality-of-life: 3 bug fixes + agent-optimized certify
+## 0.6.0 - Frontier features: dedup, budget, memory, swarm hiring, Ling-2.6-1T
 
-Fixes three bugs discovered during live Forge MCP audit, plus new
-machine-readable certify fields and two new golden-path recipes.
+Major minor — five new capabilities cherry-picked from forge-deluxe-seed
+plus a frontier free-tier LLM, plus three MCP bug fixes and agent-optimized
+certify output.
+
+### Added — capabilities
+
+- **`dedup_engine`** — orchestrates `intent_similarity` + `code_signature`
+  + `research_note_distiller` to catch duplicate research notes AND
+  duplicate code logic at the gate. The "never reinvent the wheel"
+  primitive, ported with 13 tests.
+
+- **`cost_circuit_breaker`** — multi-tier (per-task / per-session /
+  per-day) USD + token budget with hard-kill, soft-warn-at-80%, and
+  no-progress stuck detection. Defaults match OpenHands
+  (MAX_ITERATIONS=100, $100/day). Closes the production-incident gap
+  ($47k loop, $30k loop) called out in cycle-14 SOTA research.
+
+- **`hierarchical_memory`** — 4-tier MemGPT pattern (M0 working /
+  M1 core pinned / M2 episodic / M3 reflection) with Park-2023
+  recency × importance × relevance scoring. Pure stdlib sqlite3 —
+  air-gappable.
+
+- **`agent_hire_protocol`** — 5-step swarm SOP (sealed-probe vetting
+  → trust gate → similarity check → contract → signed receipt) with
+  D_max=3 (ChatDev empirical limit) for safe multi-agent fanout.
+
+- **`ling` / `--provider ling`** — wires Ling-2.6-1T (1T-param MoE,
+  262K context, SOTA SWE-bench) via OpenRouter at the **free tier**.
+  Forge users now get a frontier model for iterate/evolve at zero
+  cost; OpenRouter default model also bumped from gemma-3-27b-it
+  to ling-2.6-1t.
+
+### Fixed
 
 ### Fixed
 
@@ -24,7 +55,7 @@ machine-readable certify fields and two new golden-path recipes.
   PASS regardless of score; now requires `score >= 75`. No-input plans
   (score defaults to 0.0) correctly return `FAIL`.
 
-### Added
+### Added — certify polish
 
 - `certify` output now includes `health_summary` (score + verdict +
   blockers + scan_duration_ms) — a single at-a-glance block for agent
@@ -47,6 +78,20 @@ machine-readable certify fields and two new golden-path recipes.
   reports `ran=false` or `pass_ratio=0` despite pytest passing locally:
   traces xfailed parse failure, wrong-package import filter, and import
   smoke failure paths.
+
+### Internal
+
+- CI Ruff lint debt cleared: 50 errors → 0 across recent merges
+  (I001/F401/UP037/UP006/UP035 auto-fixed; UP038/B006/E701/E702/F841
+  manually). Lint now blocks regressions instead of being permanently red.
+
+- Test count: 937 → 975 (+38) — every new capability shipped with
+  pinning tests; certify holds 100.0/100 across the lift.
+
+- README provider matrix updated: Anthropic default → `claude-sonnet-4-6`,
+  OpenAI default → `gpt-4o-mini` (with override hints), `ling` row added.
+
+- Live demo (`forge.atomadic.tech`) and invest links surfaced in README.
 
 ---
 
