@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.7.0 — Pricing v4 + Founder's Pack live
+
+Forge Standard's monetization layer goes live. Two-product roadmap (Standard
+mature + Deluxe in active development) is published; only Standard is sold
+today, Deluxe holds until its catalog has real exclusive tools.
+
+### Added
+
+- **Forge Standard tier ladder** — Free / Basic $19 / Dev $39 / Pro $99/user /
+  Enterprise (from $2,500/mo). Yearly billing saves 2 months.
+- **Atomadic Lifetime Founder** — $999 one-time, first 25 only. Lifetime Forge
+  Standard Pro + Lifetime AAAA-Nexus Pro + Lifetime Forge Deluxe (when launched)
+  + every future Atomadic product. Numbered master keys F001–F025.
+- **Prepaid call packs** — $25 / $100 / $500 / $2,500 with up to 50% bonus
+  credits for higher tiers; subscribers get an additional 25% off.
+- **x402 PAYMENT-REQUIRED** on `forge.atomadic.tech/mcp` — pay-per-call
+  pricing per tool class ($0.001 reads → $0.25 mutating).
+- **`forge-auth-worker`** — `checkout.session.completed` webhook now mints
+  numbered master keys for Founder's Pack purchases and credits buyers'
+  ledgers for credit-pack purchases.
+- **Site surfaces** — new `/pricing` page (5-tier ladder + Founder's Pack +
+  prepaid packs), `/subscribe` redirects to `/pricing`, `/account` shows
+  Founder badge + dual MCP config snippets (hosted HTTP + local stdio).
+- **`COMMERCIAL_LICENSE.md`** — explicit BSL→commercial conversion paths
+  for procurement teams.
+- **Plan type expansion** in `forge-auth-worker` — added v4 plan names
+  (`basic`, `dev`, `pro`) and `forge_founder_lifetime` to ForgePlan + the
+  KNOWN_PLANS allow-list. Legacy v1 plans (`starter`, `founding`,
+  `professional`, `enterprise`) remain valid for existing customers.
+
+### Status
+
+- Forge **Deluxe** subscription tier and `/deluxe/mcp` are *live but not
+  publicly listed* — endpoint works for Founder keys (alpha access), public
+  pricing page does not advertise it. Listing waits until Deluxe has 5+
+  exclusive tools beyond Standard.
+
 ## Unreleased
 
 ### Added

@@ -414,10 +414,31 @@ Forge ships with named limits. No overpromise.
 | **Atomadic Forge** | Absorb-and-emerge engine for developers (this repo) | **0.6.1** — on PyPI, 944 tests, 100/100, MCP server, multi-agent safeguards |
 | **Atomadic Assistant** | Sovereign AI assistant with cognitive loop on Cloudflare | In development |
 
+## Pricing
+
+Free for OSS / non-commercial. Paid hosted MCP at `forge.atomadic.tech/mcp` for
+production agents.
+
+| Tier | Monthly | What you get |
+|---|---|---|
+| **Free** | $0 | OSS, 25 calls/day, read-only tools |
+| **Basic** | $19 | All 22 tools, 5k calls/mo, signed receipts |
+| **Dev** | $39 | + custom recipes, 25k calls/mo, priority queue |
+| **Pro** | $99/user | + compliance attestations, AAAA-Nexus notarization, cross-repo telemetry |
+| **Enterprise** | from $2.5k | BSL commercial license, SSO, self-host, SLA |
+
+**👑 Atomadic Lifetime Founder — $999 — first 25 only.** One key. Forever. Lifetime
+Forge Standard Pro + Forge Deluxe (when launched) + AAAA-Nexus + every future
+Atomadic product. See [forge.atomadic.tech/pricing](https://forge.atomadic.tech/pricing).
+
+Pay-per-call (x402) and prepaid call packs ($25 / $100 / $500 / $2,500) are also
+available on the hosted MCP.
+
 ## License
 
 [Business Source License 1.1](LICENSE). Free for non-production use.
-Commercial license required for production. Change Date: 2030-04-27 →
+Commercial license required for production — see
+[COMMERCIAL_LICENSE.md](COMMERCIAL_LICENSE.md). Change Date: 2030-04-27 →
 Apache 2.0.
 
 ## Documentation
