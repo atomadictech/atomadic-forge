@@ -12,9 +12,13 @@ from atomadic_forge.a1_at_functions.synergy_render import render_synergy_adapter
 
 
 def _card(**overrides) -> FeatureSurfaceCard:
+    name = overrides.get("name", "x")
     base: FeatureSurfaceCard = FeatureSurfaceCard(
-        name=overrides.get("name", "x"),
-        module=overrides.get("module", "pkg.x"),
+        name=name,
+        # Default module to name-derived path so distinct cards in the same
+        # test live in distinct modules (synergy_detect skips same-module
+        # pairs as colocation, not synergy).
+        module=overrides.get("module", f"pkg.{name}"),
         help_text=overrides.get("help_text", ""),
         inputs=overrides.get("inputs", []),
         input_files=overrides.get("input_files", []),

@@ -17,7 +17,7 @@ from ..a0_qk_constants.synergy_types import (
 )
 from ..a1_at_functions.synergy_detect import detect_synergies
 from ..a1_at_functions.synergy_render import render_synergy_adapter
-from ..a1_at_functions.synergy_surface_extract import harvest_feature_surfaces
+from ..a1_at_functions.synergy_surface_extract import harvest_multilevel_surfaces
 
 
 class SynergyScan:
@@ -31,7 +31,7 @@ class SynergyScan:
     @property
     def features(self) -> list:
         if self._features is None:
-            self._features = harvest_feature_surfaces(self.src_root, self.package)
+            self._features = harvest_multilevel_surfaces(self.src_root, self.package)
         return self._features
 
     def scan(self, *, top_n: int = 25) -> SynergyScanReport:

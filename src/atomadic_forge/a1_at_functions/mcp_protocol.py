@@ -48,6 +48,7 @@ from .agent_summary import summarize_blockers
 from .certify_checks import certify
 from .lineage_chain import canonical_receipt_hash, verify_chain_link
 from .lineage_reader import list_artifacts, read_lineage
+from .manifest_diff import diff_manifests as _diff_manifests
 from .patch_scorer import score_patch as _score_patch
 from .plan_adapter import adapt_plan as _adapt_plan
 from .policy_loader import load_policy as _load_policy
@@ -56,6 +57,9 @@ from .receipt_emitter import build_receipt
 from .recipes import all_recipes, get_recipe, list_recipes
 from .repo_explainer import explain_repo as _explain_repo
 from .scout_walk import harvest_repo
+from .sidecar_parser import find_sidecar_for as _find_sidecar_for
+from .sidecar_parser import parse_sidecar_file as _parse_sidecar_file
+from .sidecar_validator import validate_sidecar as _validate_sidecar
 from .test_selector import select_tests as _select_tests
 from .tool_composer import compose_tools as _compose_tools
 from .wire_check import scan_violations
@@ -450,6 +454,177 @@ def register_auto_step_handler(handler: ToolHandler) -> None:
 def register_auto_apply_handler(handler: ToolHandler) -> None:
     global _auto_apply_handler
     _auto_apply_handler = handler
+
+
+def _tool_emergent_scan_unbound(project_root: Path,
+                                 args: dict[str, Any]) -> dict[str, Any]:
+    """emergent_scan stub — a3 binds the real EmergentScan at import time via
+    ``register_emergent_scan_handler``.  Same a1↔a3 injection pattern used by
+    enforce, auto_plan, auto_step, and auto_apply."""
+    return {
+        "schema_version": "atomadic-forge.emergent.scan/v1",
+        "wired": False,
+        "note": (
+            "emergent_scan not yet wired — import "
+            "atomadic_forge.a3_og_features.mcp_server (or any code "
+            "under a3) to register the real handler."
+        ),
+    }
+
+
+def _tool_synergy_scan_unbound(project_root: Path,
+                                args: dict[str, Any]) -> dict[str, Any]:
+    """synergy_scan stub — same pattern as emergent_scan."""
+    return {
+        "schema_version": "atomadic-forge.synergy.scan/v1",
+        "wired": False,
+        "note": (
+            "synergy_scan not yet wired — import "
+            "atomadic_forge.a3_og_features.mcp_server (or any code "
+            "under a3) to register the real handler."
+        ),
+    }
+
+
+_emergent_scan_handler: ToolHandler = _tool_emergent_scan_unbound
+_synergy_scan_handler: ToolHandler = _tool_synergy_scan_unbound
+
+
+def _tool_emergent_scan(project_root: Path,
+                         args: dict[str, Any]) -> dict[str, Any]:
+    return _emergent_scan_handler(project_root, args)
+
+
+def _tool_synergy_scan(project_root: Path,
+                        args: dict[str, Any]) -> dict[str, Any]:
+    return _synergy_scan_handler(project_root, args)
+
+
+def _tool_doctor(project_root: Path, args: dict[str, Any]) -> dict[str, Any]:
+    """Environment diagnostic — Forge version, Python info, optional deps.
+
+    Same data the `forge doctor` CLI verb prints, returned as JSON. Useful
+    as the first call after `initialize` to confirm the runtime is healthy
+    and to discover which optional dependencies (`complexipy`,
+    `cryptography`, `tomli`) are wired in.
+    """
+    import importlib
+
+    def _check(dep: str) -> str:
+        try:
+            importlib.import_module(dep)
+            return "ok"
+        except ImportError:
+            return "missing"
+
+    return {
+        "schema_version": "atomadic-forge.doctor/v1",
+        "atomadic_forge_version": __version__,
+        "python": sys.version.split()[0],
+        "executable": sys.executable,
+        "platform": sys.platform,
+        "stdout_encoding": getattr(sys.stdout, "encoding", "?"),
+        "optional_deps": {
+            "complexipy": _check("complexipy"),
+            "cryptography": _check("cryptography"),
+            "tomli": _check("tomli"),
+        },
+    }
+
+
+def _tool_sidecar_validate(project_root: Path,
+                            args: dict[str, Any]) -> dict[str, Any]:
+    """Cross-check a `.forge` sidecar against its source AST.
+
+    Looks for ``<source>.forge`` next to the source file. Reports drift
+    across S0000–S0007 finding classes. Pure: no exec, no LLM.
+    """
+    src_arg = args.get("source_file") or args.get("path")
+    if not src_arg:
+        return {"error": "missing 'source_file' argument"}
+    src_path = Path(str(src_arg))
+    if not src_path.is_absolute():
+        src_path = (project_root / src_path).resolve()
+    if not src_path.is_file():
+        return {"error": f"source_file not found: {src_path}"}
+    sidecar_path = _find_sidecar_for(src_path)
+    parse = _parse_sidecar_file(sidecar_path)
+    if parse["errors"]:
+        return {
+            "schema_version": "atomadic-forge.sidecar_validate/v1",
+            "verdict": "FAIL",
+            "sidecar_path": str(sidecar_path),
+            "parse_errors": parse["errors"],
+            "findings": [],
+        }
+    try:
+        source_text = src_path.read_text(encoding="utf-8")
+    except OSError as exc:
+        return {"error": f"could not read {src_path}: {exc}"}
+    rep = _validate_sidecar(
+        parse["sidecar"], source_text=source_text, source_path=src_path,
+    )
+    return {
+        "schema_version": "atomadic-forge.sidecar_validate/v1",
+        "source_file": str(src_path),
+        "sidecar_path": str(sidecar_path),
+        **rep,
+    }
+
+
+def _tool_manifest_diff(project_root: Path,
+                         args: dict[str, Any]) -> dict[str, Any]:
+    """Schema-aware diff between two Forge manifests.
+
+    Accepts either inline dicts (``left`` / ``right``) or filesystem paths
+    (``left_path`` / ``right_path``) to JSON manifests. Reports added /
+    removed / moved symbols, tier-distribution deltas, effect-distribution
+    deltas, and certify-score deltas.
+    """
+    def _resolve(side: str) -> tuple[dict | None, str | None]:
+        inline = args.get(side)
+        if isinstance(inline, dict) and inline:
+            return inline, None
+        path_key = f"{side}_path"
+        path_arg = args.get(path_key)
+        if not path_arg:
+            return None, f"missing '{side}' or '{path_key}'"
+        p = Path(str(path_arg))
+        if not p.is_absolute():
+            p = (project_root / p).resolve()
+        if not p.is_file():
+            return None, f"{path_key} not found: {p}"
+        try:
+            return json.loads(p.read_text(encoding="utf-8")), None
+        except (OSError, json.JSONDecodeError) as exc:
+            return None, f"could not parse {p}: {exc}"
+
+    left, lerr = _resolve("left")
+    if lerr:
+        return {"error": lerr}
+    right, rerr = _resolve("right")
+    if rerr:
+        return {"error": rerr}
+    try:
+        delta = _diff_manifests(left, right)
+    except ValueError as exc:
+        return {"error": str(exc)}
+    return {
+        "schema_version": "atomadic-forge.manifest_diff/v1",
+        **delta,
+    }
+
+
+def register_emergent_scan_handler(handler: ToolHandler) -> None:
+    """Bind the real EmergentScan-backed handler from a3."""
+    global _emergent_scan_handler
+    _emergent_scan_handler = handler
+
+
+def register_synergy_scan_handler(handler: ToolHandler) -> None:
+    """Bind the real SynergyScan-backed handler from a3."""
+    global _synergy_scan_handler
+    _synergy_scan_handler = handler
 
 
 TOOLS: dict[str, dict[str, Any]] = {
@@ -947,6 +1122,161 @@ TOOLS: dict[str, dict[str, Any]] = {
         },
         "handler": _tool_exported_api_check,
     },
+    "emergent_scan": {
+        "name": "emergent_scan",
+        "description": (
+            "Discover novel function/composite compositions across all tiers. "
+            "Walks a0/a1/a2/a3 symbols and finds type-compatible chains where "
+            "the output of one symbol feeds the input of another — surfacing "
+            "capabilities that don't exist yet as a3 features. Scored on: "
+            "domain-crossing (+12 each), tier-spanning (+8 each), gap bonus "
+            "(+20 when the domain pair has no existing a3 feature), specificity "
+            "(+5 per typed bridge), and novel composition (+10 when all symbols "
+            "come from distinct modules). Primitive and Any seeds are filtered "
+            "to keep results domain-specific and actionable."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "project_root": {
+                    "type": "string",
+                    "description": "Repo root; defaults to the server's project_root.",
+                },
+                "package": {
+                    "type": "string",
+                    "default": "atomadic_forge",
+                    "description": "Python package name to scan.",
+                },
+                "top_n": {
+                    "type": "integer",
+                    "default": 25,
+                    "description": "Number of top candidates to return.",
+                },
+                "max_depth": {
+                    "type": "integer",
+                    "default": 3,
+                    "description": "Maximum chain length.",
+                },
+            },
+            "additionalProperties": False,
+        },
+        "handler": _tool_emergent_scan,
+    },
+    "synergy_scan": {
+        "name": "synergy_scan",
+        "description": (
+            "Discover feature-level synergies across CLI verbs, a3 features, "
+            "and a2 composites. Eight detection signals: json_artifact (file "
+            "handoff), in_memory_pipe (vocab overlap), shared_schema (same "
+            "schema string), shared_vocabulary (Jaccard ≥ 0.4), phase_omission "
+            "(unwired phase chain), feedback_loop (certify↔materialize iterate "
+            "cycle), type_pipeline (named-type direct in-memory pipe), and "
+            "data_flow_gap (same specific type in different tiers, no adapter). "
+            "Returns ranked SynergyCandidateCards; call 'forge synergy implement "
+            "<id>' to materialise the top candidate as a commands/ adapter."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "project_root": {
+                    "type": "string",
+                    "description": "Repo root; defaults to the server's project_root.",
+                },
+                "package": {
+                    "type": "string",
+                    "default": "atomadic_forge",
+                    "description": "Python package name to scan.",
+                },
+                "top_n": {
+                    "type": "integer",
+                    "default": 25,
+                    "description": "Number of top candidates to return.",
+                },
+            },
+            "additionalProperties": False,
+        },
+        "handler": _tool_synergy_scan,
+    },
+    "doctor": {
+        "name": "doctor",
+        "description": (
+            "Environment diagnostic — Forge version, Python info, "
+            "platform, stdout encoding, and optional dependency status "
+            "(complexipy, cryptography, tomli). Useful as the first "
+            "call after `initialize` to confirm the runtime is healthy."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False,
+        },
+        "handler": _tool_doctor,
+    },
+    "sidecar_validate": {
+        "name": "sidecar_validate",
+        "description": (
+            "Cross-check a `.forge` sidecar declaration against its "
+            "source AST. Pure: parses both inputs, no exec, no LLM. "
+            "Reports drift across S0000–S0007 finding classes — "
+            "missing/extra symbols, purity violations, tier mismatches."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "source_file": {
+                    "type": "string",
+                    "description": (
+                        "Path to the source file (relative to "
+                        "project_root or absolute). The matching "
+                        "<source>.forge sidecar is auto-located."
+                    ),
+                },
+            },
+            "required": ["source_file"],
+            "additionalProperties": False,
+        },
+        "handler": _tool_sidecar_validate,
+    },
+    "manifest_diff": {
+        "name": "manifest_diff",
+        "description": (
+            "Schema-aware diff between two Forge manifests "
+            "(scout.json / certify.json / wire.json). Reports added / "
+            "removed / moved symbols, tier-distribution deltas, "
+            "effect-distribution deltas, and certify-score deltas with "
+            "component breakdown. Use to compare baseline vs head in "
+            "PR review or to track repo trajectory across runs."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "left": {
+                    "type": "object",
+                    "description": (
+                        "Inline left manifest dict. Mutually exclusive "
+                        "with `left_path`."
+                    ),
+                },
+                "left_path": {
+                    "type": "string",
+                    "description": "Path to the left manifest JSON file.",
+                },
+                "right": {
+                    "type": "object",
+                    "description": (
+                        "Inline right manifest dict. Mutually "
+                        "exclusive with `right_path`."
+                    ),
+                },
+                "right_path": {
+                    "type": "string",
+                    "description": "Path to the right manifest JSON file.",
+                },
+            },
+            "additionalProperties": False,
+        },
+        "handler": _tool_manifest_diff,
+    },
 }
 
 _CLI_FALLBACKS: dict[str, str] = {
@@ -977,6 +1307,11 @@ _CLI_FALLBACKS: dict[str, str] = {
     "worktree_status": "forge worktree status <project-root> --json",
     "trust_gate_response": "MCP-only: trust_gate_response",
     "exported_api_check": "MCP-only: exported_api_check",
+    "emergent_scan": "forge emergent scan <repo> --json",
+    "synergy_scan": "forge synergy scan <repo> --json",
+    "doctor": "forge doctor --json",
+    "sidecar_validate": "forge sidecar validate <source-file> --json",
+    "manifest_diff": "forge diff <left-manifest> <right-manifest> --json",
 }
 
 
@@ -1302,6 +1637,8 @@ __all__ = [
     "SERVER_NAME",
     "TOOLS",
     "dispatch_request",
+    "register_emergent_scan_handler",
+    "register_synergy_scan_handler",
     # Lane B Studio's Topology Map renders against these helpers.
     "canonical_receipt_hash",
     "verify_chain_link",

@@ -37,7 +37,7 @@ from ..a0_qk_constants.emergent_types import (
 
 _STOP_WORDS = frozenset({
     "feature", "pipeline", "engine", "runner", "service",
-    "integration", "cmd", "feature", "tool", "gate",
+    "integration", "cmd", "tool", "gate",
 })
 
 

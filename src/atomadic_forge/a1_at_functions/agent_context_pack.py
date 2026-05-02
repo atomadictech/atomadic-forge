@@ -37,12 +37,85 @@ _TIER_LAW = (
     "F0040–F0049."
 )
 
+# Machine-readable agent workflow protocol — embedded in every context pack.
+# Agents must follow these phases; MCP clients can branch on specific keys.
+_AGENT_WORKFLOW = {
+    "protocol": "atomadic-forge.agent_workflow/v1",
+    "summary": (
+        "Every Forge agent session follows four phases: orient → preflight → "
+        "edit → end-of-cycle. Use the tools listed in each phase. Never skip "
+        "preflight_change before editing or certify at end-of-cycle."
+    ),
+    "phases": {
+        "1_orient": {
+            "description": "Run once at session start to ground the agent.",
+            "required_tools": ["context_pack"],
+            "recommended_tools": ["wire", "audit_list"],
+            "notes": [
+                "Call context_pack first — always.",
+                "If wire reports violations, fix them before feature work.",
+            ],
+        },
+        "2_preflight": {
+            "description": "Run before every file edit.",
+            "required_tools": ["preflight_change", "select_tests"],
+            "notes": [
+                "preflight_change validates tier placement and forbidden imports.",
+                "select_tests returns the minimum test set to run after the edit.",
+                "Do NOT edit files that preflight flags as write_scope_too_broad.",
+            ],
+        },
+        "3_edit": {
+            "description": "Apply the bounded edit, then validate immediately.",
+            "required_tools": ["wire", "select_tests"],
+            "recommended_tools": ["score_patch"],
+            "naming_conventions": {
+                "a0_qk_constants": ["*_config.py", "*_constants.py", "*_types.py", "*_enums.py"],
+                "a1_at_functions": [
+                    "*_utils.py", "*_helpers.py", "*_validators.py", "*_parsers.py",
+                    "*_functions.py", "*_compose.py", "*_rank.py", "*_render.py",
+                    "*_extract.py", "*_detect.py", "*_check.py", "*_protocol.py",
+                ],
+                "a2_mo_composites": ["*_client.py", "*_core.py", "*_store.py", "*_registry.py"],
+                "a3_og_features": ["*_feature.py", "*_service.py", "*_pipeline.py", "*_gate.py"],
+                "a4_sy_orchestration": ["*_cmd.py", "*_cli.py", "*_runner.py", "*_main.py"],
+            },
+            "notes": [
+                "New files MUST follow the naming convention for their tier.",
+                "One responsibility per file — split if it grows large.",
+                "After every edit: run wire to confirm no upward imports.",
+                "Run select_tests minimum set; if any fail, fix before proceeding.",
+            ],
+        },
+        "4_end_of_cycle": {
+            "description": "Run at the end of a feature dev cycle before closing the session.",
+            "required_tools": ["certify"],
+            "recommended_tools": ["emergent_scan", "synergy_scan", "wire"],
+            "gate": "certify score must be ≥ 75 to consider the cycle complete.",
+            "notes": [
+                "emergent_scan finds novel a1/a2 compositions to materialise as a3 features.",
+                "synergy_scan finds feature-pair gaps across CLI, a3, and a2.",
+                "certify is the PASS/FAIL gate — do not close the session with score < 75.",
+                "If certify < 75, run auto_plan to get ranked repair cards.",
+            ],
+        },
+    },
+    "never_do": [
+        "Import upward (a0 from a1, a1 from a2, etc.) — wire will flag F004x.",
+        "Put logic at a4 that belongs in a1 — CLI wrappers are thin by design.",
+        "Duplicate a building block that already exists in a lower tier.",
+        "Close the session without running certify.",
+        "Skip preflight_change before editing more than 3 files.",
+    ],
+}
+
 
 class ContextPack(TypedDict, total=False):
     schema_version: str
     project_root: str
     repo_purpose: str
     architecture_law: str
+    agent_workflow: dict           # Machine-readable 4-phase workflow protocol
     tier_map: dict[str, int]
     primary_language: str
     blockers_summary: dict
@@ -341,6 +414,7 @@ def emit_context_pack(
         project_root=str(project_root),
         repo_purpose=_read_repo_purpose(project_root),
         architecture_law=_TIER_LAW,
+        agent_workflow=_AGENT_WORKFLOW,
         tier_map=dict(tier_map),
         primary_language=primary_language,
         blockers_summary=blockers,

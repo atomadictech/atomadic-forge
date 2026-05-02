@@ -93,6 +93,39 @@ _RECIPES: dict[str, dict] = {
             {"tool": "certify", "why": "final repo confidence gate"},
         ],
     },
+    "dev_cycle": {
+        "match": (
+            "dev cycle", "dev workflow", "full cycle", "agent workflow",
+            "start work", "begin session", "end session", "close session",
+            "dev_cycle", "agent_workflow", "naming check", "cna",
+        ),
+        "steps": [
+            # Phase 1 — Orient
+            {"tool": "context_pack",
+              "why": "Phase 1 — ground the agent: repo purpose, tier law, workflow protocol"},
+            {"tool": "wire",
+              "why": "Phase 1 — confirm zero tier violations before starting"},
+            {"tool": "audit_list",
+              "why": "Phase 1 — see what Forge has already written in this repo"},
+            # Phase 2 — Preflight (before editing)
+            {"tool": "preflight_change",
+              "why": "Phase 2 — validate tier placement + forbidden imports for planned files"},
+            {"tool": "select_tests",
+              "why": "Phase 2 — know which tests to run after the edit"},
+            # Phase 3 — Post-edit validation
+            {"tool": "wire",
+              "why": "Phase 3 — verify no upward imports were introduced"},
+            {"tool": "score_patch",
+              "why": "Phase 3 — risk-score the diff before it lands"},
+            # Phase 4 — End-of-cycle
+            {"tool": "emergent_scan",
+              "why": "Phase 4 — discover novel compositions to materialise as a3 features"},
+            {"tool": "synergy_scan",
+              "why": "Phase 4 — find feature-pair gaps across CLI/a3/a2"},
+            {"tool": "certify",
+              "why": "Phase 4 — final PASS/FAIL gate (must be ≥ 75 to close cycle)"},
+        ],
+    },
 }
 
 

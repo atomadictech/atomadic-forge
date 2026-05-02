@@ -208,6 +208,94 @@ _RECIPES: dict[str, GoldenRecipe] = {
             "broke the match. Fix: 5 independent per-metric regexes.",
         ],
     ),
+    "dev_cycle": GoldenRecipe(
+        schema_version=SCHEMA_VERSION_RECIPE_V1,
+        name="dev_cycle",
+        description=(
+            "Complete agent development cycle: orient → preflight → edit → "
+            "validate → end-of-cycle scan. Enforces monadic tier law, "
+            "CNA naming conventions, and closes with emergent/synergy/certify."
+        ),
+        checklist=[
+            # ── Phase 1: Orient ──────────────────────────────────────────────
+            "PHASE 1 — ORIENT: call context_pack first (always).",
+            "Run wire to confirm zero tier violations before starting.",
+            "Check audit_list to see what Forge has already written.",
+            # ── Phase 2: Preflight ───────────────────────────────────────────
+            "PHASE 2 — PREFLIGHT: before every file edit, call preflight_change "
+            "with intent + proposed_files. Abort if write_scope_too_broad=True.",
+            "Call select_tests to know which tests to run after the edit.",
+            # ── Phase 3: Edit ────────────────────────────────────────────────
+            "PHASE 3 — EDIT: apply the bounded change in the correct tier.",
+            "  a0 file? Use suffix: *_config/_constants/_types/_enums.",
+            "  a1 file? Use suffix: *_utils/_helpers/_validators/_parsers/_compose/_rank/_render.",
+            "  a2 file? Use suffix: *_client/_core/_store/_registry.",
+            "  a3 file? Use suffix: *_feature/_service/_pipeline/_gate.",
+            "  a4 file? Use suffix: *_cmd/_cli/_runner/_main.",
+            "After every edit: run wire + select_tests minimum set.",
+            "If any test fails, fix it before proceeding.",
+            # ── Phase 4: End of cycle ────────────────────────────────────────
+            "PHASE 4 — END OF CYCLE: run emergent_scan to find novel compositions.",
+            "Run synergy_scan to find feature-pair gaps.",
+            "Run certify — score must be ≥ 75 to close the cycle.",
+            "If certify < 75, run auto_plan for ranked repair cards.",
+        ],
+        file_scope_hints=[
+            "src/<pkg>/aN_*/<new_file>.py",
+            "tests/test_<feature>.py",
+        ],
+        validation_gate=[
+            "forge wire src/<pkg> --fail-on-violations",
+            "python -m pytest",
+            "forge certify . --fail-under 75",
+            "forge emergent scan . --json",
+            "forge synergy scan . --json",
+        ],
+        notes=[
+            "This recipe is the canonical agent dev cycle for Forge-shaped repos.",
+            "Agents that skip context_pack or preflight_change violate the protocol.",
+            "emergent_scan and synergy_scan surface new a3 features to implement next.",
+            "CNA = Convention Naming Adherence — file names must match their tier suffix.",
+        ],
+    ),
+    "naming_check": GoldenRecipe(
+        schema_version=SCHEMA_VERSION_RECIPE_V1,
+        name="naming_check",
+        description=(
+            "Audit every source file's name against the CNA (Convention Naming "
+            "Adherence) rules for its tier. Files that don't follow the convention "
+            "are flagged; rename them or move them to the correct tier."
+        ),
+        checklist=[
+            "Run forge wire src/<pkg> to get the tier map.",
+            "For each tier directory, check file suffixes:",
+            "  a0_qk_constants/ → must end in _config/_constants/_types/_enums.py",
+            "  a1_at_functions/ → must end in _utils/_helpers/_validators/_parsers/"
+            "_functions/_compose/_rank/_render/_extract/_detect/_check/_protocol.py",
+            "  a2_mo_composites/ → must end in _client/_core/_store/_registry.py",
+            "  a3_og_features/ → must end in _feature/_service/_pipeline/_gate.py",
+            "  a4_sy_orchestration/ → must end in _cmd/_cli/_runner/_main.py",
+            "Rename any file that violates the convention.",
+            "Re-run forge wire to confirm no side effects from the rename.",
+        ],
+        file_scope_hints=[
+            "src/<pkg>/a0_qk_constants/",
+            "src/<pkg>/a1_at_functions/",
+            "src/<pkg>/a2_mo_composites/",
+            "src/<pkg>/a3_og_features/",
+            "src/<pkg>/a4_sy_orchestration/",
+        ],
+        validation_gate=[
+            "forge wire src/<pkg>",
+            "python -m pytest",
+        ],
+        notes=[
+            "CNA enforcement is heuristic — __init__.py and _*.py private files "
+            "are exempt. The convention is about PUBLIC module interfaces.",
+            "Renaming a file in a4 requires updating the CLI entry-point name; "
+            "check pyproject.toml [project.scripts].",
+        ],
+    ),
     "publish_mcp": GoldenRecipe(
         schema_version=SCHEMA_VERSION_RECIPE_V1,
         name="publish_mcp",

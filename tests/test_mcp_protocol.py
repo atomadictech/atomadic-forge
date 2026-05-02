@@ -96,6 +96,10 @@ def test_tools_list_pinned(tmp_path):
         "list_recipes", "get_recipe", "worktree_status",
         # Backported from Forge Deluxe (cycles 13 + 15):
         "trust_gate_response", "exported_api_check",
+        # Composition / synergy discovery engines:
+        "emergent_scan", "synergy_scan",
+        # Operational tools (env diagnostic, sidecar drift, manifest diff):
+        "doctor", "sidecar_validate", "manifest_diff",
     }
     assert pinned == names == set(TOOLS.keys()), (
         f"tools/list drifted: returned {names}, expected {pinned}"

@@ -30,6 +30,9 @@ def render_synergy_adapter(card: SynergyCandidateCard) -> str:
         "phase_omission": _render_phase_omission,
         "shared_schema": _render_shared_schema,
         "shared_vocabulary": _render_phase_omission,  # treat like a soft chain
+        "feedback_loop": _render_feedback_loop,
+        "type_pipeline": _render_in_memory_pipe,      # same shape: in-process call
+        "data_flow_gap": _render_data_flow_gap,
     }
     return renderers.get(card["kind"], _render_json_artifact)(card)
 
@@ -246,6 +249,117 @@ def _render_shared_schema(card: SynergyCandidateCard) -> str:
         "            'schema_id': schema_id,",
         f"            'producer': {card['producer']!r},",
         f"            'consumer': {card['consumer']!r},",
+        "        }, indent=2))",
+        "",
+    ])
+    return "\n".join(body) + "\n"
+
+
+def _render_feedback_loop(card: SynergyCandidateCard) -> str:
+    """Certify-loop adapter: run producer → certifier → repeat until pass.
+
+    The loop runs up to ``--max-iter`` times (default 3).  On each iteration
+    the producer output is written to a temp file; the certifier reads it and
+    returns either a passing verdict (loop ends) or a failure verdict that is
+    fed back to the producer as a ``--feedback`` argument for refinement.
+    """
+    body = _header_lines(card)
+    body.extend([
+        "@app.callback(invoke_without_command=True)",
+        "def run(",
+        "    ctx: typer.Context,",
+        "    max_iter: Annotated[int, typer.Option('--max-iter',",
+        "        help='Maximum certify iterations.')] = 3,",
+        "    producer_args: Annotated[list[str] | None, typer.Option('--producer-args',",
+        "        help='Extra args forwarded to producer.')] = None,",
+        ") -> None:",
+        f'    """Iterate: {card["producer"]} → {card["consumer"]} → refine loop."""',
+        "    if ctx.invoked_subcommand is not None:",
+        "        return",
+        "    producer_args = (producer_args or '').split() if isinstance(producer_args, str) else (producer_args or [])",
+        "    import itertools",
+        "    last_rc = 0",
+        "    with tempfile.TemporaryDirectory(prefix='synergy-loop-') as tmp:",
+        "        artifact = Path(tmp) / 'iteration.json'",
+        "        feedback_arg: list[str] = []",
+        "        for iteration in itertools.islice(range(max_iter), max_iter):",
+        "            cmd_produce = [sys.executable, '-m',",
+        "                           'atomadic_forge.a4_sy_orchestration.unified_cli',",
+        f"                           {card['producer']!r}, '--json-out', str(artifact),",
+        "                           *producer_args, *feedback_arg]",
+        "            rc = subprocess.run(cmd_produce, capture_output=False).returncode",
+        "            if rc != 0:",
+        "                typer.secho(f'producer exited {rc} at iteration {iteration}',",
+        "                            fg='red', err=True)",
+        "                raise typer.Exit(rc)",
+        "            cmd_certify = [sys.executable, '-m',",
+        "                           'atomadic_forge.a4_sy_orchestration.unified_cli',",
+        f"                           {card['consumer']!r}, str(artifact)]",
+        "            result = subprocess.run(cmd_certify, capture_output=True, text=True)",
+        "            last_rc = result.returncode",
+        "            if last_rc == 0:",
+        "                typer.secho(f'certify PASSED at iteration {iteration}',",
+        "                            fg='green')",
+        "                break",
+        "            # Feed certifier stderr back as --feedback for next iteration",
+        "            feedback_arg = ['--feedback', result.stderr[:500]]",
+        "        typer.echo(json.dumps({",
+        f"            'synergy': {card['candidate_id']!r},",
+        f"            'producer': {card['producer']!r},",
+        f"            'consumer': {card['consumer']!r},",
+        "            'certify_rc': last_rc,",
+        "            'iterations': iteration + 1,",
+        "        }, indent=2))",
+        "",
+    ])
+    return "\n".join(body) + "\n"
+
+
+def _render_data_flow_gap(card: SynergyCandidateCard) -> str:
+    """Gap-bridge adapter: serialise A's typed output to JSON then pipe to B.
+
+    Unlike ``json_artifact`` (which uses CLI ``--json-out`` flags), this
+    adapter uses Python's ``json.dumps`` to serialise the shared typed object
+    and writes it to a temp file that B consumes as its first positional arg.
+    """
+    body = _header_lines(card)
+    body.extend([
+        "@app.callback(invoke_without_command=True)",
+        "def run(",
+        "    ctx: typer.Context,",
+        "    producer_args: Annotated[list[str] | None, typer.Argument(",
+        "        help='Args forwarded to the producer command.')] = None,",
+        ") -> None:",
+        f'    """Gap-bridge: {card["producer"]} typed output → {card["consumer"]}."""',
+        "    if ctx.invoked_subcommand is not None:",
+        "        return",
+        "    producer_args = producer_args or []",
+        "    with tempfile.TemporaryDirectory(prefix='synergy-gap-') as tmp:",
+        "        artifact = Path(tmp) / 'gap_payload.json'",
+        "        # Run producer; expect it to write a JSON-serialisable object.",
+        "        cmd_a = [sys.executable, '-m',",
+        "                 'atomadic_forge.a4_sy_orchestration.unified_cli',",
+        f"                 {card['producer']!r}, *producer_args,",
+        "                 '--json-out', str(artifact)]",
+        "        rc = subprocess.run(cmd_a, capture_output=False).returncode",
+        "        if rc != 0:",
+        "            typer.secho(f'producer exited {rc}', fg='red', err=True)",
+        "            raise typer.Exit(rc)",
+        "        if not artifact.exists():",
+        "            typer.secho('producer did not write expected artifact — check --json-out support',",
+        "                        fg='yellow', err=True)",
+        "            raise typer.Exit(2)",
+        "        cmd_b = [sys.executable, '-m',",
+        "                 'atomadic_forge.a4_sy_orchestration.unified_cli',",
+        f"                 {card['consumer']!r}, str(artifact)]",
+        "        rc = subprocess.run(cmd_b, capture_output=False).returncode",
+        "        if rc != 0:",
+        "            typer.secho(f'consumer exited {rc}', fg='red', err=True)",
+        "            raise typer.Exit(rc)",
+        "        typer.echo(json.dumps({",
+        f"            'synergy': {card['candidate_id']!r},",
+        f"            'gap_bridge': [{card['producer']!r}, {card['consumer']!r}],",
+        "            'artifact_bytes': artifact.stat().st_size,",
         "        }, indent=2))",
         "",
     ])

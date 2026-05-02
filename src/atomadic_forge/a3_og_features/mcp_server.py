@@ -51,10 +51,13 @@ from ..a1_at_functions.mcp_protocol import (
     register_auto_apply_handler,
     register_auto_plan_handler,
     register_auto_step_handler,
+    register_emergent_scan_handler,
     register_enforce_handler,
+    register_synergy_scan_handler,
 )
 from ..a2_mo_composites.forge_auth_client import ForgeAuthClient
 from ..a2_mo_composites.plan_store import PlanStore as _PlanStore
+from .emergent_feature import EmergentScan as _EmergentScan
 from .forge_enforce import run_enforce as _run_enforce
 from .forge_pipeline import run_auto_plan as _run_auto_plan
 from .forge_plan_apply import (
@@ -63,6 +66,7 @@ from .forge_plan_apply import (
 from .forge_plan_apply import (
     apply_card as _apply_card,
 )
+from .synergy_feature import SynergyScan as _SynergyScan
 
 
 def _bound_enforce(project_root, args):
@@ -123,10 +127,33 @@ def _bound_auto_apply(project_root, args):
     return _apply_all_applyable(project, plan, apply=apply)
 
 
+def _bound_emergent_scan(project_root, args):
+    """a3-side emergent_scan handler — wired into the a1 dispatcher."""
+    root = _Path(args.get("project_root", project_root)).resolve()
+    package = str(args.get("package", "atomadic_forge"))
+    top_n = int(args.get("top_n", 25))
+    max_depth = int(args.get("max_depth", 3))
+    scan = _EmergentScan(src_root=root, package=package)
+    report = scan.scan(top_n=top_n, max_depth=max_depth)
+    return dict(report)
+
+
+def _bound_synergy_scan(project_root, args):
+    """a3-side synergy_scan handler — wired into the a1 dispatcher."""
+    root = _Path(args.get("project_root", project_root)).resolve()
+    package = str(args.get("package", "atomadic_forge"))
+    top_n = int(args.get("top_n", 25))
+    scan = _SynergyScan(src_root=root, package=package)
+    report = scan.scan(top_n=top_n)
+    return dict(report)
+
+
 register_enforce_handler(_bound_enforce)
 register_auto_plan_handler(_bound_auto_plan)
 register_auto_step_handler(_bound_auto_step)
 register_auto_apply_handler(_bound_auto_apply)
+register_emergent_scan_handler(_bound_emergent_scan)
+register_synergy_scan_handler(_bound_synergy_scan)
 
 
 # ---- Lane C W5: subscription gate -------------------------------------
