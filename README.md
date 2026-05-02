@@ -10,6 +10,9 @@
 [![CI](https://github.com/atomadictech/atomadic-forge/actions/workflows/ci.yml/badge.svg)](https://github.com/atomadictech/atomadic-forge/actions/workflows/ci.yml)
 [![Forge certify](https://img.shields.io/badge/forge_certify-100%2F100-brightgreen)](docs/SHOWCASE.md)
 [![Product Hunt](https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1136405&theme=light&t=1777661664916)](https://www.producthunt.com/products/atomadic-forge-mcp-architecture-copilot)
+[![MCP Registry](https://img.shields.io/badge/MCP-Official_Registry-blue)](https://registry.modelcontextprotocol.io/)
+
+<!-- mcp-name: io.github.atomadictech/atomadic-forge -->
 
 > **Absorb. Enforce. Emerge.** The architecture substrate for AI-generated code — now polyglot (Python, JavaScript, TypeScript).
 
