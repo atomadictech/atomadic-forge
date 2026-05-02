@@ -279,7 +279,8 @@ def emit_agent_plan(
     score = float((certify_report or {}).get("score", 0.0))
     if wire_report and wire_report.get("verdict") == "PASS" and score >= 100:
         verdict = "PASS"
-    elif not cards:
+    elif not cards and score >= 75:
+        # No action cards AND score is acceptable -- genuinely passing.
         verdict = "PASS"
     else:
         verdict = "FAIL"

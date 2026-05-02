@@ -35,39 +35,37 @@ class TestRunReport(TypedDict):
     failure_excerpts: list[str]  # top-N failed test names + first lines of traceback
 
 
-_SUMMARY_RE = re.compile(
-    r"(?:(\d+)\s+failed)?,?\s*(?:(\d+)\s+passed)?,?\s*"
-    r"(?:(\d+)\s+error)?,?\s*(?:(\d+)\s+skipped)?",
-    re.IGNORECASE,
-)
-# Pytest's terminal summary line — matches both decorated and -q forms:
-#   "===== 3 passed, 1 failed in 0.42s ====="
-#   "1 passed in 0.03s"
-#   "2 failed, 3 passed in 1.12s"
-_FINAL_LINE_RE = re.compile(
-    r"=*\s*"
-    r"(?:(\d+)\s+failed)?,?\s*"
-    r"(?:(\d+)\s+passed)?,?\s*"
-    r"(?:(\d+)\s+error[s]?)?,?\s*"
-    r"(?:(\d+)\s+skipped)?\s*"
-    r"in\s+[\d.]+s",
-    re.IGNORECASE,
-)
+# Five independent per-metric patterns: each looks for its own keyword
+# followed by a space and a count.  A single "in X.Xs" anchor line is
+# required so we only match the final summary line, not progress dots.
+# This tolerates xfailed/xpassed/deselected words between the counts.
+_PYTEST_IN_RE      = re.compile(r"\bin\s+[\d.]+s", re.IGNORECASE)
+_PYTEST_FAILED_RE  = re.compile(r"(\d+)\s+failed",  re.IGNORECASE)
+_PYTEST_PASSED_RE  = re.compile(r"(\d+)\s+passed",  re.IGNORECASE)
+_PYTEST_ERROR_RE   = re.compile(r"(\d+)\s+error",   re.IGNORECASE)
+_PYTEST_SKIPPED_RE = re.compile(r"(\d+)\s+skipped", re.IGNORECASE)
 
 
 def _parse_pytest_summary(stdout: str) -> tuple[int, int, int, int]:
     """Return ``(passed, failed, errors, skipped)`` parsed from pytest stdout."""
     passed = failed = errors = skipped = 0
     for line in reversed(stdout.splitlines()):
-        m = _FINAL_LINE_RE.search(line)
+        if not _PYTEST_IN_RE.search(line):
+            continue
+        m = _PYTEST_FAILED_RE.search(line)
         if m:
-            failed = int(m.group(1) or 0)
-            passed = int(m.group(2) or 0)
-            errors = int(m.group(3) or 0)
-            skipped = int(m.group(4) or 0)
-            break
+            failed = int(m.group(1))
+        m = _PYTEST_PASSED_RE.search(line)
+        if m:
+            passed = int(m.group(1))
+        m = _PYTEST_ERROR_RE.search(line)
+        if m:
+            errors = int(m.group(1))
+        m = _PYTEST_SKIPPED_RE.search(line)
+        if m:
+            skipped = int(m.group(1))
+        break
     return passed, failed, errors, skipped
-
 
 def _extract_failure_excerpts(stdout: str, max_failures: int = 5) -> list[str]:
     """Pull the FAILED test ids + a short excerpt of each traceback."""

@@ -285,6 +285,7 @@ def check_changelog(root: Path) -> tuple[bool, dict]:
 
 def certify(root: Path, *, project: str = "Atomadic project",
             package: str | None = None) -> dict:
+    _scan_start = time.perf_counter()
     docs_ok, docs_d = check_documentation(root)
     tests_ok, tests_d = check_tests_present(root)
     layout_ok, layout_d = check_tier_layout(root, package)
@@ -358,12 +359,14 @@ def certify(root: Path, *, project: str = "Atomadic project",
                     "(or run `forge auto` to scaffold them).")
     if not wire_ok:
         issues.append(f"Upward-import violations: {wire_d['violation_count']}")
-        recs.append("Run `forge wire` to inspect violations, then move imports down-tier or split modules.")
+        recs.append("Run `forge wire` to inspect violations, then move imports "
+                    "down-tier or split modules.")
     if not no_stubs:
         issues.append(f"Stub bodies detected: {len(stub_findings)} "
                        "function(s) with `pass`/NotImplementedError/TODO")
         for f in stub_findings[:5]:
-            issues.append(f"  · {f['file']}:{f['lineno']} {f['qualname']} ({f['kind']})")
+            issues.append(f"  · {f['file']}:{f['lineno']} "
+                           f"{f['qualname']} ({f['kind']})")
         recs.append("Replace stub bodies with real implementations before shipping.")
     if smoke is not None and not importable:
         issues.append(f"Package fails to import: {smoke['error_kind']} — "
@@ -392,7 +395,7 @@ def certify(root: Path, *, project: str = "Atomadic project",
     #   docs / layout / wire     — 10 each   (30 max — structural axis)
     #   tests-present            —  5         (structural axis)
     #   importable runtime       — 25         (runtime axis)
-    #   tests-pass-ratio         — 30 max     (behavioural axis — rewards actual behaviour)
+    #   tests-pass-ratio         — 30 max     (behavioural axis)
     #   ci workflow              —  5         (operational axis)
     #   changelog/release notes  —  5         (operational axis)
     #   stub-body penalty        — up to 40 deducted
@@ -410,6 +413,9 @@ def certify(root: Path, *, project: str = "Atomadic project",
         + (5 if changelog_ok else 0)
     )
     score = max(0.0, float(structural + runtime + behavioral + operational) - stub_pen)
+    scan_duration_ms = int((time.perf_counter() - _scan_start) * 1000)
+    blockers = len([i for i in issues if not i.startswith("  ·")])
+    verdict = "PASS" if score >= 75 and blockers == 0 else "FAIL"
     return {
         "schema_version": "atomadic-forge.certify/v1",
         "project": project,
@@ -424,6 +430,12 @@ def certify(root: Path, *, project: str = "Atomadic project",
         "ci_workflow_present": ci_ok,
         "changelog_present": changelog_ok,
         "score": score,
+        "health_summary": {
+            "score": score,
+            "verdict": verdict,
+            "blockers": blockers,
+            "scan_duration_ms": scan_duration_ms,
+        },
         "score_components": {
             "structural":   structural,
             "runtime":      runtime,
@@ -433,6 +445,64 @@ def certify(root: Path, *, project: str = "Atomadic project",
         },
         "issues": issues,
         "recommendations": recs,
+        "axes": {
+            "documentation": {
+                "ok": docs_ok, "score_weight": 10,
+                "how_to_fix": ("Add README.md or docs/*.md files."
+                               if not docs_ok else None),
+            },
+            "tests_present": {
+                "ok": tests_ok, "score_weight": 5,
+                "how_to_fix": ("Create tests/test_*.py with at least one test."
+                               if not tests_ok else None),
+            },
+            "tier_layout": {
+                "ok": layout_ok, "score_weight": 10,
+                "how_to_fix": (
+                    "Add 3+ of a0_qk_constants/ a1_at_functions/ "
+                    "a2_mo_composites/ a3_og_features/ a4_sy_orchestration/."
+                ) if not layout_ok else None,
+            },
+            "wire_clean": {
+                "ok": wire_ok, "score_weight": 10,
+                "how_to_fix": (
+                    f"Fix {wire_d['violation_count']} upward import(s): "
+                    "run forge wire --suggest-repairs."
+                ) if not wire_ok else None,
+            },
+            "no_stubs": {
+                "ok": no_stubs, "score_weight": 0,
+                "how_to_fix": (
+                    f"Replace {len(stub_findings)} stub bodies "
+                    "(pass/NotImplementedError/TODO) with real code."
+                ) if not no_stubs else None,
+            },
+            "importable": {
+                "ok": importable, "score_weight": 25,
+                "how_to_fix": (
+                    (f"Fix import error: {smoke['error_kind']} — "
+                     f"{smoke['error_message']}"
+                     if smoke else "Package not importable.")
+                ) if not importable else None,
+            },
+            "tests_pass": {
+                "ok": test_pass_ratio == 1.0, "score_weight": 30,
+                "how_to_fix": (
+                    f"Fix {test_run['failed']} failing test(s)." if test_run
+                    else "Run pytest to diagnose."
+                ) if test_pass_ratio < 1.0 else None,
+            },
+            "ci_workflow": {
+                "ok": ci_ok, "score_weight": 5,
+                "how_to_fix": ("Add .github/workflows/ci.yml."
+                               if not ci_ok else None),
+            },
+            "changelog": {
+                "ok": changelog_ok, "score_weight": 5,
+                "how_to_fix": ("Add CHANGELOG.md (200+ bytes) at project root."
+                               if not changelog_ok else None),
+            },
+        },
         "detail": {"docs": docs_d, "tests": tests_d, "layout": layout_d,
                    "wire": wire_d,
                    "ci":  ci_d,

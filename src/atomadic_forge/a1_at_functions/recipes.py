@@ -141,6 +141,73 @@ _RECIPES: dict[str, GoldenRecipe] = {
             "forge certify . --fail-under 75",
         ],
     ),
+    "bump_version": GoldenRecipe(
+        schema_version=SCHEMA_VERSION_RECIPE_V1,
+        name="bump_version",
+        description=(
+            "Bump the package version in pyproject.toml, add a CHANGELOG "
+            "entry, and create a git tag."
+        ),
+        checklist=[
+            "Decide patch / minor / major bump (semver).",
+            "Edit version in pyproject.toml (and package.json if present).",
+            "Update __version__ in src/<pkg>/__init__.py.",
+            "Prepend a CHANGELOG.md entry under the new version.",
+            "Run forge certify . --fail-under 75.",
+            "Commit with message 'chore(release): v<version>'.",
+            "Tag: git tag v<version> && git push --tags.",
+        ],
+        file_scope_hints=[
+            "pyproject.toml",
+            "src/<pkg>/__init__.py",
+            "CHANGELOG.md",
+        ],
+        validation_gate=[
+            "python -m pytest",
+            "forge certify . --fail-under 75",
+            "forge wire src/<pkg> --fail-on-violations",
+        ],
+        notes=[
+            "If vscode-forge-extension/package.json exists, keep its "
+            "version field in sync — test_vscode_extension_manifest.py "
+            "asserts the versions match.",
+        ],
+    ),
+    "fix_test_detection": GoldenRecipe(
+        schema_version=SCHEMA_VERSION_RECIPE_V1,
+        name="fix_test_detection",
+        description=(
+            "Debug and fix when forge certify reports ran=False or "
+            "pass_ratio=0 despite pytest passing locally."
+        ),
+        checklist=[
+            "Run forge certify . --json and inspect "
+            "detail.test_run.ran + detail.test_run.pytest_summary.",
+            "Check for xfailed/xpassed in pytest output: the old "
+            "_FINAL_LINE_RE regex choked on unknown status words — "
+            "upgrade to the 5-independent-regex fix in test_runner.py.",
+            "Confirm PYTHONPATH includes src/ so imports resolve inside "
+            "subprocess.",
+            "Check that test files import the target package (package= "
+            "filter rejects unrelated tests).",
+            "Re-run forge certify after the fix to confirm "
+            "pass_ratio > 0.",
+        ],
+        file_scope_hints=[
+            "src/atomadic_forge/a1_at_functions/test_runner.py",
+        ],
+        validation_gate=[
+            "python -m pytest tests/test_test_runner.py",
+            "forge certify . --json | python -c "
+            "\"import sys,json; r=json.load(sys.stdin); "
+            "assert r['test_pass_ratio']>0,'still broken'\"",
+        ],
+        notes=[
+            "P1 bug (v0.6.0): _FINAL_LINE_RE was a single monolithic "
+            "pattern; xfailed/xpassed between 'passed' and 'in Xs' "
+            "broke the match. Fix: 5 independent per-metric regexes.",
+        ],
+    ),
     "publish_mcp": GoldenRecipe(
         schema_version=SCHEMA_VERSION_RECIPE_V1,
         name="publish_mcp",

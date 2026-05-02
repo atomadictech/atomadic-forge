@@ -79,7 +79,11 @@ ToolHandler = Callable[[Path, dict[str, Any]], dict[str, Any]]
 
 def _tool_recon(project_root: Path, args: dict[str, Any]) -> dict[str, Any]:
     target = Path(args.get("target", project_root)).resolve()
-    return harvest_repo(target)
+    verbose = bool(args.get("verbose", False))
+    report = harvest_repo(target)
+    if not verbose:
+        report = {k: v for k, v in report.items() if k != "symbols"}
+    return report
 
 
 def _tool_wire(project_root: Path, args: dict[str, Any]) -> dict[str, Any]:
