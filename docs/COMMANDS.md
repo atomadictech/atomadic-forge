@@ -1,6 +1,6 @@
 # Atomadic Forge — Command Reference
 
-All verbs available in the `forge` CLI as of 0.5.2.
+All verbs available in the `forge` CLI as of 0.5.3.
 
 ## Pipeline / absorption
 
@@ -419,7 +419,7 @@ Prints the installed Forge version and exits 0. Hardened in v0.3.0
 
 ```bash
 $ forge --version
-atomadic-forge 0.5.2
+atomadic-forge 0.5.3
 ```
 
 ### `.forge` sidecars — Lane D W8

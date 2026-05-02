@@ -31,7 +31,7 @@ your PATH:
 
 ```bash
 pip install atomadic-forge
-forge --version   # should print 0.3.0+
+forge --version   # should print 0.5.3+
 forge lsp serve   # should print "forge-lsp: ready" then wait
 ```
 

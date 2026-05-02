@@ -185,7 +185,7 @@ You now know enough to use Forge productively. For specific topics:
 - [tutorials/](tutorials/) — quickstart tutorials and the JS / TS path.
 - **[AGENTS_GUIDE.md](AGENTS_GUIDE.md)** — using Forge from a coding
   agent (Cursor / Claude Code / Aider / Devin / Copilot / Codex) via
-  the built-in MCP server. One config snippet, **21 tools**, 5
+  the built-in MCP server. One config snippet, **23 tools**, 5
   resources. The fastest way to put Forge in front of every PR your
   team's agents touch.
 - [MULTI_REPO.md](MULTI_REPO.md) — absorbing more than one repo at once.

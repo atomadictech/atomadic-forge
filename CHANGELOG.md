@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.5.3 - Documentation metadata sync
+
+Small follow-up to `0.5.2` so the published package description and
+current-facing docs no longer advertise stale `0.3.x` version strings,
+old test counts, or the pre-`0.5.2` MCP tool count.
+
+### Fixed
+
+- README install and contributor snippets now show the current Forge
+  version family and `937 passed, 2 skipped`.
+- Current ecosystem positioning now reflects the `0.5.3` PyPI line and
+  23-tool MCP surface.
+- First-run and VS Code extension docs now reference the current MCP
+  surface/version expectations.
+
+---
+
 ## 0.5.2 - Agent ergonomics and language-aware guidance
 
 Implements the first round of quality-of-life improvements from the

@@ -58,7 +58,7 @@ Or against the installed CLI:
 
 ```bash
 $ forge --version
-atomadic-forge 0.5.2
+atomadic-forge 0.5.3
 ```
 
 The `--version` flag (and `-V`) is the canonical "Forge is wired in
@@ -368,7 +368,7 @@ Forge's normative answer; only the *attestation chain* is missing.
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | Tools list returns 0 tools | MCP client didn't pass `--project .` | Check args in MCP config |
-| Tools list returns < 23 (e.g. 21 or 10) | Old `forge` install | `pip install -U atomadic-forge` (or `pip install -e .` from the repo). Pin `forge --version >= 0.5.2`. |
+| Tools list returns < 23 (e.g. 21 or 10) | Old `forge` install | `pip install -U atomadic-forge` (or `pip install -e .` from the repo). Pin `forge --version >= 0.5.3`. |
 | `wire` says PASS but agent still hits import errors | Agent is running tests in a different working directory | `--project` should match the test cwd |
 | `certify` returns score 90 instead of 100 | Project has no `.github/workflows/` and no `CHANGELOG.md` (operational axis is 0) | Add either; both are 5pts |
 | Receipt's `signatures` is null | `AAAA_NEXUS_API_KEY` not set, or AAAA-Nexus endpoint not yet shipped | Soft-fail behavior — Receipt is still valid for local use |
